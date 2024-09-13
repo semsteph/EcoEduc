@@ -1,14 +1,18 @@
 <template>
   <div>
-    <!-- Bouton pour ajouter une classe -->
-    <v-btn color="primary" @click="showForm = true">Ajouter Classe</v-btn>
-    
+    <!-- Boutons de gestion des classes -->
+    <div class="button-group">
+      <v-btn color="primary" @click="showForm = true" v-if="!showProgram">Ajouter Classe</v-btn>
+      <v-btn color="primary" @click="fetchClasses" v-if="!showProgram">Mes Classes</v-btn>
+      <v-btn @click="toggleProgram" :color="showProgram ? 'secondary' : 'primary'">
+        Programme
+      </v-btn>
+    </div>
+
     <!-- Formulaire pour ajouter une nouvelle classe -->
-    <v-card v-if="showForm" class="pa-4 mt-4">
+    <v-card v-if="showForm && !showProgram" class="pa-4 mt-4">
       <v-form @submit.prevent="submitForm">
         <v-text-field v-model="newClassName" label="Nom de la classe" required></v-text-field>
-        
-        <!-- Champ de sélection pour les promotions -->
         <v-select
           v-model="selectedPromotionId"
           :items="promotions"
@@ -17,7 +21,6 @@
           label="Promotion"
           required
         ></v-select>
-        
         <div class="d-flex justify-space-between mt-4">
           <v-btn color="primary" type="submit">Ajouter</v-btn>
           <v-btn @click="cancelForm">Annuler</v-btn>
@@ -25,64 +28,75 @@
       </v-form>
     </v-card>
 
-    <!-- Bouton pour afficher les classes -->
-    <v-btn color="primary" class="mt-4" @click="fetchClasses">Mes Classes</v-btn>
-
     <!-- Liste des classes par promotion -->
-    <div v-if="classesByPromotion && Object.keys(classesByPromotion).length > 0">
+    <div v-if="!showForm && !showProgram && classesByPromotion && Object.keys(classesByPromotion).length > 0">
       <div v-for="(classes, promotion) in classesByPromotion" :key="promotion">
-        <h3>{{ promotion }}</h3>
-        <v-card
-          v-for="classe in classes"
-          :key="classe.id"
-          class="mt-3"
-        >
+        <h3>Promotion: {{ promotion }}</h3>
+        <v-card v-for="classe in classes" :key="classe.id" class="mt-3">
           <v-card-title>
             {{ classe.name }} ({{ classe.studentCount }} élèves)
           </v-card-title>
           <v-card-actions>
             <v-btn @click="editClass(classe)">Modifier</v-btn>
-            <v-btn color="red" @click="deleteClass(classe.id)">Supprimer</v-btn>
+            <v-btn color="red" @click="confirmDeleteClass(classe.id)">Supprimer</v-btn>
           </v-card-actions>
         </v-card>
       </div>
     </div>
+
+    <!-- Affichage du composant enfant si showProgram est vrai -->
+    <Programme-cours v-if="showProgram" />
+
+    <!-- Snackbar pour afficher les messages -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color">
+      {{ snackbar.message }}
+      <v-btn color="white" text @click="snackbar.show = false">Fermer</v-btn>
+    </v-snackbar>
   </div>
 </template>
 
 <script>
-import axios from 'axios'; // Importation d'Axios
+import axios from 'axios';
+import ProgrammeCours from './ProgrammeCours.vue'; // Assurez-vous que le chemin est correct
 
 export default {
   name: 'ClassManagement',
+  components: { ProgrammeCours },
   data() {
     return {
       classesByPromotion: {},
       showForm: false,
       newClassName: '',
-      promotions: [], // Liste des promotions
-      selectedPromotionId: null, // ID de la promotion sélectionnée
-      editClassId: null, // ID de la classe à modifier
-    }
+      promotions: [],
+      selectedPromotionId: null,
+      editClassId: null,
+      snackbar: {
+        show: false,
+        message: '',
+        color: 'success'
+      },
+      showProgram: false
+    };
   },
   methods: {
     submitForm() {
       const url = this.editClassId
         ? `http://localhost:8080/api/Classes/${this.editClassId}`
         : 'http://localhost:8080/api/Classes';
-
       const method = this.editClassId ? 'put' : 'post';
-
+      
       axios[method](url, {
         nom: this.newClassName,
         promotion_id: this.selectedPromotionId
       })
-      .then(response => {
+      .then(() => {
         this.fetchClasses();
         this.cancelForm();
+        this.showSnackbar('Classe ajoutée/modifiée avec succès.', 'success');
       })
       .catch(error => {
         console.error('Erreur lors de l\'ajout/modification de la classe :', error.response ? error.response.data : error.message);
+        this.showSnackbar('Erreur lors de l\'ajout/modification de la classe.', 'error');
       });
     },
     fetchPromotions() {
@@ -97,14 +111,12 @@ export default {
     fetchClasses() {
       axios.get('http://localhost:8080/api/Classes')
         .then(response => {
-          this.classesByPromotion = response.data.reduce((acc, classe) => {
-            const promotionName = classe.promotion_nom;
-            if (!acc[promotionName]) {
-              acc[promotionName] = [];
-            }
-            acc[promotionName].push(classe);
-            return acc;
-          }, {});
+          const data = response.data;
+          if (typeof data === 'object') {
+            this.classesByPromotion = data;
+          } else {
+            console.error('Format de données inattendu.');
+          }
         })
         .catch(error => {
           console.error('Erreur lors de la récupération des classes :', error);
@@ -116,13 +128,19 @@ export default {
       this.editClassId = classe.id;
       this.showForm = true;
     },
+    confirmDeleteClass(classId) {
+      if (confirm('Êtes-vous sûr de vouloir supprimer cette classe ?')) {
+        this.deleteClass(classId);
+      }
+    },
     deleteClass(classId) {
       axios.delete(`http://localhost:8080/api/Classes/${classId}`)
-        .then(() => {
+        .then(response => {
           this.fetchClasses();
+          this.showSnackbar(response.data.message, 'success');
         })
         .catch(error => {
-          console.error('Erreur lors de la suppression de la classe :', error);
+          this.showSnackbar(error.response.data.error || 'Erreur lors de la suppression de la classe.', 'error');
         });
     },
     cancelForm() {
@@ -130,16 +148,36 @@ export default {
       this.selectedPromotionId = null;
       this.editClassId = null;
       this.showForm = false;
-    }
+    },
+    showSnackbar(message, color) {
+      this.snackbar.message = message;
+      this.snackbar.color = color;
+      this.snackbar.show = true;
+    },
+    toggleProgram() {
+      this.showProgram = !this.showProgram;
+      if (this.showProgram) {
+        this.showForm = false;
+      }
+    },
+      goBack() {
+        this.$emit('back');
+      },
+      navigateTo(route) {
+        this.$emit('navigate', route);
+      }
   },
   mounted() {
-    this.fetchPromotions(); // Charger les promotions lors du montage du composant
+    this.fetchPromotions();
   }
 }
 </script>
 
 <style scoped>
-/* Styles pour améliorer l'apparence du formulaire */
+.button-group {
+  margin-bottom: 16px;
+}
+
 .pa-4 {
   padding: 16px;
 }

@@ -1,12 +1,11 @@
 <template>
   <v-container>
-    <h1>Conduite de l'élève - {{ trimestre }}</h1>
+    <h1>Conduite de l'élève - {{ semestre }}</h1>
 
-    <!-- Boutons pour sélectionner les trimestres -->
-    <div class="trimestre-buttons">
-      <v-btn @click="trimestre = 'trimestre1'" :class="{'active': trimestre === 'trimestre1'}" class="trimestre1">Trimestre 1</v-btn>
-      <v-btn @click="trimestre = 'trimestre2'" :class="{'active': trimestre === 'trimestre2'}" class="trimestre2">Trimestre 2</v-btn>
-      <v-btn @click="trimestre = 'trimestre3'" :class="{'active': trimestre === 'trimestre3'}" class="trimestre3">Trimestre 3</v-btn>
+    <!-- Boutons pour sélectionner les semestres -->
+    <div class="semestre-buttons">
+      <v-btn @click="changerSemestre('semestre1')" :class="{'active': semestre === 'semestre1'}" class="semestre1">Semestre 1</v-btn>
+      <v-btn @click="changerSemestre('semestre2')" :class="{'active': semestre === 'semestre2'}" class="semestre2">Semestre 2</v-btn>
     </div>
 
     <!-- Tableau à double entrée -->
@@ -18,15 +17,17 @@
           <th>Heure</th>
           <th>Punition</th>
           <th>Motif</th>
+          <th>Somme d'heures</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="incident in incidentsParTrimestre" :key="incident.id">
+        <tr v-for="incident in incidents" :key="incident.id">
           <td>{{ incident.auteur }}</td>
           <td>{{ incident.date }}</td>
           <td>{{ incident.heure }}</td>
           <td>{{ incident.punition }}</td>
           <td>{{ incident.motif }}</td>
+          <td>{{ incident.total_hours }}</td> <!-- Utilisation de total_hours -->
         </tr>
       </tbody>
     </v-simple-table>
@@ -37,77 +38,76 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
+  props: {
+    childId: {
+      type: Number,
+      required: true,
+    },
+  },
   data() {
     return {
-      trimestre: 'trimestre1', // Trimestre par défaut
-      incidentsParTrimestre: {
-        trimestre1: [
-          // Exemple de données pour le Trimestre 1
-          {
-            id: 1,
-            auteur: 'Professeur Dupont',
-            date: '2024-08-01',
-            heure: '14:00',
-            punition: '2h de colle',
-            motif: 'Retard répété'
-          },
-          // Ajoutez plus de données
-        ],
-        trimestre2: [
-          // Exemple de données pour le Trimestre 2
-          {
-            id: 2,
-            auteur: 'Professeur Martin',
-            date: '2024-08-02',
-            heure: '09:00',
-            punition: '4h de colle',
-            motif: 'Absence injustifiée'
-          },
-          // Ajoutez plus de données
-        ],
-        trimestre3: [
-          // Exemple de données pour le Trimestre 3
-          {
-            id: 3,
-            auteur: 'Professeur Dupont',
-            date: '2024-09-15',
-            heure: '11:00',
-            punition: '1h de colle',
-            motif: 'Comportement inapproprié'
-          },
-          // Ajoutez plus de données
-        ]
-      }
+      semestre: 'semestre1', // Semestre par défaut
+      incidents: [], // Les incidents récupérés de l'API
     };
   },
-  computed: {
-    incidentsParTrimestre() {
-      return this.incidentsParTrimestre[this.trimestre] || [];
-    }
-  }
+  methods: {
+    changerSemestre(semestreSelectionne) {
+      this.semestre = semestreSelectionne;
+      this.fetchIncidents(this.childId); // Re-fetch incidents for the selected semester
+    },
+    async fetchIncidents(idEleve) {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          this.$router.push('/login');
+          return;
+        }
+
+        const response = await axios.get('http://localhost:8080/api/incidents', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: {
+            eleveId: idEleve,
+            semestre: this.semestre,
+          },
+        });
+
+        console.log(idEleve); // Pour déboguer
+        console.log(this.semestre); // Pour déboguer
+
+        this.incidents = response.data;
+      } catch (error) {
+        console.error('Erreur lors de la récupération des incidents :', error);
+        this.$router.push('/login');
+      }
+    },
+  },
+  mounted() {
+    this.fetchIncidents(this.childId); // Appel initial pour récupérer les incidents
+  },
 };
 </script>
 
 <style scoped>
-.trimestre-buttons {
+.semestre-buttons {
   margin-bottom: 20px;
 }
-.trimestre-buttons .v-btn {
+.semestre-buttons .v-btn {
   margin-right: 10px;
 }
-.trimestre-buttons .v-btn.active {
+.semestre-buttons .v-btn.active {
   color: white;
   font-weight: bold;
 }
-.trimestre1.active {
-  background-color: #007bff; /* Bleu pour Trimestre 1 */
+.semestre1.active {
+  background-color: #007bff; /* Bleu pour Semestre 1 */
 }
-.trimestre2.active {
-  background-color: #28a745; /* Vert pour Trimestre 2 */
-}
-.trimestre3.active {
-  background-color: #dc3545; /* Rouge pour Trimestre 3 */
+.semestre2.active {
+  background-color: #28a745; /* Vert pour Semestre 2 */
 }
 .tableau-conduite th, .tableau-conduite td {
   border: 1px solid #ddd; /* Bordures entre les cellules */

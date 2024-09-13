@@ -1,5 +1,8 @@
 <template>
   <div class="container">
+    <v-btn icon @click="$emit('back')">
+        <v-icon>mdi-arrow-left</v-icon>
+      </v-btn>
     <button @click="showForm = true" v-if="!showForm && !submitted">Inscrire un élève</button>
     
     <div class="form-container" v-if="showForm && !submitted">
@@ -93,8 +96,9 @@ export default {
   methods: {
     async fetchClasses() {
       try {
-        const response = await axios.get('http://localhost:8080/api/Classes');
+        const response = await axios.get('http://localhost:8080/api/classe');
         this.classes = response.data; // Stocker les classes dans le data
+        console.log(response.data);
       } catch (error) {
         console.error('Erreur lors de la récupération des classes :', error.response ? error.response.data : error.message);
       }

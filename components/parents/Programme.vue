@@ -1,13 +1,6 @@
 <template>
   <v-container>
-    <h1>Programme de l'élève - {{ trimestre }}</h1>
-
-    <!-- Boutons pour sélectionner les trimestres -->
-    <div class="trimestre-buttons">
-      <v-btn @click="trimestre = 'trimestre1'" :class="{'active': trimestre === 'trimestre1'}" class="trimestre1">Trimestre 1</v-btn>
-      <v-btn @click="trimestre = 'trimestre2'" :class="{'active': trimestre === 'trimestre2'}" class="trimestre2">Trimestre 2</v-btn>
-      <v-btn @click="trimestre = 'trimestre3'" :class="{'active': trimestre === 'trimestre3'}" class="trimestre3">Trimestre 3</v-btn>
-    </div>
+    <h1>Programme de l'élève</h1>
 
     <!-- Tableau à double entrée -->
     <v-simple-table class="tableau-programme">
@@ -36,98 +29,48 @@
 
 <script>
 export default {
-  data() {
-    return {
-      trimestre: 'trimestre1', // Trimestre par défaut
-      jours: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'],
-      matieres: ['Mathématiques', 'Français', 'Physique', 'Histoire'], // Liste des matières
-      horairesParTrimestre: {
-        trimestre1: {
-          'Lundi': {
-            'Mathématiques': ['08:00 - 10:00'],
-            'Français': ['10:00 - 12:00'],
-            'Physique': ['14:00 - 16:00'],
-            'Histoire': ['16:00 - 18:00']
-          },
-          'Mardi': {
-            'Mathématiques': ['08:00 - 10:00'],
-            'Français': ['10:00 - 12:00'],
-            'Physique': ['14:00 - 16:00'],
-            'Histoire': ['16:00 - 18:00']
-          },
-          // Ajoutez les horaires pour les autres jours
-        },
-        trimestre2: {
-          'Lundi': {
-            'Mathématiques': ['15:00 - 17:00'],
-            'Français': ['09:00 - 11:00'],
-            'Physique': ['13:00 - 15:00'],
-            'Histoire': ['11:00 - 13:00']
-          },
-          'Mardi': {
-            'Mathématiques': ['15:00 - 17:00'],
-            'Français': ['09:00 - 11:00'],
-            'Physique': ['13:00 - 15:00'],
-            'Histoire': ['11:00 - 13:00']
-          },
-          // Ajoutez les horaires pour les autres jours
-        },
-        trimestre3: {
-          'Lundi': {
-            'Mathématiques': ['10:00 - 12:00'],
-            'Français': ['12:00 - 14:00'],
-            'Physique': ['08:00 - 10:00'],
-            'Histoire': ['14:00 - 16:00']
-          },
-          'Mardi': {
-            'Mathématiques': ['10:00 - 12:00'],
-            'Français': ['12:00 - 14:00'],
-            'Physique': ['08:00 - 10:00'],
-            'Histoire': ['14:00 - 16:00']
-          },
-          // Ajoutez les horaires pour les autres jours
-        }
-      }
-    };
-  },
-  computed: {
-    programmeFiltre() {
-      // Retourne les horaires du trimestre sélectionné
-      return this.horairesParTrimestre[this.trimestre] || {};
+  props: {
+    childId: {
+      type: Number,
+      required: true
     }
   },
+  data() {
+    return {
+      jours: [], // Liste des jours récupérés depuis l'API
+      matieres: [], // Liste des matières récupérées depuis l'API
+      programme: {} // Contiendra les jours, horaires et matières récupérés
+    };
+  },
+  mounted() {
+    this.recupererProgramme(); // Charger le programme au montage du composant
+  },
   methods: {
+    async recupererProgramme() {
+      try {
+        // Appel API pour récupérer le programme selon l'ID de l'élève
+        const response = await fetch(`http://localhost:8080/api/programme/${this.childId}`);
+        const data = await response.json();
+
+        // Récupération des jours, matières et horaires depuis la réponse API
+        this.jours = data.jours;
+        this.matieres = data.matieres;
+        this.programme = data.programme; // Contiendra les horaires par jour et matière
+      } catch (error) {
+        console.error('Erreur lors de la récupération du programme:', error);
+      }
+    },
     getHoraires(jour, matiere) {
       // Récupérer les horaires pour un jour et une matière donnés
-      const horaires = this.programmeFiltre[jour] && this.programmeFiltre[jour][matiere]
-        ? this.programmeFiltre[jour][matiere]
+      return this.programme[jour] && this.programme[jour][matiere]
+        ? this.programme[jour][matiere]
         : [];
-      return horaires;
     }
   }
 };
 </script>
 
 <style scoped>
-.trimestre-buttons {
-  margin-bottom: 20px;
-}
-.trimestre-buttons .v-btn {
-  margin-right: 10px;
-}
-.trimestre-buttons .v-btn.active {
-  color: white;
-  font-weight: bold;
-}
-.trimestre1.active {
-  background-color: #007bff; /* Bleu pour Trimestre 1 */
-}
-.trimestre2.active {
-  background-color: #28a745; /* Vert pour Trimestre 2 */
-}
-.trimestre3.active {
-  background-color: #dc3545; /* Rouge pour Trimestre 3 */
-}
 .tableau-programme th, .tableau-programme td {
   border: 1px solid #ddd; /* Bordures entre les cellules */
   padding: 8px; /* Espacement interne des cellules */

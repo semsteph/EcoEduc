@@ -1,44 +1,49 @@
 <template>
   <v-card>
-    <v-card-title>
-      Gérer Conduite
-      <v-spacer></v-spacer>
-      <v-btn color="primary" @click="save">Sauvegarder</v-btn>
-    </v-card-title>
-    <v-card-text>
-      <v-container>
-        <!-- Tabs for trimesters -->
-        <v-tabs v-model="currentTrimester" background-color="blue" dark>
-          <v-tab
-            v-for="trimester in trimesters"
-            :key="trimester"
-            @click="changeTrimester(trimester)"
-            :class="{'v-tab--active': currentTrimester === trimester}"
-          >
-            {{ trimester }}
-          </v-tab>
-        </v-tabs>
+    <!-- Expansion Panel for Semester Selection -->
+    <v-expansion-panels>
+      <v-expansion-panel v-model="currentSemester">
+        <v-expansion-panel-header>
+          <span class="font-weight-bold">Choisir Semestre</span>
+        </v-expansion-panel-header>
+        <v-expansion-panel-content>
+          <v-btn-toggle v-model="currentSemester" mandatory>
+            <v-btn value="Semestre1">Semestre 1</v-btn>
+            <v-btn value="Semestre2">Semestre 2</v-btn>
+          </v-btn-toggle>
+        </v-expansion-panel-content>
+      </v-expansion-panel>
+    </v-expansion-panels>
 
-        <!-- Data Table -->
+    <!-- Toolbar with Title and Save Button -->
+    <v-toolbar color="blue lighten-1" dark>
+      <v-toolbar-title class="font-weight-bold">Gérer Conduite</v-toolbar-title>
+      <v-spacer></v-spacer>
+      <v-btn color="yellow darken-2" @click="save" elevation="2">Sauvegarder</v-btn>
+    </v-toolbar>
+
+    <!-- Data Table for Conduct Records -->
+    <v-card-text>
+      <v-container fluid>
         <v-data-table
           :headers="headers"
           :items="conductRecords"
           item-key="id"
           :items-per-page="5"
-          class="elevation-1"
+          class="elevation-2 rounded"
         >
           <template v-slot:item="{ item }">
             <tr>
               <td>
-                <!-- List of Students -->
                 <v-select
                   :items="students"
-                  item-value="name"
-                  item-text="name"
-                  v-model="item.studentName"
+                  item-value="id"
+                  item-title="fullName"
+                  v-model="item.studentId"
                   dense
                   hide-details
                   readonly
+                  style="width: 225px;"
                 ></v-select>
               </td>
               <td>
@@ -47,6 +52,7 @@
                   type="date"
                   dense
                   hide-details
+                  style="width: 150px;"
                 ></v-text-field>
               </td>
               <td>
@@ -55,16 +61,18 @@
                   type="time"
                   dense
                   hide-details
+                  style="width: 90px;"
                 ></v-text-field>
               </td>
               <td>
-                <v-select
+                <v-combobox
                   v-model="item.punition"
                   :items="punitionOptions"
                   dense
                   hide-details
-                  @change="updateConduct(item)"
-                ></v-select>
+                  placeholder="Choisir ou entrer la punition"
+                  style="width: 150px;"
+                ></v-combobox>
               </td>
               <td>
                 <v-textarea
@@ -73,89 +81,185 @@
                   hide-details
                   rows="1"
                   auto-grow
+                  style="width: 200px;"
                 ></v-textarea>
               </td>
+              <!-- Total hours calculated -->
               <td>
-                <!-- Note de conduite, calculée automatiquement -->
-                {{ item.conductGrade }}
+                <span class="font-weight-bold">{{ item.totalHours }} heures</span>
+              </td>
+              <td>
+                <v-textarea
+                  v-model="item.auteur"
+                  dense
+                  hide-details
+                  rows="1"
+                  auto-grow
+                  placeholder="Nom et prénom de l'auteur"
+                  style="width: 200px;"
+                ></v-textarea>
               </td>
             </tr>
           </template>
         </v-data-table>
       </v-container>
     </v-card-text>
+
+    <!-- Card Actions for Back Button -->
     <v-card-actions>
-      <v-btn color="primary" @click="$emit('back')">Retour</v-btn>
+      <v-btn color="blue darken-2" dark @click="$emit('back')">Retour</v-btn>
     </v-card-actions>
   </v-card>
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'ConductManager',
+  props: {
+    classeId: {
+      type: Number,
+      required: true
+    }
+  },
   data() {
     return {
-      currentTrimester: 'Trimestre1',
-      trimesters: ['Trimestre1', 'Trimestre2', 'Trimestre3'],
+      currentSemester: 'Semestre1',
       headers: [
-        { text: 'Élève', value: 'studentName' },
-        { text: 'Date', value: 'date' },
-        { text: 'Heure', value: 'hour' },
-        { text: 'Punition', value: 'punition' },
-        { text: 'Motif', value: 'motif' },
-        { text: 'Note de Conduite', value: 'conductGrade' }, // Nouvelle colonne
+        { title: 'Élève', value: 'studentId' },
+        { title: 'Date', value: 'date' },
+        { title: 'Heure', value: 'hour' },
+        { title: 'Punition', value: 'punition' },
+        { title: 'Motif', value: 'motif' },
+        { title: 'Somme des heures', value: 'totalHours' },
+        { title: 'Auteur', value: 'auteur' },
       ],
-      punitionOptions: [2, 4], // Possible values for punishment
-      students: [], // Liste des élèves à remplir
-      conductRecords: [], // Initial empty array to be filled with data from API
+      punitionOptions: ['2h', '4h', '8h'],
+      students: [],
+      conductRecords: [],
     };
   },
   methods: {
-    changeTrimester(trimester) {
-      this.currentTrimester = trimester;
-      this.fetchConductRecords();
-    },
-    fetchConductRecords() {
-      // Fetch conduct records based on the selected trimester
-      // Example API call
-      this.conductRecords = [
-        // Populate with data from API or mock data
-        { studentName: 'John Doe', date: '', hour: '', punition: '', motif: '', conductGrade: '' },
-        { studentName: 'Jane Smith', date: '', hour: '', punition: '', motif: '', conductGrade: '' },
-      ];
-    },
-    save() {
-      // Implement the logic to save conduct records
-      console.log('Save button clicked');
-      // Add API call to save data here
-      this.conductRecords.forEach(record => {
-        record.punition = ''; // Clear punishment field
-        record.motif = ''; // Clear motif field
-        record.date = ''; // Clear date field
-        record.hour = ''; // Clear hour field
-        record.conductGrade = ''; // Clear conduct grade
-      });
-    },
-    updateConduct(record) {
-      // Calculate the conduct grade based on the punishment
-      if (record.punition === 2) {
-        record.conductGrade = Math.max(record.conductGrade - 1, 0);
-      } else if (record.punition === 4) {
-        record.conductGrade = Math.max(record.conductGrade - 2, 0);
-      } else {
-        // If punishment is neither 2 nor 4, keep the grade unchanged
-        record.conductGrade = record.conductGrade;
+    async fetchStudents() {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/classes/${this.classeId}/eleves`);
+        this.students = response.data.map((student) => ({
+          id: student.id,
+          fullName: `${student.nom} ${student.prenom}`
+        }));
+        await this.fetchConductRecords();
+      } catch (error) {
+        console.error("Erreur lors de la récupération des élèves :", error);
       }
     },
+    changeSemester(semester) {
+      this.currentSemester = semester;
+      this.fetchConductRecords();
+    },
+    async fetchConductRecords() {
+      try {
+        this.conductRecords = await Promise.all(this.students.map(async (student) => {
+          const totalHours = await this.fetchTotalHours(student.id);
+          return {
+            studentId: student.id,
+            studentName: student.fullName,
+            date: '',
+            hour: '',
+            punition: '',
+            motif: '',
+            totalHours: totalHours || 0, // Calcul des heures de punition
+            auteur: ''
+          };
+        }));
+      } catch (error) {
+        console.error('Erreur lors de la récupération des enregistrements de conduite :', error);
+      }
+    },
+    async fetchTotalHours(studentId) {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/punitions/somme-heures/${studentId}`);
+        return response.data.totalHours; // API retourne la somme des heures
+      } catch (error) {
+        console.error('Erreur lors de la récupération des heures de punition :', error);
+        return 0;
+      }
+    },
+    async save() {
+      try {
+        // Filtrer les enregistrements avec les champs requis remplis
+        const validRecords = this.conductRecords.filter((record) => {
+          return record.date && record.hour && record.punition && record.motif && record.auteur;
+        });
+
+        if (validRecords.length === 0) {
+          console.warn('Aucun enregistrement valide à sauvegarder.');
+          return;
+        }
+
+        const payload = {
+          semester: this.currentSemester,
+          records: validRecords, // Seuls les enregistrements valides seront envoyés
+        };
+
+        await axios.post('http://localhost:8080/api/save/conduct', payload);
+
+        // Réinitialiser les champs après la sauvegarde pour les enregistrements valides uniquement
+        validRecords.forEach((record) => {
+          record.punition = '';
+          record.motif = '';
+          record.date = '';
+          record.hour = '';
+          record.auteur = ''; // Ne pas réinitialiser l'auteur
+        });
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde des données :', error);
+      }
+    }
   },
   created() {
-    this.fetchConductRecords();
+    this.fetchStudents();
   },
 };
 </script>
 
-<style>
-.v-tab--active {
-  font-weight: bold;
+<style scoped>
+.v-card {
+  border-radius: 16px;
+  padding: 16px;
+  background-color: #f5f5f5;
+}
+
+.v-expansion-panel-header {
+  background-color: #2196f3;
+  color: white;
+}
+
+.v-btn-toggle .v-btn {
+  color: white;
+  background-color: #ffca28;
+}
+
+.v-btn-toggle .v-btn--active {
+  background-color: #ffc107 !important;
+}
+
+.v-toolbar {
+  background-color: #2196f3;
+}
+
+.v-toolbar-title {
+  font-size: 24px;
+  color: white;
+}
+
+.v-card-text {
+  background-color: white;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.v-data-table tr td {
+  padding: 8px;
 }
 </style>

@@ -27,11 +27,13 @@
           <v-icon>mdi-message</v-icon>
         </v-badge>
       </v-btn>
-      <v-btn icon @click="showNotifications">
-        <v-badge color="red" content="3" overlap>
+        <!-- Bouton Notifications -->
+        <v-btn icon @click="showNotifications">
+        <v-badge :color="notificationBadgeColor" :content="notificationCount" overlap>
           <v-icon>mdi-bell</v-icon>
         </v-badge>
       </v-btn>
+      
       <v-btn icon @click="showLogoutDialog">
         <v-icon>mdi-logout</v-icon>
       </v-btn>
@@ -39,7 +41,11 @@
   
     <v-main>
       <v-container>
-        <component :is="currentComponent" @component-selected="selectComponent" @back="currentComponent = previousComponent"></component>
+        <component :is="currentComponent" 
+                   @component-selected="selectComponent" 
+                   @back="currentComponent = previousComponent"
+                   @update-notification-count="updateNotificationCount"
+        />
       </v-container>
     </v-main>
   
@@ -81,7 +87,9 @@ export default {
   data() {
     return {
       currentComponent: 'ClassManagement',
-      previousComponent: null
+      previousComponent: null,
+      notificationCount: 0, // Initialiser le nombre de notifications à zéro
+      notificationBadgeColor: 'red'
     }
   },
   methods: {
@@ -89,6 +97,7 @@ export default {
       this.currentComponent = 'MessageComponent'
     },
     showNotifications() {
+      this.notificationCount = 0; // Réinitialiser le badge à zéro quand on consulte les notifications
       this.currentComponent = 'NotificationComponent'
     },
     showLogoutDialog() {
@@ -97,6 +106,9 @@ export default {
     selectComponent(component) {
       this.previousComponent = this.currentComponent
       this.currentComponent = component
+    },
+    updateNotificationCount(newCount) {
+      this.notificationCount = newCount;
     }
   }
 }

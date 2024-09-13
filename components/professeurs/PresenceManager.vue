@@ -68,7 +68,6 @@
             <v-col class="text-center">
               <v-btn color="primary" @click="$emit('back')">Retour</v-btn>
               <div id="message" style="display: none; padding: 10px; background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; border-radius: 5px; margin-top: 20px;"></div>
-
             </v-col>
           </v-row>
         </template>
@@ -93,8 +92,8 @@ export default {
   },
   data() {
     return {
-      currentSemester: 'Semestre 1',
-      semesters: ['Semestre 1', 'Semestre 2'],
+      currentSemester: 'Semestre1',
+      semesters: ['Semestre1', 'Semestre2'],
       headers: [
         { title: 'Nom/Prenom', value: 'name' },
         { title: 'Date', value: 'date' },
@@ -120,77 +119,82 @@ export default {
       this.getStudents();
     },
     async getStudents() {
-  try {
-    const response = await axios.get(`http://localhost:8080/api/classes/${this.classeId}/eleves`);
-    
-    this.students = response.data.map(student => ({
-      ...student,
-      name: `${student.nom} ${student.prenom}`, // Concatène nom et prénom
-      date: '', // Date par défaut (peut être modifié ultérieurement)
-      time: '17h00-18h00', // Heure par défaut
-      status: '', // Statut par défaut (à définir plus tard)
-    }));
-    
-  } catch (error) {
-    console.error('Erreur lors de la récupération des élèves:', error);
-  }
-},
-async save() {
-  try {
-    const dataToSave = this.students.map(student => ({
-      eleveId: student.id,
-      date: student.date,
-      time: student.time,
-      status: student.status,
-      subjectId: this.subjectId,
-      classeId: this.classeId,
-    }));
+      try {
+        const response = await axios.get(`http://localhost:8080/api/classes/${this.classeId}/eleves`);
+        this.students = response.data.map(student => ({
+          ...student,
+          name: `${student.nom} ${student.prenom}`, // Concatène nom et prénom
+          date: '', // Date par défaut
+          time: '17h00-18h00', // Heure par défaut
+          status: '', // Statut par défaut
+        }));
+      } catch (error) {
+        console.error('Erreur lors de la récupération des élèves:', error);
+      }
+    },
+    async save() {
+      try {
+        const dataToSave = this.students
+          .filter(student => student.date && student.time && student.status)
+          .map(student => ({
+            eleveId: student.id,
+            date: student.date,
+            time: student.time,
+            status: student.status,
+            subjectId: this.subjectId,
+            classeId: this.classeId,
+            semesterName: this.currentSemester, // Ajout du nom du semestre
+          }));
 
-    // Envoie les données à l'API
-    await axios.post('http://localhost:8080/api/presence', dataToSave);
-    console.log('Données sauvegardées:', dataToSave);
+        if (dataToSave.length === 0) {
+          alert("Aucun élève sélectionné n'a tous ses champs remplis.");
+          return;
+        }
 
-    // Réinitialiser les champs des étudiants après la sauvegarde
-    this.students = this.students.map(student => ({
-      ...student,
-      date: '',
-      time: '',  // Réinitialiser l'heure si nécessaire
-      status: '', // Réinitialiser le statut
-    }));
+        // Envoie les données à l'API
+        await axios.post('http://localhost:8080/api/presence', dataToSave);
+        console.log('Données sauvegardées:', dataToSave);
 
-    // Afficher un message de succès
-    const messageDiv = document.getElementById('message');
-    messageDiv.textContent = 'Les données ont été sauvegardées avec succès !';
-    messageDiv.style.display = 'block';
-    messageDiv.className = 'success-message';
+        // Réinitialiser les champs des étudiants après la sauvegarde
+        this.students = this.students.map(student => ({
+          ...student,
+          date: '',
+          time: '',  // Réinitialiser l'heure si nécessaire
+          status: '', // Réinitialiser le statut
+        }));
 
-    // Masquer le message après 5 secondes
-    setTimeout(() => {
-      messageDiv.style.display = 'none';
-    }, 5000);
+        // Afficher un message de succès
+        const messageDiv = document.getElementById('message');
+        messageDiv.textContent = 'Les données ont été sauvegardées avec succès !';
+        messageDiv.style.display = 'block';
+        messageDiv.className = 'success-message';
 
-  } catch (error) {
-    console.error('Erreur lors de la sauvegarde des données:', error);
+        // Masquer le message après 5 secondes
+        setTimeout(() => {
+          messageDiv.style.display = 'none';
+        }, 5000);
 
-    // Afficher un message d'erreur
-    const messageDiv = document.getElementById('message');
-    messageDiv.textContent = 'Une erreur est survenue lors de la sauvegarde des données.';
-    messageDiv.style.display = 'block';
-    messageDiv.className = 'error-message';
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde des données:', error);
 
-    // Masquer le message après 5 secondes
-    setTimeout(() => {
-      messageDiv.style.display = 'none';
-    }, 5000);
-  }
-}
+        // Afficher un message d'erreur
+        const messageDiv = document.getElementById('message');
+        messageDiv.textContent = 'Une erreur est survenue lors de la sauvegarde des données.';
+        messageDiv.style.display = 'block';
+        messageDiv.className = 'error-message';
 
+        // Masquer le message après 5 secondes
+        setTimeout(() => {
+          messageDiv.style.display = 'none';
+        }, 5000);
+      }
+    }
   },
 
   created() {
     this.getStudents();
   },
-  mounted(){
+  mounted() {
     console.log(this.subjectId);
   }
 };
@@ -219,5 +223,4 @@ async save() {
   border-radius: 5px;
   margin-top: 20px;
 }
-
 </style>

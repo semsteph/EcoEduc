@@ -10,10 +10,10 @@
       <PresenceManager :classe="selectedClass" :classeId="selectedClassId" :subjectId="subjectId" @back="goBack"/>
     </template>
     <template v-else-if="currentView === 'ConductManager'">
-      <ConductManager :classe="selectedClass" @back="goBack"/>
+      <ConductManager :classe="selectedClass" :classeId="selectedClassId" :subjectId="subjectId" @back="goBack"/>
     </template>
     <template v-else-if="currentView === 'CahierDeTexteManager'">
-      <CahierDeTexteManager :classe="selectedClass" @back="goBack"/>
+      <CahierDeTexteManager :classe="selectedClass" :classeId="selectedClassId" :subjectId="subjectId" @back="goBack"/>
     </template>
     <template v-else>
       <v-row>

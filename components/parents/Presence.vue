@@ -2,88 +2,198 @@
   <div>
     <h1>Présences pour le :</h1>
     
-    <!-- Boutons pour sélectionner les trimestres -->
-    <div class="trimestre-buttons">
-      <v-btn @click="trimestre = 'trimestre1'" :class="{ 'active': trimestre === 'trimestre1', 'trimestre1': trimestre === 'trimestre1' }">Trimestre 1</v-btn>
-      <v-btn @click="trimestre = 'trimestre2'" :class="{ 'active': trimestre === 'trimestre2', 'trimestre2': trimestre === 'trimestre2' }">Trimestre 2</v-btn>
-      <v-btn @click="trimestre = 'trimestre3'" :class="{ 'active': trimestre === 'trimestre3', 'trimestre3': trimestre === 'trimestre3' }">Trimestre 3</v-btn>
+    <!-- Boutons pour sélectionner les semestres -->
+    <div class="semestre-buttons">
+      <v-btn @click="fetchPresenceData('semestre1')" :class="{ active: semestre === 'semestre1' }" color="primary" depressed>
+        Semestre 1
+      </v-btn>
+      <v-btn @click="fetchPresenceData('semestre2')" :class="{ active: semestre === 'semestre2' }" color="primary" depressed>
+        Semestre 2
+      </v-btn>
     </div>
 
     <!-- Tableau des présences -->
-    <v-data-table :headers="headers" :items="filteredPresence" item-key="id">
-      <template v-slot:column.date="{ item }">
+    <v-data-table :headers="headers" :items="filteredPresence" item-key="id" class="elevation-1">
+      <template v-slot:item.date="{ item }">
         <td>{{ item.date }}</td>
       </template>
-      <template v-slot:column.matiere="{ item }">
+      <template v-slot:item.matiere="{ item }">
         <td>{{ item.matiere }}</td>
       </template>
-      <template v-slot:column.heure="{ item }">
+      <template v-slot:item.heure="{ item }">
         <td>{{ item.heure }}</td>
       </template>
-      <template v-slot:column.presence="{ item }">
+      <template v-slot:item.presence="{ item }">
         <td>{{ item.presence }}</td>
+      </template>
+      <template v-slot:item.motif="{ item }">
+        <td>
+          <v-textarea
+            v-model="item.motif"
+            label="Motif"
+            rows="2"
+            auto-grow
+            @input="handleMotifChange(item.id, item.motif)"
+            :style="{ maxHeight: '120px' }"
+            class="elevation-0"
+            outlined
+            dense
+          ></v-textarea>
+        </td>
       </template>
     </v-data-table>
 
-    <!-- Bouton de retour -->
-    <v-btn color="primary" @click="$emit('back')">Retour</v-btn>
+    <!-- Boutons d'action -->
+    <div class="action-buttons">
+      <v-btn color="primary" @click="submitMotifs" large outlined>
+        Envoyer
+      </v-btn>
+      <v-btn color="secondary" @click="$emit('back')" large outlined>
+        Retour
+      </v-btn>
+    </div>
+
+    <!-- Snackbar pour afficher les messages de succès ou d'erreur -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" top right>
+      {{ snackbar.message }}
+    </v-snackbar>
   </div>
 </template>
+
 <script>
+import axios from 'axios';
+
 export default {
+  props: {
+    childId: {
+      type: Number,
+      required: true,
+    },
+  },
   data() {
     return {
-      trimestre: 'trimestre1', // Trimestre par défaut
+      semestre: 'semestre1',
       headers: [
-        { text: 'Date', value: 'date' },
-        { text: 'Matière', value: 'matiere' },
-        { text: 'Heure', value: 'heure' },
-        { text: 'Présence', value: 'presence' }
+        { title: 'Date', value: 'date' },
+        { title: 'Matière', value: 'matiere' },
+        { title: 'Heure', value: 'heure' },
+        { title: 'Présence', value: 'presence' },
+        { title: 'Motif', value: 'motif' },
       ],
-      presenceData: [
-        { id: 1, trimestre: 'trimestre1', date: '2024-01-10', matiere: 'Mathématiques', heure: '15h - 17h', presence: 'Présent' },
-        { id: 2, trimestre: 'trimestre1', date: '2024-01-12', matiere: 'Français', heure: '10h - 12h', presence: 'Absent' },
-        { id: 3, trimestre: 'trimestre2', date: '2024-03-05', matiere: 'Physique', heure: '13h - 15h', presence: 'Présent' },
-        { id: 4, trimestre: 'trimestre3', date: '2024-06-20', matiere: 'Histoire', heure: '9h - 11h', presence: 'Présent' }
-      ]
+      presenceData: [],
+      modifiedMotifs: {}, // Suivi des motifs modifiés
+      snackbar: {
+        show: false,
+        message: '',
+        color: '',
+      },
     };
   },
   computed: {
     filteredPresence() {
-      return this.presenceData.filter(item => item.trimestre === this.trimestre);
-    }
+      return this.presenceData;
+    },
   },
+  methods: {
+    async fetchPresenceData(semestre) {
+      this.semestre = semestre;
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          this.$router.push('/login');
+          return;
+        }
 
+        const response = await axios.get('http://localhost:8080/api/presence', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: {
+            childId: this.childId,
+            semestre: this.semestre,
+          },
+        });
+
+        this.presenceData = response.data;
+        this.modifiedMotifs = {}; // Réinitialise les motifs modifiés après récupération
+      } catch (error) {
+        console.error('Erreur lors de la récupération des données de présence :', error);
+        this.$router.push('/login');
+      }
+    },
+    handleMotifChange(id, motif) {
+      // Mise à jour directe de l'objet modifié
+      this.modifiedMotifs[id] = motif;
+    },
+    async submitMotifs() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          this.$router.push('/login');
+          return;
+        }
+
+        // Ne soumettre que les motifs modifiés
+        const updatePromises = Object.keys(this.modifiedMotifs).map(async id => {
+          const response = await axios.post(`http://localhost:8080/api/presence/${id}/motif`, { motif: this.modifiedMotifs[id] }, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (response.status !== 200) {
+            throw new Error(`Failed to update motif for ID ${id}`);
+          }
+        });
+
+        await Promise.all(updatePromises);
+
+        // Afficher un message de succès stylisé
+        this.showSnackbar('Les motifs modifiés ont été mis à jour avec succès', 'success');
+
+        // Réinitialiser les motifs modifiés
+        this.modifiedMotifs = {};
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour des motifs :', error);
+        this.showSnackbar('Erreur lors de la mise à jour des motifs', 'error');
+      }
+    },
+    showSnackbar(message, color) {
+      this.snackbar.message = message;
+      this.snackbar.color = color;
+      this.snackbar.show = true;
+    },
+  },
+  mounted() {
+    this.fetchPresenceData(this.semestre);
+  },
 };
 </script>
+
 <style scoped>
-.table-container {
-  margin: 20px;
-}
-.trimestre-buttons {
+.semestre-buttons {
   margin-bottom: 20px;
 }
-.trimestre-buttons .v-btn {
-  margin-right: 10px;
-}
-.trimestre-buttons .v-btn.active {
-  color: white;
-  font-weight: bold;
-}
-.trimestre1 {
-  background-color: #007bff; /* Bleu pour Trimestre 1 */
-}
-.trimestre2 {
-  background-color: #28a745; /* Vert pour Trimestre 2 */
-}
-.trimestre3 {
-  background-color: #dc3545; /* Rouge pour Trimestre 3 */
-}
-.trimestre-buttons .v-btn.active {
-  background-color: #333; /* Couleur active neutre */
+
+.active {
+  background-color: #1976d2;
   color: white;
 }
-.back-button {
+
+.v-textarea {
+  width: 100%;
+  min-height: 40px;
+  resize: none;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.action-buttons {
   margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.elevation-0 {
+  box-shadow: none !important;
 }
 </style>

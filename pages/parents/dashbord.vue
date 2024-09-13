@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app class="background">
     <ToolbarComponent @showComponent="showComponent" />
     <component :is="currentComponent"></component>
   </v-app>
@@ -22,13 +22,24 @@ export default {
   },
   data() {
     return {
-      currentComponent: ChildrenList
+      currentComponent: ChildrenList // Le composant par défaut affiché
     };
   },
   methods: {
     showComponent(component) {
-      this.currentComponent
+      // Mise à jour du composant actuel affiché
+      this.currentComponent = component;
     }
   }
 }
 </script>
+
+<style scoped>
+.background {
+  background-image: url('/assets/parents/ecolier-fait-ses-devoirs-ses-parents_1290988-1159.jpg'); /* Chemin vers votre image de fond */
+  background-size: cover;  /* L'image couvre tout l'écran */
+  background-position: center; /* Centrer l'image */
+  background-repeat: no-repeat; /* Empêche la répétition de l'image */
+  min-height: 100vh; /* S'assure que la page couvre au moins toute la hauteur de l'écran */
+}
+</style>

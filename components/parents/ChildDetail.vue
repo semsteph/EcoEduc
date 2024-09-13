@@ -21,7 +21,9 @@ export default {
         { label: 'Conduite' },
         { label: 'Présence' },
         { label: 'Programme' },
-        { label: 'Scolarité' }
+        { label: 'Scolarité' },
+        { label: 'Activité' },
+        { label: 'Demande de Permission' }
       ]
     };
   },

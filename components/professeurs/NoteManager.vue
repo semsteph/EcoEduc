@@ -19,7 +19,7 @@
 
       <v-row class="my-4">
         <v-col>
-          <v-btn color="green darken-1" @click="openExcelForm">
+          <v-btn color="green darken-1" @click="generateExcelFile">
             Gestion avec fichier Excel
           </v-btn>
         </v-col>
@@ -52,56 +52,6 @@
           <v-btn color="primary" @click="$emit('back')">Retour</v-btn>
         </v-col>
       </v-row>
-
-      <!-- Formulaire de gestion avec fichier Excel -->
-      <v-dialog v-model="showExcelForm" max-width="600px">
-        <v-card>
-          <v-card-title>
-            <span>Générer un fichier Excel</span>
-          </v-card-title>
-
-          <v-card-text>
-            <v-form>
-              <v-select
-                v-model="selectedClasse"
-                :items="classes"
-                label="Classe"
-                item-text="nom"
-                item-value="id"
-                disabled
-              ></v-select>
-              <v-select
-                v-model="selectedSubject"
-                :items="subjects"
-                label="Matière"
-                item-text="nom"
-                item-value="id"
-                disabled
-              ></v-select>
-              <v-select
-                v-model="selectedSemester"
-                :items="semesters"
-                label="Semestre"
-                item-title="nom"
-                item-value="id"
-              ></v-select>
-              <v-select
-                v-model="selectedNoteType"
-                :items="noteTypes"
-                label="Type de note"
-              ></v-select>
-            </v-form>
-          </v-card-text>
-
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn color="blue darken-1" @click="generateExcelFile">
-              Générer le fichier Excel
-            </v-btn>
-            <v-btn color="grey" @click="closeExcelForm">Annuler</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
     </v-container>
   </v-app>
 </template>
@@ -119,7 +69,6 @@ export default {
       type: Number,
       required: true, 
     },
-   
   },
   data: () => ({
     dialog: false,
@@ -143,65 +92,8 @@ export default {
       { title: 'Rang Final', value: 'finalRank' },
       { title: 'Actions', value: 'actions', sortable: false },
     ],
-    snackbar: {
-      show: false,
-      message: '',
-      color: 'success'
-    },
     students: [],
-    editedIndex: -1,
-    editedField: '',
-    editedItem: {
-      studentName: '',
-      coef: 0,
-      interro1: null,
-      interro2: null,
-      interro3: null,
-      interro4: null,
-      TP1: null,
-      TP2: null,
-      devoir1: null,
-      devoir2: null,
-      averageInterro: 0,
-      averageDevoir: 0,
-      finalRank: 0,
-    },
-    defaultItem: {
-      studentName: '',
-      coef: 0,
-      interro1: null,
-      interro2: null,
-      interro3: null,
-      interro4: null,
-      TP1: null,
-      TP2: null,
-      devoir1: null,
-      devoir2: null,
-      averageInterro: 0,
-      averageDevoir: 0,
-      finalRank: 0,
-    },
-    showExcelForm: false,
-    selectedClasse: null,
-    selectedSubject: null,
-    selectedSemester: null,
-    selectedNoteType: null,
-    classes: [],  // Remplir avec les classes disponibles
-    subjects: [], // Remplir avec les matières disponibles
-    noteTypes: ['Interro', 'Devoir', 'TP'], // Types de notes possibles
   }),
-
-  computed: {
-    formTitle() {
-      return this.editedIndex === -1 ? 'Nouvel Élève' : 'Modifier Élève';
-    },
-  },
-  watch: {
-    subjectId(newVal) {
-      console.log('L\'ID de la matière a été mis à jour:', newVal);
-      // Logique pour mettre à jour les classes en fonction de la nouvelle matière sélectionnée
-    }
-  },
 
   methods: {
     getButtonColor(semester) {
@@ -238,88 +130,34 @@ export default {
       // Implémentez votre logique de validation ici
     },
 
-    openExcelForm() {
-      this.selectedClasse = this.classeId;
-      this.selectedSubject = this.subjectId;
-      this.showExcelForm = true;
-    },
-    closeExcelForm() {
-      this.showExcelForm = false;
-    },
-
     async generateExcelFile() {
-  try {
-    const response = await axios.post('http://localhost:8080/api/export/excel', {
-      classeId: this.selectedClasse,
-      subjectId: this.subjectId,  // Utilisation de subjectId ici
-      semester: this.selectedSemester,
-      noteType: this.selectedNoteType,
-    });
+      try {
+        const response = await axios.post('http://localhost:8080/api/export/excel', {
+          classeId: this.classeId,
+          semester: this.currentSemester,
+        });
 
-    // Gérer la réponse et télécharger le fichier
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Classe_${this.selectedClasse}_Semestre_${this.selectedSemester}.xlsx`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+        // Gérer la réponse et télécharger le fichier
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Classe_${this.classeId}_Semestre_${this.currentSemester}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
 
-    this.showExcelForm = false;
-  } catch (error) {
-    console.error('Erreur lors de la génération du fichier Excel', error);
-  }
-},
-
-
-    editField(item, field) {
-      this.editedItem = { ...item };
-      this.editedField = field;
-      this.dialog = true;
+      } catch (error) {
+        console.error('Erreur lors de la génération du fichier Excel', error);
+      }
     },
-
-    save() {
-      this.dialog = false;
-    },
-
-    close() {
-      this.dialog = false;
-    },
-
-    calculateAverageInterro(item) {
-      const values = [
-        item.interro1,
-        item.interro2,
-        item.interro3,
-        item.interro4,
-        item.TP1,
-        item.TP2
-      ].filter(v => v !== null && v !== undefined);
-      return values.length > 0
-        ? values.reduce((acc, val) => acc + val, 0) / values.length
-        : 0;
-    },
-
-    calculateAverageDevoir(item) {
-      const values = [
-        item.devoir1,
-        item.devoir2
-      ].filter(v => v !== null && v !== undefined);
-      return values.length > 0
-        ? values.reduce((acc, val) => acc + val, 0) / values.length
-        : 0;
-    }
   },
 
   async created() {
     this.getStudents();
     this.fetchSemesters();
-    console.log('ID de la matière reçu:', this.subjectId);
   },
   mounted() {
-    console.log('ID de la matière:', this.subjectId);  // Vérifie que l'ID est bien reçu
-    console.log('ID de la classe:', this.classeId);     // Vérifie que l'ID de la classe est bien reçu
-    this.getStudents();  // Appelle la méthode pour récupérer les étudiants
+    this.getStudents();
   },
 };
 </script>
