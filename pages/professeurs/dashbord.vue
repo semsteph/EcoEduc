@@ -1,18 +1,19 @@
 <template>
   <v-app>
-    <v-navigation-drawer app>
+    <v-navigation-drawer app color="blue darken-3">
       <v-list dense>
         <v-list-item
           v-for="subject in uniqueSubjects"
           :key="subject.matiere_id"
           @click="selectSubject(subject.matiere_id)"
+          class="white--text"
         >
           <v-list-item-content>{{ subject.matiere }}</v-list-item-content>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
 
-    <v-main>
+    <v-main class="main-background">
       <v-container>
         <v-row>
           <v-col>
@@ -103,3 +104,17 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.custom-drawer {
+  /* Garde la couleur bleu foncé pour le drawer */
+}
+
+.main-background {
+  background-image: url('/assets/professeurs/istockphoto-1328488607-1024x1024.jpg'); /* Remplace par le chemin de ton image */
+  background-size: cover; /* L'image couvre tout le fond */
+  background-position: center; /* L'image est centrée */
+  background-repeat: no-repeat; /* Empêche la répétition de l'image */
+  min-height: 100vh; /* Pour s'assurer que l'image couvre toute la hauteur de l'écran */
+}
+</style>

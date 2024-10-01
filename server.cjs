@@ -4,7 +4,12 @@ const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const XLSX = require('xlsx');
+const multer = require('multer');
 const moment = require('moment');
+const fs = require('fs');  // Ajout de fs
+const path = require('path');  // Ajout de path
+
+
 
 const app = express();
 const port = 8080;
@@ -33,6 +38,24 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+// Configurer le stockage des fichiers pour `multer`
+const upload = multer({ dest: 'uploads/' });
+
+// Fonction pour mapper le type de note sélectionné au champ de la table Note
+function mapTypeNoteToField(typeNote) {
+  const noteFields = {
+    'Inter1': 'inter1',
+    'Inter2': 'inter2',
+    'Inter3': 'inter3',
+    'Inter4': 'inter4',
+    'TP1': 'TP1',
+    'TP2': 'TP2',
+    'Devoir1': 'Dev1',
+    'Devoir2': 'Dev2',
+  };
+
+  return noteFields[typeNote] || null; // Renvoie le champ correspondant ou null si le type de note n'existe pas
+}
 
 // Ajout de la connexion à la base de données dans `req` pour l'utiliser dans les API
 app.use((req, res, next) => {
@@ -533,7 +556,7 @@ app.post('/api/Enseignants', (req, res) => {
 
 // Endpoint pour générer le fichier Excel
 app.post('/api/export/excel/:classeId', async (req, res) => {
-  const  classeId  = req.params.classeId;
+  const classeId = req.params.classeId;
 
   try {
     // Récupération des données des élèves
@@ -559,21 +582,230 @@ app.post('/api/export/excel/:classeId', async (req, res) => {
     // Ajout de la feuille de calcul au workbook
     XLSX.utils.book_append_sheet(workbook, worksheet, `Classe_${classeId}`);
 
-    // Génération du fichier Excel en binaire
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+    // Définir le chemin du fichier temporaire
+    const filePath = path.join(__dirname, `Classe_${classeId}.xlsx`);
+
+    // Écrire le fichier Excel dans le système de fichiers
+    XLSX.writeFile(workbook, filePath);
 
     // Configuration des en-têtes HTTP pour le téléchargement du fichier Excel
     res.setHeader('Content-Disposition', `attachment; filename=Classe_${classeId}.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-    // Envoi du fichier Excel au client
-    res.send(excelBuffer);
+    // Envoyer le fichier via un flux
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+    // Supprimer le fichier temporaire après envoi
+    fileStream.on('end', () => {
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error('Erreur lors de la suppression du fichier temporaire', err);
+        }
+      });
+    });
+
   } catch (error) {
     console.error('Erreur lors de la génération du fichier Excel:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
+// API pour l'upload du fichier Excel et mise à jour des notes
+app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file; // Fichier uploadé
+    if (!file) {
+      return res.status(400).send('Aucun fichier uploadé.');
+    }
+
+    const { typeNote, semestreId, matiereId, classeId } = req.body; // Récupérer les paramètres envoyés par le formulaire
+
+    // Valider le type de note
+    const updateField = mapTypeNoteToField(typeNote);
+    if (!updateField) {
+      return res.status(400).send('Type de note non valide.');
+    }
+
+    // Lire le fichier Excel
+    const workbook = XLSX.readFile(file.path);
+    const sheetNameList = workbook.SheetNames;
+
+    if (sheetNameList.length === 0) {
+      return res.status(400).send('Le fichier Excel ne contient aucune feuille.');
+    }
+
+    const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetNameList[0]]);
+    
+    // Vérifiez que les colonnes nécessaires existent
+    if (!data.every(row => row.Nom && row.Prénom && row.Note)) {
+      return res.status(400).send('Le fichier Excel doit contenir des colonnes "Nom", "Prénom" et "Note".');
+    }
+
+    // Parcourir chaque ligne (chaque étudiant) du fichier Excel
+    for (const row of data) {
+      const { Nom, Prénom, Note } = row; // Ajustement des noms de colonnes
+
+      // Vérifiez que les champs ne sont pas vides
+      if (!Nom || !Prénom || !Note) {
+        console.error(`Les champs doivent être complétés pour : ${JSON.stringify(row)}`);
+        continue; // Passer à la ligne suivante si des champs sont manquants
+      }
+
+      // 1. Récupérer l'ID de l'élève à partir de son nom et prénom
+      const [eleve] = await db.query('SELECT id FROM Eleve WHERE nom = ? AND prenom = ?', [Nom, Prénom]);
+
+      if (eleve.length > 0) {
+        const eleveId = eleve[0].id;
+
+        // 2. Insérer ou mettre à jour la note dans la table Note pour l'élève
+        await db.query(
+          `INSERT INTO Note (${updateField}, Eleves_id, Semestre_id, matieres_id, classe_id)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE ${updateField} = VALUES(${updateField})`,
+          [Note, eleveId, semestreId, matiereId, classeId]
+        );
+      } else {
+        console.error(`Élève non trouvé : ${Nom} ${Prénom}`);
+      }
+    }
+
+    // Supprimer le fichier uploadé après traitement
+    fs.unlinkSync(file.path);
+
+    res.send('Données importées avec succès');
+  } catch (error) {
+    console.error('Erreur lors de l\'importation des données Excel', error);
+    res.status(500).send('Erreur lors de l\'importation');
+  }
+});
+
+// Endpoint pour récupérer les notes d'une classe et d'une matière spécifiques
+app.get('/api/notes/:classeId/:subjectId/:semesterId', async (req, res) => {
+  const { classeId, subjectId, semesterId } = req.params;
+
+  // Vérifier si les paramètres sont fournis
+  if (!classeId || !subjectId || !semesterId) {
+    return res.status(400).json({ error: 'Classe ID, semestre ID et Matière ID sont requis' });
+  }
+
+  try {
+    // Exécution de la requête SQL pour récupérer les notes des élèves
+    const [results] = await req.db.query(`
+      SELECT 
+        e.id AS eleveId, e.nom, e.prenom, 
+        MAX(n.inter1) AS inter1, 
+        MAX(n.inter2) AS inter2, 
+        MAX(n.inter3) AS inter3, 
+        MAX(n.inter4) AS inter4, 
+        MAX(n.Dev1) AS Dev1, 
+        MAX(n.Dev2) AS Dev2
+      FROM 
+        Eleve e
+      LEFT JOIN 
+        Note n 
+      ON 
+        e.id = n.Eleves_id 
+        AND n.classe_id = ? 
+        AND n.matieres_id = ? 
+        AND n.semestre_id = ?
+      WHERE 
+        e.classe_id = ?
+      GROUP BY 
+        e.id, e.nom, e.prenom;
+    `, [classeId, subjectId, semesterId, classeId]);
+
+    // Si aucun résultat, retourner un message vide
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Aucune donnée trouvée pour cette classe, cette matière et ce semestre.' });
+    }
+
+    // Récupération du coefficient associé à la classe et à la matière
+    const [[coefficient]] = await req.db.query(`
+      SELECT c.valeur 
+      FROM Coefficient c 
+      JOIN Enseigner e ON e.coefficient_id = c.id 
+      WHERE e.Classes_id = ? AND e.matiere_id = ?;
+    `, [classeId, subjectId]);
+
+    const coeffValue = coefficient ? coefficient.valeur : 0; // Utilisez 'valeur' au lieu de 'coefficient'
+
+    // Calcul des moyennes et ajout au résultat
+    const updatedResults = results.map(student => {
+      const { inter1, inter2, inter3, inter4, Dev1, Dev2 } = student;
+
+      // Convertir les notes en nombres
+      const notes = [parseFloat(inter1), parseFloat(inter2), parseFloat(inter3), parseFloat(inter4)].filter(note => !isNaN(note));
+      const moyInter = notes.length > 0 ? (notes.reduce((sum, note) => sum + note, 0) / notes.length) : 0;
+
+      // Calculer moy en incluant Dev1 et Dev2
+      const totalNotes = [moyInter, parseFloat(Dev1), parseFloat(Dev2)].filter(note => !isNaN(note));
+      const moy = totalNotes.length > 0 ? (totalNotes.reduce((sum, note) => sum + note, 0) / totalNotes.length) : 0;
+
+      // Calcul de coeff
+      const coeff = moy * coeffValue;
+
+      // Retourner l'objet mis à jour
+      return {
+        ...student,
+        moyInter: Number(moyInter.toFixed(2)), // Arrondir à 2 décimales
+        moy: Number(moy.toFixed(2)),           // Arrondir à 2 décimales
+        coeff: Number(coeff.toFixed(2)),       // Arrondir à 2 décimales
+      };
+    });
+
+    // Retourner les résultats mis à jour au client
+    res.json(updatedResults);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des notes', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Fonction pour sauvegarder les notes dans la table `Note`
+app.post('/api/notes/save', async (req, res) => {
+  const { classeId, subjectId, semesterId, notes } = req.body;
+
+  // Valider que les données nécessaires sont présentes
+  if (!classeId || !subjectId || !semesterId || !notes || !Array.isArray(notes)) {
+    return res.status(400).json({ message: 'Données manquantes ou invalides' });
+  }
+
+  try {
+    const connection = await req.db.getConnection(); // Récupérer une connexion à partir du pool
+
+    // Boucle à travers chaque note et effectue la mise à jour
+    for (const studentNote of notes) {
+      const { nom, prenom, MoyI, Moy, Moycoef } = studentNote;
+
+      // Récupérer l'`eleveId` en fonction du nom et prénom
+      const [rows] = await connection.query(`
+        SELECT id FROM Eleve 
+        WHERE nom = ? AND prenom = ? AND classe_id = ?
+      `, [nom, prenom, classeId]);
+
+      if (rows.length === 0) {
+        // Si aucun élève ne correspond, ignorer cette note
+        console.warn(`Élève non trouvé: ${nom} ${prenom}`);
+        continue;
+      }
+
+      const eleveId = rows[0].id;
+
+      // Requête SQL pour mettre à jour les notes dans la base de données
+      await connection.query(`
+        UPDATE Note 
+        SET moyInter = ?, moy = ?, moycoef = ?
+        WHERE Eleves_id = ? AND classe_id = ? AND matieres_id = ? AND Semestre_id = ?
+      `, [MoyI, Moy, Moycoef, eleveId, classeId, subjectId, semesterId]);
+    }
+
+    res.status(200).json({ message: 'Notes sauvegardées avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour des notes :', error);
+    res.status(500).json({ message: 'Erreur serveur lors de la sauvegarde des notes' });
+  }
+});
 
 app.get('/api/semesters', async (req, res) => {
   try {
@@ -581,45 +813,6 @@ app.get('/api/semesters', async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error('Erreur lors de la récupération des semestres:', error);
-    res.status(500).json({ error: 'Erreur interne du serveur' });
-  }
-});
-
-app.post('/api/notes', async (req, res) => {
-  const { matiereId, semesterId, noteType, notes } = req.body;
-
-  // Mapper le type de note avec la colonne correspondante dans la table Note
-  const noteColumnMap = {
-    'inter1': 'inter1',
-    'inter2': 'inter2',
-    'inter3': 'inter3',
-    'inter4': 'inter4',
-    'Dev1': 'Dev1',
-    'Dev2': 'Dev2',
-  };
-
-  const column = noteColumnMap[noteType];
-  
-  if (!column) {
-    return res.status(400).json({ error: 'Type de note invalide' });
-  }
-
-  try {
-    for (const note of notes) {
-      const { studentId, noteValue } = note;
-
-      const query = `
-        INSERT INTO Notes (eleves_id, matiere_id, semestre_id, ${column})
-        VALUES (?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE ${column} = VALUES(${column})
-      `;
-
-      await db.query(query, [studentId, matiereId, semesterId, noteValue]);
-    }
-
-    res.json({ message: 'Notes enregistrées avec succès' });
-  } catch (error) {
-    console.error('Erreur lors de l\'enregistrement des notes:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -1160,7 +1353,7 @@ app.get('/api/presenceid', async (req, res) => {
   }
 });
 
-// Endpoint pour les informations de l'élève pour notification
+//api a revoir particulierement
 app.get('/api/eleves/:studentId', async (req, res) => {
   const studentId = parseInt(req.params.studentId);
   try {
@@ -1175,7 +1368,7 @@ app.get('/api/eleves/:studentId', async (req, res) => {
     res.status(500).send('Erreur interne du serveur');
   }
 });
-
+//api pour notification administration dashbord
 // Endpoint pour le nom de la classe
 // Endpoint pour récupérer les informations d'une classe par son ID
 app.get('/api/classes/:classId', async (req, res) => {
@@ -1192,7 +1385,7 @@ app.get('/api/classes/:classId', async (req, res) => {
     res.status(500).send('Erreur interne du serveur');
   }
 });
-
+//api pour notification administration dashbord
 app.get('/api/parentid/:parentId', async (req, res) => {
   const  parentId  = req.params.parentId;
   try {
@@ -1207,7 +1400,7 @@ app.get('/api/parentid/:parentId', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
-
+//api a revoir
 app.get('/api/classe', async (req, res) => {
  try {
     const [rows] = await db.query('SELECT id, nom FROM Classes');
@@ -1217,7 +1410,7 @@ app.get('/api/classe', async (req, res) => {
     res.status(500).json({ error: 'Erreur lors de la récupération des classes' });
   }
 });
-
+//api pour notification administration dashbord
 app.get('/api/eleve/:studentId', async (req, res) => {
   const studentId = parseInt(req.params.studentId);
   try {

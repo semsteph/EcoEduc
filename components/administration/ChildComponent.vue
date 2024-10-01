@@ -10,7 +10,7 @@
           <v-expansion-panel-header>
             <v-btn title="Semestre1" @click="currentSemestre = 'Semestre1'; fetchSemestreData()">Semestre1</v-btn>
           </v-expansion-panel-header>
-          <v-expansion-panel-content v-if="currentSemestre === 'Semestre1'">kk
+          <v-expansion-panel-content v-if="currentSemestre === 'Semestre1'">
             <v-data-table
               :headers="headers"
               :items="semestre1Data"

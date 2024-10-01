@@ -95,7 +95,7 @@ export default {
     async contactParent(studentId) {
       try {
         // Récupère l'id du parent a l'eleve
-        const studentResponse = await axios.get(`http://localhost:8080/api/eleves/${studentId}`);
+        const studentResponse = await axios.get(`http://localhost:8080/api/eleve/${studentId}`);
         console.log(studentResponse);
         const parentId = studentResponse.data.Parents_id;
 
