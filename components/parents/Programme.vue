@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <h1>Programme de l'élève</h1>
+    <h1 class="bid">Programme de l'élève</h1>
 
     <!-- Tableau à double entrée -->
     <v-simple-table class="tableau-programme">
@@ -76,8 +76,11 @@ export default {
   padding: 8px; /* Espacement interne des cellules */
   text-align: center; /* Alignement du texte au centre */
 }
-.tableau-programme th {
+.tableau-programme tr {
   background-color: #f4f4f4; /* Couleur de fond pour les en-têtes */
+}
+.bid{
+  color: #ddd;
 }
 .back-button {
   display: block;

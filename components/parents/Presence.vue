@@ -15,7 +15,7 @@
     <!-- Tableau des présences -->
     <v-data-table :headers="headers" :items="filteredPresence" item-key="id" class="elevation-1">
       <template v-slot:item.date="{ item }">
-        <td>{{ item.date }}</td>
+        <td>{{ formaterDate(item.date) }}</td> <!-- Utilisation de la méthode de formatage -->
       </template>
       <template v-slot:item.matiere="{ item }">
         <td>{{ item.matiere }}</td>
@@ -62,6 +62,7 @@
 
 <script>
 import axios from 'axios';
+import dayjs from 'dayjs'; // Importation de dayjs
 
 export default {
   props: {
@@ -120,6 +121,9 @@ export default {
         console.error('Erreur lors de la récupération des données de présence :', error);
         this.$router.push('/login');
       }
+    },
+    formaterDate(date) {
+      return dayjs(date).format('DD/MM/YYYY'); // Formater la date au format jour/mois/année
     },
     handleMotifChange(id, motif) {
       // Mise à jour directe de l'objet modifié

@@ -1,20 +1,68 @@
 <template>
-    <div>
-      <v-btn icon @click="$emit('back')">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
-      <v-card color="amber lighten-4">
-        <v-card-title>Consulter Note</v-card-title>
-        <v-card-text>
-          <!-- Contenu pour la consultation des notes -->
-        </v-card-text>
-      </v-card>
-    </div>
-  </template>
-  
-  <script>
-  export default {
-    name: 'NoteConsultation',
+  <div>
+    <v-btn icon @click="$emit('back')">
+      <v-icon>mdi-arrow-left</v-icon>
+    </v-btn>
+    <v-card color="blue lighten-4" v-if="!selectedClassId">
+      <v-card-title>Consulter note</v-card-title>
+      <v-card-text>
+        <v-row>
+          <v-col
+            v-for="classe in classes"
+            :key="classe.id"
+            cols="12"
+            md="4"
+          >
+            <v-card
+              class="ma-2"
+              outlined
+              @click="goToClass(classe.id)"
+            >
+              <v-card-title>{{ classe.nom }}</v-card-title>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-card-text>
+    </v-card>
+    <!-- Affiche le composant enfant si une classe est sélectionnée -->
+    <note-details v-else :class-id="selectedClassId" @back="clearSelection" />
+  </div>
+</template>
+
+<script>
+import axios from 'axios';
+import NoteDetails from './NoteDetails.vue';
+
+export default {
+  name: 'NoteConsultation',
+  components: {
+    NoteDetails,
+  },
+  data() {
+    return {
+      classes: [],
+      selectedClassId: null,
+    };
+  },
+  methods: {
+    fetchClasses() {
+      axios.get('http://localhost:8080/api/classe')
+        .then(response => {
+          this.classes = response.data;
+        })
+        .catch(error => {
+          console.error('Erreur lors de la récupération des classes:', error);
+        });
+    },
+    goToClass(classId) {
+      this.selectedClassId = classId;
+    },
+    clearSelection() {
+      this.selectedClassId = null;
+    }
+  },
+  created() {
+    this.fetchClasses();
   }
-  </script>
-  
+}
+</script>

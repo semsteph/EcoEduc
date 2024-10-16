@@ -6,12 +6,13 @@
     <!-- Tableau affichant les matières, dates et activités, bien espacées et séparées -->
     <v-simple-table>
       <thead>
-        <tr>
-          <th style="padding: 10px; border-bottom: 1px solid black;">Matière</th>
-          <th style="padding: 10px; border-bottom: 1px solid black;">Date</th>
-          <th style="padding: 10px; border-bottom: 1px solid black;">Activité</th>
-        </tr>
-      </thead>
+  <tr>
+    <th style="padding: 10px; border-bottom: 1px solid black; color: white;">Matière</th>
+    <th style="padding: 10px; border-bottom: 1px solid black; color: white;">Date</th>
+    <th style="padding: 10px; border-bottom: 1px solid black; color: white;">Activité</th>
+  </tr>
+</thead>
+
       <tbody>
         <!-- Boucle sur les matières regroupées -->
         <template v-for="(test, index) in groupedTests" :key="index">

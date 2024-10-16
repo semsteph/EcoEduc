@@ -2,11 +2,12 @@
   <div>
     <!-- Boutons de gestion des classes -->
     <div class="button-group">
-      <v-btn color="primary" @click="showForm = true" v-if="!showProgram">Ajouter Classe</v-btn>
-      <v-btn color="primary" @click="fetchClasses" v-if="!showProgram">Mes Classes</v-btn>
+      <v-btn color="primary" @click="showForm = true" v-if="!showProgram && !showConductForm">Ajouter Classe</v-btn>
+      <v-btn color="primary" @click="fetchClasses" v-if="!showProgram && !showConductForm">Mes Classes</v-btn>
       <v-btn @click="toggleProgram" :color="showProgram ? 'secondary' : 'primary'">
         Programme
       </v-btn>
+      <v-btn color="primary" @click="showConductForm = true" v-if="!showProgram && !showForm">Note de conduite</v-btn>
     </div>
 
     <!-- Formulaire pour ajouter une nouvelle classe -->
@@ -28,8 +29,37 @@
       </v-form>
     </v-card>
 
+    <!-- Formulaire pour ajouter une note de conduite -->
+    <v-card v-if="showConductForm && !showProgram" class="pa-4 mt-4">
+      <v-form @submit.prevent="submitConductForm">
+        <v-text-field v-model="conductNote" label="Note de conduite" required></v-text-field>
+        <v-select
+          v-model="selectedClassIds"
+          :items="classesOptions"
+          item-title="name"
+          item-value="id"
+          label="Sélectionnez les classes"
+          multiple
+          required
+        ></v-select>
+        <v-select
+          v-model="selectedSemestreId"
+          :items="semestresOptions"
+          item-title="name"
+          item-value="id"
+          label="Sélectionnez le semestre"
+          required
+        ></v-select>
+        
+        <div class="d-flex justify-space-between mt-4">
+          <v-btn color="primary" type="submit">Ajouter</v-btn>
+          <v-btn @click="cancelConductForm">Annuler</v-btn>
+        </div>
+      </v-form>
+    </v-card>
+
     <!-- Liste des classes par promotion -->
-    <div v-if="!showForm && !showProgram && classesByPromotion && Object.keys(classesByPromotion).length > 0">
+    <div v-if="!showForm && !showProgram && !showConductForm && classesByPromotion && Object.keys(classesByPromotion).length > 0">
       <div v-for="(classes, promotion) in classesByPromotion" :key="promotion">
         <h3>Promotion: {{ promotion }}</h3>
         <v-card v-for="classe in classes" :key="classe.id" class="mt-3">
@@ -57,7 +87,7 @@
 
 <script>
 import axios from 'axios';
-import ProgrammeCours from './ProgrammeCours.vue'; // Assurez-vous que le chemin est correct
+import ProgrammeCours from './ProgrammeCours.vue';
 
 export default {
   name: 'ClassManagement',
@@ -66,9 +96,15 @@ export default {
     return {
       classesByPromotion: {},
       showForm: false,
+      showConductForm: false,
       newClassName: '',
+      conductNote: '',
       promotions: [],
+      semestresOptions: [],
+      selectedSemestreId: null,
       selectedPromotionId: null,
+      selectedClassIds: [],
+      classesOptions: [],
       editClassId: null,
       snackbar: {
         show: false,
@@ -99,6 +135,45 @@ export default {
         this.showSnackbar('Erreur lors de l\'ajout/modification de la classe.', 'error');
       });
     },
+    fetchSemestre() {
+      axios.get('http://localhost:8080/api/semesters')
+        .then(response => {
+          const data = response.data;
+          if (typeof data === 'object') {
+            this.semestresOptions = Object.values(data).map(semestre => ({
+              id: semestre.id,
+              name: semestre.nom
+            }));
+          } else {
+            console.error('Format de données inattendu.');
+          }
+        })
+        .catch(error => {
+          console.error('Erreur lors de la récupération des semestres :', error);
+        });
+    },
+    submitConductForm() {
+  // Vérifiez si tous les champs requis sont remplis
+  if (!this.conductNote || this.selectedClassIds.length === 0 || !this.selectedSemestreId) {
+    this.showSnackbar('Veuillez remplir tous les champs.', 'error');
+    return;
+  }
+
+  // Effectuer la requête POST avec tous les identifiants de classe
+  axios.post('http://localhost:8080/api/conduite', {
+    note_conduite: this.conductNote,
+    classe_ids: this.selectedClassIds,  // Envoyer tous les identifiants de classe
+    semestre_id: this.selectedSemestreId
+  })
+  .then(response => {
+    this.cancelConductForm();
+    this.showSnackbar(response.data.message, 'success');  // Utiliser le message de succès de la réponse
+  })
+  .catch(error => {
+    console.error('Erreur lors de l\'ajout des notes de conduite :', error.response ? error.response.data : error.message);
+    this.showSnackbar(error.response?.data?.error || 'Erreur lors de l\'ajout des notes de conduite.', 'error');  // Afficher le message d'erreur approprié
+  });
+},
     fetchPromotions() {
       axios.get('http://localhost:8080/api/Promotions')
         .then(response => {
@@ -114,6 +189,10 @@ export default {
           const data = response.data;
           if (typeof data === 'object') {
             this.classesByPromotion = data;
+            this.classesOptions = Object.values(data).flat().map(classe => ({
+              id: classe.id,
+              name: classe.name
+            }));
           } else {
             console.error('Format de données inattendu.');
           }
@@ -149,6 +228,12 @@ export default {
       this.editClassId = null;
       this.showForm = false;
     },
+    cancelConductForm() {
+      this.conductNote = '';
+      this.selectedClassIds = [];
+      this.showConductForm = false;
+      this.selectedSemestreId = null;
+    },
     showSnackbar(message, color) {
       this.snackbar.message = message;
       this.snackbar.color = color;
@@ -158,17 +243,20 @@ export default {
       this.showProgram = !this.showProgram;
       if (this.showProgram) {
         this.showForm = false;
+        this.showConductForm = false;
       }
     },
-      goBack() {
-        this.$emit('back');
-      },
-      navigateTo(route) {
-        this.$emit('navigate', route);
-      }
+    goBack() {
+      this.$emit('back');
+    },
+    navigateTo(route) {
+      this.$emit('navigate', route);
+    }
   },
   mounted() {
     this.fetchPromotions();
+    this.fetchClasses();
+    this.fetchSemestre();
   }
 }
 </script>

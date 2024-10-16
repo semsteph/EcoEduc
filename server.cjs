@@ -10,7 +10,6 @@ const fs = require('fs');  // Ajout de fs
 const path = require('path');  // Ajout de path
 
 
-
 const app = express();
 const port = 8080;
 const secretKey = 'your_jwt_secret';
@@ -205,6 +204,49 @@ app.delete('/api/Classes/:id', async (req, res) => {
   } catch (error) {
     console.error('Erreur lors de la suppression de la classe', error);
     res.status(500).json({ error: 'Une erreur est survenue lors de la suppression de la classe.' });
+  }
+});
+
+
+app.post('/api/conduite', async (req, res) => {
+  try {
+    const { note_conduite, classe_ids, semestre_id } = req.body;
+
+    // Vérifiez les données reçues
+    if (!note_conduite || !classe_ids || classe_ids.length === 0 || !semestre_id) {
+      return res.status(400).json({ error: 'Veuillez fournir une note de conduite, des identifiants de classe et un identifiant de semestre.' });
+    }
+
+    // Vérifiez si des notes de conduite existent déjà pour les classes sélectionnées dans le semestre donné
+    const placeholders = classe_ids.map(() => '?').join(',');
+    const checkQuery = `
+      SELECT c.id, c.nom AS className
+      FROM Conduite co
+      JOIN Classes c ON co.classe_id = c.id
+      WHERE co.classe_id IN (${placeholders}) AND co.semestre_id = ?
+    `;
+    const [rows] = await req.db.execute(checkQuery, [...classe_ids, semestre_id]);
+
+    if (rows.length > 0) {
+      // Récupération des noms des classes pour lesquelles une note existe déjà
+      const existingClasses = rows.map(row => row.className);
+      return res.status(400).json({
+        error: `Une note de conduite a déjà été ajoutée pour cette/ces classe(s) : ${existingClasses.join(', ')}.`
+      });
+    }
+
+    // Insertion des notes de conduite pour chaque classe
+    const insertQuery = 'INSERT INTO Conduite (note_conduite, classe_id, semestre_id) VALUES (?, ?, ?)';
+    const insertPromises = classe_ids.map(classe_id => 
+      req.db.execute(insertQuery, [note_conduite, classe_id, semestre_id])
+    );
+
+    await Promise.all(insertPromises);
+
+    res.status(200).json({ message: 'Notes de conduite ajoutées avec succès.' });
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout de la note de conduite :', error);
+    res.status(500).json({ error: 'Erreur du serveur.' });
   }
 });
 
@@ -1711,7 +1753,6 @@ app.get('/api/notifications/:parentId', async (req, res) => {
 });
 
 
-// API pour récupérer les tests (matières, dates, activités) pour un élève
 app.get('/api/tests/:childId', async (req, res) => {
   const { childId } = req.params;
 
@@ -1733,10 +1774,15 @@ app.get('/api/tests/:childId', async (req, res) => {
       WHERE t.classe_id = ?
     `, [classId]);
 
+    // Vérifier si des tests existent
+    if (tests.length === 0) {
+      return res.status(200).json([]);  // Pas de tests disponibles
+    }
+
     // Filtrer les tests pour ne garder que ceux du mois actuel
     const currentMonth = moment().month();  // Mois actuel (0 pour janvier, 11 pour décembre)
     const filteredTests = tests.filter(test => {
-      const testMonth = moment(test.date).month();  // Mois du test
+      const testMonth = moment(test.date, 'YYYY-MM-DD').month();  // Assumer que la date est stockée au format 'YYYY-MM-DD'
       return testMonth === currentMonth;
     });
 
@@ -1748,6 +1794,7 @@ app.get('/api/tests/:childId', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
+
 app.get('/api/classes/:classId/details', async (req, res) => {
   const classeId = req.params.classId;
 
@@ -1834,7 +1881,222 @@ app.post('/api/Matieres', async (req, res) => {
     }
   });
 
+  app.get('/api/classe-details', async (req, res) => {
+    const { classeId } = req.query;
+  
+    try {
+      // Récupération des notes, des matières et des semestres en une seule requête
+      const [results] = await req.db.query(
+        `SELECT e.id AS eleve_id, e.nom AS eleve_nom, e.prenom AS eleve_prenom, 
+                m.id AS matiere_id, m.nom AS matiere_nom, 
+                s.id AS semestre_id, s.nom AS semestre_nom, 
+                n.inter1, n.inter2, n.inter3, n.inter4, n.moyInter, 
+                n.Dev1, n.Dev2, n.moy, n.moycoef 
+         FROM Eleve e
+         JOIN Note n ON e.id = n.Eleves_id
+         JOIN Matieres m ON m.id = n.matieres_id
+         JOIN Semestre s ON s.id = n.semestre_id
+         JOIN Enseigner en ON en.matiere_id = m.id
+         WHERE n.classe_id = ?`,
+        [classeId]
+      );
+  
+      // Vérification si des résultats ont été récupérés
+      if (results.length === 0) {
+        return res.json({ semestres: [], matieres: [], notes: {}, message: "Aucune note trouvée pour cette classe." });
+      }
+  
+      // Structuration des données
+      const semestres = [];
+      const matieres = [];
+      let notes = {};
+  
+      results.forEach(row => {
+        // Ajout des semestres uniques
+        if (!semestres.find(sem => sem.id === row.semestre_id)) {
+          semestres.push({ id: row.semestre_id, nom: row.semestre_nom });
+        }
+  
+        // Ajout des matières uniques
+        if (!matieres.find(mat => mat.id === row.matiere_id)) {
+          matieres.push({ id: row.matiere_id, nom: row.matiere_nom });
+        }
+  
+        // Structuration des notes par semestre et matière
+        if (!notes[row.semestre_id]) {
+          notes[row.semestre_id] = [];
+        }
+  
+        notes[row.semestre_id].push({
+          matiereId: row.matiere_id,
+          eleveId: row.eleve_id,
+          nom: row.eleve_nom,
+          prenom: row.eleve_prenom,
+          inter1: row.inter1 || '',
+          inter2: row.inter2 || '',
+          inter3: row.inter3 || '',
+          inter4: row.inter4 || '',
+          moyInter: row.moyInter || '',
+          dev1: row.Dev1 || '',
+          dev2: row.Dev2 || '',
+          moy: row.moy || '',
+          moycoef: row.moycoef || '',
+        });
+      });
+  
+      // Envoi de la réponse structurée
+      res.json({ semestres, matieres, notes });
+    } catch (error) {
+      console.error("Erreur lors de la récupération des détails de la classe :", error);
+      res.status(500).json({ message: "Erreur serveur lors de la récupération des détails de la classe" });
+    }
+  });
+  
+  app.get('/api/bulletin', async (req, res) => {
+    const { classeId } = req.query;
 
+    try {
+        // Première requête : récupération des notes, des matières, des semestres et du nom de la classe
+        const [results] = await req.db.query(
+            `SELECT e.id AS eleve_id,
+                    e.nom AS eleve_nom,
+                    e.prenom AS eleve_prenom,
+                    c.nom AS classe_nom,
+                    m.id AS matiere_id,
+                    m.nom AS matiere_nom, 
+                    s.id AS semestre_id, 
+                    s.nom AS semestre_nom,
+                    n.moy, n.moycoef,
+                    MAX(p.total_hours) AS total_hours
+            FROM Eleve e 
+            JOIN Note n ON e.id = n.Eleves_id 
+            JOIN Matieres m ON m.id = n.matieres_id 
+            JOIN Semestre s ON s.id = n.semestre_id 
+            JOIN Classes c ON c.id = n.classe_id 
+            LEFT JOIN Punitions p ON e.id = p.eleve_id 
+            WHERE n.classe_id = ?
+            GROUP BY e.id, m.id, s.id`,
+            [classeId]
+        );
+
+        if (results.length === 0) {
+            return res.json({ semestres: [], matieres: [], notes: {}, classeNom: null, message: "Aucune note trouvée pour cette classe." });
+        }
+
+        // Structuration des données
+        const semestres = [];
+        const matieres = [];
+        let notes = {};
+        const classeNom = results[0]?.classe_nom || null;
+
+        results.forEach(row => {
+            if (!semestres.find(sem => sem.id === row.semestre_id)) {
+                semestres.push({ id: row.semestre_id, nom: row.semestre_nom });
+            }
+
+            if (!matieres.find(mat => mat.id === row.matiere_id)) {
+                matieres.push({ id: row.matiere_id, nom: row.matiere_nom });
+            }
+
+            if (!notes[row.semestre_id]) {
+                notes[row.semestre_id] = [];
+            }
+
+            notes[row.semestre_id].push({
+                matiereId: row.matiere_id,
+                eleveId: row.eleve_id,
+                nom: row.eleve_nom,
+                prenom: row.eleve_prenom,
+                moy: row.moy || null,
+                moycoef: row.moycoef || null,
+                total_hours: row.total_hours || 0, // Valeur maximale des heures
+                coefficient: null
+            });
+        });
+
+        // Deuxième requête : récupération des coefficients
+        const [coefficients] = await req.db.query(
+            `SELECT c.id As coefficient_id, c.valeur AS coefficient, en.matiere_id
+             FROM Coefficient c
+             JOIN Enseigner en ON en.coefficient_id = c.id
+             WHERE en.Classes_id = ?`,
+            [classeId]
+        );
+
+        coefficients.forEach(coef => {
+            Object.keys(notes).forEach(semestreId => {
+                notes[semestreId].forEach(note => {
+                    if (note.matiereId === coef.matiere_id) {
+                        note.coefficient = coef.coefficient || null;
+                        note.coefficientId = coef.coefficient_id;
+                    }
+                });
+            });
+        });
+
+        // Troisième requête : récupération des notes de conduite et des semestres
+        const [conduiteResults] = await req.db.query(
+            `SELECT c.note_conduite AS note_conduite, s.id AS semestre_id, s.nom AS semestre_nom
+             FROM Conduite c
+             JOIN Semestre s ON s.id = c.semestre_id
+             WHERE c.classe_id = ?`,
+            [classeId]
+        );
+
+        conduiteResults.forEach(conduite => {
+            if (!notes[conduite.semestre_id]) {
+                notes[conduite.semestre_id] = [];
+            }
+            notes[conduite.semestre_id].forEach(note => {
+                note.conduite = conduite.note_conduite || null;
+            });
+        });
+
+        res.json({ semestres, matieres, notes, classeNom });
+    } catch (error) {
+        console.error("Erreur lors de la récupération des détails de la classe et des coefficients :", error);
+        res.status(500).json({ message: "Erreur serveur lors de la récupération des détails de la classe et des coefficients" });
+    }
+});
+
+
+ // Route pour insérer les données dans la table Bulletin
+ app.post('/api/save-bulletin', async (req, res) => {
+  try {
+    const bulletins = req.body; // Supposons que req.body contient le tableau d'objets
+
+    for (const bulletin of bulletins) {
+      const { eleve_id, semestre_id, matiere_id, coef_id, moy, moycoef, total, moySem, rang, mention } = bulletin;
+
+      // Conversion des types de données
+      const parsedMoy = parseFloat(moy);
+      const parsedMoycoef = parseFloat(moycoef);
+      const parsedTotal = parseFloat(total);
+      const parsedMoySem = parseFloat(moySem);
+      const parsedRang = parseInt(rang, 10); // Assurez-vous que `rang` est un entier
+
+      // Vérification de l'intégrité des données
+      if (!eleve_id || !semestre_id || !matiere_id || !coef_id || isNaN(parsedMoy) || isNaN(parsedMoycoef) || isNaN(parsedTotal) || isNaN(parsedMoySem) || isNaN(parsedRang)) {
+        return res.status(400).json({ message: 'Données manquantes ou invalides' });
+      }
+
+      // Insertion dans la table Bulletin
+      await db.query(`
+        INSERT INTO Bulletin (eleve_id, semestre_id, matiere_id, coef_id, moy, moycoef, total, moySem, rang, mention)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [eleve_id, semestre_id, matiere_id, coef_id, parsedMoy, parsedMoycoef, parsedTotal, parsedMoySem, parsedRang, mention]
+      );
+    }
+
+    res.status(201).json({ message: 'Bulletins sauvegardés avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la sauvegarde des bulletins:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+
+  
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });

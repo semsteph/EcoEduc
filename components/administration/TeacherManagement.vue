@@ -25,6 +25,22 @@
       </v-card>
     </v-dialog>
 
+    <!-- Dialog pour afficher les informations générées -->
+    <v-dialog v-model="showGeneratedInfo" max-width="400px">
+      <v-card>
+        <v-card-title>Informations de Connexion</v-card-title>
+        <v-card-text>
+          <div v-if="generatedInfo">
+            <p><strong>Nom d'utilisateur:</strong> {{ generatedInfo.username }}</p>
+            <p><strong>Mot de passe:</strong> {{ generatedInfo.password }}</p>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="primary" @click="showGeneratedInfo = false">Fermer</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Formulaire d'ajout d'enseignant -->
     <v-dialog v-model="showAddForm" max-width="600px">
       <v-card>
@@ -101,9 +117,7 @@
   </v-container>
 </template>
 
-
 <script>
-
 import MesEnseignants from './MesEnseignants.vue';
 import CahierDeTexte from './CahierDeTexte.vue';
 import axios from 'axios';
@@ -118,7 +132,8 @@ export default {
       drawer: false,
       showInscriptionForm: false,
       showAddForm: false,
-      showAddSubjectForm: false, // Formulaire d'ajout de matière
+      showAddSubjectForm: false,
+      showGeneratedInfo: false,
       newTeacher: {
         name: '',
         firstName: '',
@@ -128,7 +143,7 @@ export default {
         password: ''
       },
       newSubject: {
-        name: '' // Nouveau champ pour ajouter une matière
+        name: ''
       },
       generatedInfo: null,
       teachers: [],
@@ -174,14 +189,16 @@ export default {
 
         console.log('Teacher registered:', response.data);
         this.generatedInfo = { username: this.newTeacher.username, password: this.newTeacher.password };
+        this.showGeneratedInfo = true;  // Affiche le dialogue avec les informations
 
+        // Réinitialiser le formulaire
         this.newTeacher.name = '';
         this.newTeacher.firstName = '';
         this.newTeacher.email = '';
         this.newTeacher.phone = '';
         this.newTeacher.username = '';
         this.newTeacher.password = '';
-        this.showInscriptionForm = false;
+        this.showInscriptionForm = false;  // Ferme le formulaire d'inscription
 
       } catch (error) {
         console.error('Error during registration:', error.response ? error.response.data : error.message);
@@ -198,11 +215,12 @@ export default {
         const response = await axios.post('http://localhost:8080/api/Enseignants/add', data);
         console.log('Teacher added:', response.data);
 
+        // Réinitialiser les sélections
         this.selectedTeacher = null;
         this.selectedClass = null;
         this.selectedSubject = null;
         this.selectedCoefficient = null;
-        this.showAddForm = false;
+        this.showAddForm = false;  // Ferme le formulaire d'ajout
 
       } catch (error) {
         console.error('Error adding teacher:', error.response ? error.response.data : error.message);
@@ -216,8 +234,8 @@ export default {
         console.log('Subject added:', response.data);
 
         this.newSubject.name = '';
-        this.showAddSubjectForm = false;
-        this.fetchData(); // Rafraîchir la liste des matières
+        this.showAddSubjectForm = false;  // Ferme le formulaire d'ajout de matière
+        this.fetchData();  // Met à jour la liste des matières
 
       } catch (error) {
         console.error('Error adding subject:', error.response ? error.response.data : error.message);
@@ -236,7 +254,6 @@ export default {
   }
 };
 </script>
-
 
 <style scoped>
 .v-dialog {

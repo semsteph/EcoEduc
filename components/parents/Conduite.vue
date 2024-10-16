@@ -23,7 +23,7 @@
       <tbody>
         <tr v-for="incident in incidents" :key="incident.id">
           <td>{{ incident.auteur }}</td>
-          <td>{{ incident.date }}</td>
+          <td>{{ formaterDate(incident.date) }}</td> <!-- Formater la date -->
           <td>{{ incident.heure }}</td>
           <td>{{ incident.punition }}</td>
           <td>{{ incident.motif }}</td>
@@ -39,6 +39,7 @@
 
 <script>
 import axios from 'axios';
+import dayjs from 'dayjs'; // Importer dayjs pour formater les dates
 
 export default {
   props: {
@@ -85,6 +86,10 @@ export default {
         this.$router.push('/login');
       }
     },
+    // Nouvelle méthode pour formater la date
+    formaterDate(date) {
+      return dayjs(date).format('DD/MM/YYYY'); // Formater la date en jour/mois/année
+    },
   },
   mounted() {
     this.fetchIncidents(this.childId); // Appel initial pour récupérer les incidents
@@ -114,7 +119,7 @@ export default {
   padding: 8px; /* Espacement interne des cellules */
   text-align: center; /* Alignement du texte au centre */
 }
-.tableau-conduite th {
+.tableau-conduite tr {
   background-color: #f4f4f4; /* Couleur de fond pour les en-têtes */
 }
 .back-button {
