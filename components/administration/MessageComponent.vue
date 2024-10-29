@@ -93,6 +93,16 @@ import moment from 'moment';
 
 export default {
   name: 'MessageComponent',
+  props: {
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
+  },
   data() {
     return {
       permissions: [],
@@ -106,7 +116,7 @@ export default {
   methods: {
     async fetchPermissions() {
       try {
-        const response = await axios.get('http://localhost:8080/api/permissions');
+        const response = await axios.get(`http://localhost:8080/api/permissions/${this.etablissementId}`);
         this.permissions = response.data;
 
         console.log('Permissions récupérées :', this.permissions);
@@ -117,6 +127,7 @@ export default {
         console.error('Erreur lors de la récupération des permissions :', error);
       }
     },
+    
     filterPermissionsByMonth() {
       const currentMonth = moment().month();
       this.filteredPermissions = this.permissions.filter(permission =>

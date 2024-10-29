@@ -1,9 +1,14 @@
 <template>
   <div>
     <!-- Navigation entre les semestres -->
-    <v-btn-toggle v-model="selectedSemester" mandatory class="mb-4">
-      <v-btn value="Semestre1" @click="fetchSemestreData">Semestre 1</v-btn>
-      <v-btn value="Semestre2" @click="fetchSemestreData">Semestre 2</v-btn>
+    <v-btn-toggle v-model="currentSemestre" mandatory class="mb-4">
+      <v-btn 
+        v-for="semestre in semestres" 
+        :key="semestre.nom" 
+        :value="semestre.nom" 
+        @click="selectSemestre(semestre.nom)">
+        {{ semestre.nom }}
+      </v-btn>
     </v-btn-toggle>
 
     <!-- Tableau des punitions -->
@@ -35,11 +40,22 @@
         <v-card-text>
           <v-form ref="form">
             <v-text-field v-model="newPunishment.auteur" label="Auteur" required></v-text-field>
-            <v-text-field v-model="newPunishment.date" label="Date (YYYY-MM-DD)" required></v-text-field>
-            <v-text-field v-model="newPunishment.punition" label="Punition" required></v-text-field>
-            <v-text-field v-model="newPunishment.heure" label="Heure (HH:mm)" required></v-text-field>
+            <v-text-field 
+              v-model="newPunishment.date" 
+              label="Date (DD-MM-YYYY)" 
+              required 
+              :rules="[rules.date]"
+            ></v-text-field>
+            <v-combobox 
+              v-model="newPunishment.punition"
+              :items="punishmentOptions"
+              label="Punition"
+              required
+              clearable
+              allow-overflow
+            ></v-combobox>
+            <v-text-field v-model="newPunishment.heure" label="Heure" required></v-text-field>
             <v-text-field v-model="newPunishment.motif" label="Motif" required></v-text-field>
-            <v-text-field v-model="newPunishment.total_hours" label="Somme d'heures" required></v-text-field>
           </v-form>
         </v-card-text>
 
@@ -70,6 +86,7 @@
 
 <script>
 import axios from 'axios';
+import moment from 'moment';
 
 export default {
   props: {
@@ -77,11 +94,21 @@ export default {
       type: Number,
       required: true,
     },
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
   },
   data() {
     return {
-      selectedSemester: 'Semestre1',
+      currentSemestre: '',
+      semestres: [],
       punishmentData: [],
+      allPunishmentData: {},
       showAddPunishmentForm: false,
       errorMessage: '',
       newPunishment: {
@@ -90,8 +117,8 @@ export default {
         punition: '',
         heure: '',
         motif: '',
-        total_hours: '',
       },
+      punishmentOptions: ['2h', '4h', '8h'],
       headers: [
         { title: 'Auteur', value: 'auteur' },
         { title: 'Punition', value: 'punition' },
@@ -100,45 +127,79 @@ export default {
         { title: 'Motif', value: 'motif' },
         { title: 'Somme d\'heures', value: 'total_hours' },
       ],
+      rules: {
+        date: value => {
+          return moment(value, 'DD-MM-YYYY', true).isValid() || 'Date invalide. Le format attendu est DD-MM-YYYY.';
+        }
+      }
     };
   },
   methods: {
+    async fetchSemesters() {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
+        this.semestres = response.data.map(sem => ({
+          nom: sem.nom,
+        }));
+
+        if (this.semestres.length > 0) {
+          this.currentSemestre = this.semestres[0].nom;
+          this.fetchSemestreData();
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des semestres', error);
+      }
+    },
+    selectSemestre(semestreNom) {
+      this.currentSemestre = semestreNom;
+      this.fetchSemestreData();
+    },
     fetchSemestreData() {
       axios.get(`http://localhost:8080/api/incidents`, {
         params: {
           eleveId: this.studentId,
-          semestre: this.selectedSemester,
+          semestre: this.currentSemestre,
         },
       })
       .then(response => {
-        this.punishmentData = response.data.map(item => {
-          return {
-            ...item,
-            formattedDate: new Date(item.date).toLocaleDateString('fr-FR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric'
-            }),
-          };
-        });
+        this.allPunishmentData[this.currentSemestre] = response.data.map(item => ({
+          ...item,
+          date: moment(item.date, 'YYYY-MM-DD').format('DD-MM-YYYY'), // Formater la date pour l'affichage
+        }));
+
+        this.punishmentData = this.allPunishmentData[this.currentSemestre] || [];
       })
       .catch(error => {
         console.error("Erreur lors de la récupération des données:", error);
       });
     },
     addPunishment() {
+      // Formater la date au format YYYY-MM-DD avant l'envoi
+      const formattedDate = moment(this.newPunishment.date, 'DD-MM-YYYY').format('YYYY-MM-DD');
+      // Formater l'heure
+      const formattedHeure = moment(this.newPunishment.heure, ['HH:mm', 'H:mm']).format('HH:mm');
+
       axios.post(`http://localhost:8080/api/incidents`, {
         eleveId: this.studentId,
-        semestre: this.selectedSemester,
+        semestre: this.currentSemestre,
         auteur: this.newPunishment.auteur,
-        date: this.newPunishment.date,
+        date: formattedDate,
         punition: this.newPunishment.punition,
-        heure: this.newPunishment.heure,
+        heure: formattedHeure, // Envoi de l'heure formatée
         motif: this.newPunishment.motif,
-        total_hours: this.newPunishment.total_hours,
+        etablissementId: this.etablissementId,
       })
       .then(response => {
-        this.punishmentData.push(response.data);
+        if (!this.allPunishmentData[this.currentSemestre]) {
+          this.allPunishmentData[this.currentSemestre] = [];
+        }
+
+        this.allPunishmentData[this.currentSemestre].push({
+          ...response.data,
+          date: moment(response.data.date, 'YYYY-MM-DD').format('DD-MM-YYYY'), // Formater la date à l'affichage
+        });
+
+        this.punishmentData = this.allPunishmentData[this.currentSemestre];
         this.showAddPunishmentForm = false;
         this.$refs.form.reset();
         this.errorMessage = '';
@@ -153,34 +214,7 @@ export default {
     },
   },
   mounted() {
-    this.fetchSemestreData();
+    this.fetchSemesters();
   },
 };
 </script>
-
-<style scoped>
-.v-btn-toggle {
-  margin-bottom: 16px;
-}
-
-.v-card-title {
-  font-weight: bold;
-}
-
-.v-toolbar-title {
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.elevation-1 {
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.12), 0px 1px 2px rgba(0, 0, 0, 0.24);
-}
-
-.v-dialog {
-  max-width: 600px;
-}
-
-.v-btn {
-  margin: 5px;
-}
-</style>

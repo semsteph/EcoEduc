@@ -49,6 +49,16 @@ import axios from 'axios';
 
 export default {
   name: 'NotificationComponent',
+  props: {
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
+  },
   data() {
     return {
       alerts: [],
@@ -59,7 +69,7 @@ export default {
   },
   async created() {
   try {
-    const response = await axios.get('http://localhost:8080/api/presenceid');
+    const response = await axios.get(`http://localhost:8080/api/presenceid/${this.etablissementId}`);
     const presenceData = response.data;
 
     const absentStudentIds = this.findAbsentStudent(presenceData);

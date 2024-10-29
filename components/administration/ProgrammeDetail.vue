@@ -53,90 +53,93 @@
     </v-snackbar>
 
     <!-- Tableau des programmes -->
-    <v-simple-table>
-      <thead>
-        <tr>
-          <th>Matières / Jours</th>
-          <th>Lundi</th>
-          <th>Mardi</th>
-          <th>Mercredi</th>
-          <th>Jeudi</th>
-          <th>Vendredi</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="matiere in matieres" :key="matiere.id">
-          <td>{{ matiere.nom }}</td>
-          <td>
-            <v-layout>
-              <v-btn icon small @click="supprimerProgramme(matiere.id, 'lundi')">
-                <v-icon color="blue">mdi-delete</v-icon>
-              </v-btn>
-              <v-text-field 
-                v-model="matiere.lundi" 
-                label="Programme" 
-                dense hide-details 
-                readonly
-              ></v-text-field>
-            </v-layout>
-          </td>
-          <td>
-            <v-layout>
-              <v-btn icon small @click="supprimerProgramme(matiere.id, 'mardi')">
-                <v-icon color="blue">mdi-delete</v-icon>
-              </v-btn>
-              <v-text-field 
-                v-model="matiere.mardi" 
-                label="Programme" 
-                dense hide-details 
-                readonly
-              ></v-text-field>
-            </v-layout>
-          </td>
-          <td>
-            <v-layout>
-              <v-btn icon small @click="supprimerProgramme(matiere.id, 'mercredi')">
-                <v-icon color="blue">mdi-delete</v-icon>
-              </v-btn>
-              <v-text-field 
-                v-model="matiere.mercredi" 
-                label="Programme" 
-                dense hide-details 
-                readonly
-              ></v-text-field>
-            </v-layout>
-          </td>
-          <td>
-            <v-layout>
-              <v-btn icon small @click="supprimerProgramme(matiere.id, 'jeudi')">
-                <v-icon color="blue">mdi-delete</v-icon>
-              </v-btn>
-              <v-text-field 
-                v-model="matiere.jeudi" 
-                label="Programme" 
-                dense hide-details 
-                readonly
-              ></v-text-field>
-            </v-layout>
-          </td>
-          <td>
-            <v-layout>
-              <v-btn icon small @click="supprimerProgramme(matiere.id, 'vendredi')">
-                <v-icon color="blue">mdi-delete</v-icon>
-              </v-btn>
-              <v-text-field 
-                v-model="matiere.vendredi" 
-                label="Programme" 
-                dense hide-details 
-                readonly
-              ></v-text-field>
-            </v-layout>
-          </td>
-        </tr>
-      </tbody>
-    </v-simple-table>
+    <div class="table-responsive">
+      <v-simple-table>
+        <thead>
+          <tr>
+            <th>Matières / Jours</th>
+            <th>Lundi</th>
+            <th>Mardi</th>
+            <th>Mercredi</th>
+            <th>Jeudi</th>
+            <th>Vendredi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="matiere in matieres" :key="matiere.id" class="hide">
+            <td>{{ matiere.nom }}</td>
+            <td>
+              <v-layout>
+                <v-btn icon small @click="supprimerProgramme(matiere.id, 'lundi')">
+                  <v-icon color="blue">mdi-delete</v-icon>
+                </v-btn>
+                <v-text-field 
+                  v-model="matiere.lundi" 
+                  label="Programme" 
+                  dense hide-details 
+                  readonly
+                ></v-text-field>
+              </v-layout>
+            </td>
+            <td>
+              <v-layout>
+                <v-btn icon small @click="supprimerProgramme(matiere.id, 'mardi')">
+                  <v-icon color="blue">mdi-delete</v-icon>
+                </v-btn>
+                <v-text-field 
+                  v-model="matiere.mardi" 
+                  label="Programme" 
+                  dense hide-details 
+                  readonly
+                ></v-text-field>
+              </v-layout>
+            </td>
+            <td>
+              <v-layout>
+                <v-btn icon small @click="supprimerProgramme(matiere.id, 'mercredi')">
+                  <v-icon color="blue">mdi-delete</v-icon>
+                </v-btn>
+                <v-text-field 
+                  v-model="matiere.mercredi" 
+                  label="Programme" 
+                  dense hide-details 
+                  readonly
+                ></v-text-field>
+              </v-layout>
+            </td>
+            <td>
+              <v-layout>
+                <v-btn icon small @click="supprimerProgramme(matiere.id, 'jeudi')">
+                  <v-icon color="blue">mdi-delete</v-icon>
+                </v-btn>
+                <v-text-field 
+                  v-model="matiere.jeudi" 
+                  label="Programme" 
+                  dense hide-details 
+                  readonly
+                ></v-text-field>
+              </v-layout>
+            </td>
+            <td>
+              <v-layout>
+                <v-btn icon small @click="supprimerProgramme(matiere.id, 'vendredi')">
+                  <v-icon color="blue">mdi-delete</v-icon>
+                </v-btn>
+                <v-text-field 
+                  v-model="matiere.vendredi" 
+                  label="Programme" 
+                  dense hide-details 
+                  readonly
+                ></v-text-field>
+              </v-layout>
+            </td>
+          </tr>
+        </tbody>
+      </v-simple-table>
+    </div>
   </v-container>
 </template>
+
 
 <script>
 import axios from 'axios';
@@ -148,6 +151,14 @@ export default {
       type: Number,
       required: true,
     },
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
   },
   data() {
     return {
@@ -173,7 +184,7 @@ export default {
   },
   methods: {
     fetchMatieres() {
-      axios.get(`http://localhost:8080/api/matieres/${this.classId}`)
+      axios.get(`http://localhost:8080/api/matiere/${this.classId}`)
         .then(response => {
           this.matiereOptions = response.data;
         })
@@ -219,6 +230,7 @@ export default {
         jour: this.nouveauProgramme.jour,
         horaire: this.nouveauProgramme.horaire,
         matiereId: this.nouveauProgramme.matiereId,
+        etablissementId: this.etablissementId,
       };
       
       axios.post('http://localhost:8080/api/programme', programmeData)
@@ -272,6 +284,7 @@ export default {
 <style scoped>
 .v-simple-table {
   margin-top: 20px;
+  background-color: white;
 }
 
 .v-text-field {
@@ -307,5 +320,30 @@ thead th, tbody td {
 
 .v-btn {
   margin-right: 8px;
+}
+
+/* Pour permettre le défilement horizontal */
+.table-responsive {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background-color: white;
+  z-index: 1;
+}
+.hide{
+  background-color: aliceblue;
+}
+@media screen and (max-width: 768px) {
+  .v-simple-table {
+    width: 100%;
+  }
+
+  .v-text-field {
+    width: 120px;
+  }
 }
 </style>

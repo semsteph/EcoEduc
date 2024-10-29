@@ -25,7 +25,7 @@
       </v-card-text>
     </v-card>
     <!-- Affiche le composant enfant si une classe est sélectionnée -->
-    <CahierDeTexteDetail v-else :class-id="selectedClassId" @back="clearSelection" />
+    <CahierDeTexteDetail v-else :class-id="selectedClassId" :etablissement-id="etablissementId" @back="clearSelection" />
   </div>
 </template>
 
@@ -38,6 +38,16 @@ export default {
   components:{
     CahierDeTexteDetail,
   },
+  props: {
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
+  },
   data() {
     return {
       classes: [],
@@ -46,7 +56,7 @@ export default {
   },
   methods: {
     fetchClasses() {
-      axios.get('http://localhost:8080/api/classe')
+      axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
         .then(response => {
           this.classes = response.data;
         })

@@ -1,6 +1,6 @@
 <template>
-  <v-container>
-    <v-row>
+  <v-container >
+    <v-row class="button-group">
       <v-col class="d-flex justify-center">
         <v-btn @click="showInscriptionForm = true" class="mx-2">Inscrire un Enseignant</v-btn>
         <v-btn @click="showAddForm = true" class="mx-2">Ajouter un Enseignant</v-btn>
@@ -113,7 +113,7 @@
       </v-col>
     </div>
 
-    <component :is="currentComponent" @component-selected="currentComponent = $event"></component>
+    <component :is="currentComponent" @component-selected="currentComponent = $event" :etablissement-id="etablissementId"></component>
   </v-container>
 </template>
 
@@ -126,6 +126,16 @@ export default {
   components: {
     MesEnseignants,
     CahierDeTexte,
+  },
+  props: {
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
   },
   data() {
     return {
@@ -140,10 +150,13 @@ export default {
         email: '',
         phone: '',
         username: '',
-        password: ''
+        password: '',
+        etablissementId: this.etablissementId
       },
       newSubject: {
-        name: ''
+        name: '',
+        etablissementId: this.etablissementId
+
       },
       generatedInfo: null,
       teachers: [],
@@ -164,9 +177,9 @@ export default {
     async fetchData() {
       try {
         const [teachersRes, classesRes, subjectsRes, coefficientRes] = await Promise.all([
-          axios.get('http://localhost:8080/api/Enseignants'),
-          axios.get('http://localhost:8080/api/classe'),
-          axios.get('http://localhost:8080/api/Matieres'),
+          axios.get(`http://localhost:8080/api/Enseignants/${this.etablissementId}`),
+          axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`),
+          axios.get(`http://localhost:8080/api/Matieres/${this.etablissementId}`),
           axios.get('http://localhost:8080/api/Coefficient')
         ]);
         this.teachers = teachersRes.data.map(teacher => ({
@@ -181,36 +194,57 @@ export default {
       }
     },
     async handleInscription() {
-      try {
-        this.newTeacher.username = this.generateUsername(this.newTeacher.name, this.newTeacher.firstName);
-        this.newTeacher.password = this.generatePassword();
+  try {
+    // Générer le nom d'utilisateur et le mot de passe
+    this.newTeacher.username = this.generateUsername(this.newTeacher.name, this.newTeacher.firstName);
+    this.newTeacher.password = this.generatePassword();
 
-        const response = await axios.post('http://localhost:8080/api/Enseignants', this.newTeacher);
+    // Envoyer les données de l'enseignant à l'API
+    const response = await axios.post('http://localhost:8080/api/Enseignants', {
+      name: this.newTeacher.name,
+      firstName: this.newTeacher.firstName,
+      email: this.newTeacher.email,
+      phone: this.newTeacher.phone,
+      username: this.newTeacher.username,
+      password: this.newTeacher.password,
+      etablissementId: this.etablissementId, // Ajouter l'ID de l'établissement si requis
+    });
 
-        console.log('Teacher registered:', response.data);
-        this.generatedInfo = { username: this.newTeacher.username, password: this.newTeacher.password };
-        this.showGeneratedInfo = true;  // Affiche le dialogue avec les informations
+    console.log('Teacher registered:', response.data);
 
-        // Réinitialiser le formulaire
-        this.newTeacher.name = '';
-        this.newTeacher.firstName = '';
-        this.newTeacher.email = '';
-        this.newTeacher.phone = '';
-        this.newTeacher.username = '';
-        this.newTeacher.password = '';
-        this.showInscriptionForm = false;  // Ferme le formulaire d'inscription
+    // Afficher le dialogue avec les informations générées après succès de l'inscription
+    this.generatedInfo = { 
+      username: this.newTeacher.username, 
+      password: this.newTeacher.password 
+    };
+    this.showGeneratedInfo = true; // Affiche le dialogue avec les informations
 
-      } catch (error) {
-        console.error('Error during registration:', error.response ? error.response.data : error.message);
-      }
-    },
+    // Réinitialiser le formulaire
+    this.newTeacher = {
+      name: '',
+      firstName: '',
+      email: '',
+      phone: '',
+      username: '',
+      password: ''
+    };
+    this.showInscriptionForm = false;  // Ferme le formulaire d'inscription
+
+  } catch (error) {
+    console.error('Error during registration:', error.response ? error.response.data : error.message);
+    this.snackbarMessage = 'Échec de l\'inscription de l\'enseignant.';
+    this.snackbar = true;
+  }
+},
+
     async handleAdd() {
       try {
         const data = {
           teacherId: this.selectedTeacher,
           class: this.selectedClass,
           subject: this.selectedSubject,
-          coefficient: this.selectedCoefficient
+          coefficient: this.selectedCoefficient,
+          etablissement: this.etablissementId
         };
         const response = await axios.post('http://localhost:8080/api/Enseignants/add', data);
         console.log('Teacher added:', response.data);
@@ -228,9 +262,9 @@ export default {
     },
     async handleAddSubject() {
       try {
-        const response = await axios.post('http://localhost:8080/api/Matieres', {
-          name: this.newSubject.name
-        });
+        const response = await axios.post('http://localhost:8080/api/Matieres',  this.newSubject) 
+          
+  
         console.log('Subject added:', response.data);
 
         this.newSubject.name = '';
@@ -258,5 +292,13 @@ export default {
 <style scoped>
 .v-dialog {
   max-width: 90vw;
+}
+.button-group {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px; /* Espace entre les boutons */
+  margin: 20px 0; /* Espacement par rapport au haut et au bas */
+  height: 200px; /* Ajustez la hauteur pour centrer verticalement */
 }
 </style>

@@ -1,19 +1,48 @@
 <template>
   <v-container class="mt-16">
     <template v-if="selectedClass && currentView === 'details'">
-      <InfoClasse :classe="selectedClass" @back="goBack" @navigate="navigateTo"/>
+      <InfoClasse 
+        :classe="selectedClass" 
+        :etablissement-id="etablissementId" 
+        @back="goBack" 
+        @navigate="navigateTo"
+      />
     </template>
     <template v-else-if="currentView === 'NoteManager'">
-      <NoteManager :classe="selectedClass" :classeId="selectedClassId" :subjectId="subjectId" @back="goBack"/>
+      <NoteManager 
+        :classe="selectedClass" 
+        :classeId="selectedClassId" 
+        :subjectId="subjectId" 
+        :etablissement-id="etablissementId" 
+        @back="goBack"
+      />
     </template>
     <template v-else-if="currentView === 'PresenceManager'">
-      <PresenceManager :classe="selectedClass" :classeId="selectedClassId" :subjectId="subjectId" @back="goBack"/>
+      <PresenceManager 
+        :classe="selectedClass" 
+        :classeId="selectedClassId" 
+        :subjectId="subjectId" 
+        :etablissement-id="etablissementId" 
+        @back="goBack"
+      />
     </template>
     <template v-else-if="currentView === 'ConductManager'">
-      <ConductManager :classe="selectedClass" :classeId="selectedClassId" :subjectId="subjectId" @back="goBack"/>
+      <ConductManager 
+        :classe="selectedClass" 
+        :classeId="selectedClassId" 
+        :subjectId="subjectId" 
+        :etablissement-id="etablissementId" 
+        @back="goBack"
+      />
     </template>
     <template v-else-if="currentView === 'CahierDeTexteManager'">
-      <CahierDeTexteManager :classe="selectedClass" :classeId="selectedClassId" :subjectId="subjectId" @back="goBack"/>
+      <CahierDeTexteManager 
+        :classe="selectedClass" 
+        :classeId="selectedClassId" 
+        :subjectId="subjectId" 
+        :etablissement-id="etablissementId" 
+        @back="goBack"
+      />
     </template>
     <template v-else>
       <v-row>
@@ -52,9 +81,13 @@ export default {
       type: Array,
       required: true, // Reçoit les classes filtrées basées sur la matière sélectionnée depuis le parent
     },
-    selectedClassId: {  // Ajout de la prop pour recevoir l'ID de la classe sélectionnée
+    selectedClassId: {
       type: Number,
       required: false,
+    },
+    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+      type: Number,
+      required: true,
     },
   },
   data() {
@@ -64,22 +97,15 @@ export default {
     };
   },
   computed: {
-    // Filtrer les classes qui correspondent à la matière sélectionnée
     filteredClasses() {
       return this.classes;
     },
-  },
-  watch: {
-    subjectId(newVal) {
-      console.log('L\'ID de la matière a été mis à jour:', newVal);
-      // Logique pour mettre à jour les classes en fonction de la nouvelle matière sélectionnée
-    }
   },
   methods: {
     selectClass(classe) {
       this.selectedClass = classe;
       this.currentView = 'details';
-      this.$emit('class-selected', classe.classe_id); // Emit l'événement de sélection de la classe
+      this.$emit('class-selected', classe.classe_id);
     },
     goBack() {
       this.currentView = 'details';
@@ -89,8 +115,8 @@ export default {
       this.currentView = view;
     },
   },
-  mounted(){
-    console.log(this.subjectId);
-  }
+  mounted() {
+    console.log(this.subjectId, this.etablissementId);
+  },
 };
 </script>

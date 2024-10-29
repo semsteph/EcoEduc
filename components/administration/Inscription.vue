@@ -73,6 +73,16 @@
 import axios from 'axios';
 
 export default {
+  props: {
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
+  },
   data() {
     return {
       form: {
@@ -81,7 +91,8 @@ export default {
         dateNaissance: '',
         sexe: '',
         classe: '', // ID de la classe
-        parentId: '' // ID du parent
+        parentId: '', // ID du parent
+        etablissementId: this.etablissementId
       },
       submitted: false,
       showForm: false,
@@ -96,7 +107,7 @@ export default {
   methods: {
     async fetchClasses() {
       try {
-        const response = await axios.get('http://localhost:8080/api/classe');
+        const response = await axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`);
         this.classes = response.data; // Stocker les classes dans le data
         console.log(response.data);
       } catch (error) {
@@ -105,10 +116,11 @@ export default {
     },
     async fetchParents() {
       try {
-        const response = await axios.get('http://localhost:8080/api/Parents');
+        const response = await axios.get(`http://localhost:8080/api/Parents/${this.etablissementId}`);
+        console.log(response.data);
         this.parents = response.data.map(parent => ({
           id: parent.id,
-          text: `${parent.nom} ${parent.prenom}` // Format de l'affichage
+          text: `${parent.name} ${parent.firstName}` // Format de l'affichage
         }));
         console.log(this.parents) // Stocker les parents dans le data
       } catch (error) {

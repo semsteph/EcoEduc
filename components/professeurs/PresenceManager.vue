@@ -5,15 +5,15 @@
       <v-row>
         <v-col
           v-for="semester in semesters"
-          :key="semester"
+          :key="semester.id"
           cols="auto"
         >
           <v-btn
-            :color="getButtonColor(semester)"
-            @click="changeSemester(semester)"
-            :class="{ 'v-btn--active': currentSemester === semester }"
+            :color="getButtonColor(semester.nom)"
+            @click="changeSemester(semester.nom)"
+            :class="{ 'v-btn--active': currentSemester === semester.nom }"
           >
-            {{ semester }}
+            {{ semester.nom }}
           </v-btn>
         </v-col>
       </v-row>
@@ -88,12 +88,16 @@ export default {
     subjectId: {
       type: Number,
       required: true, 
-    }  
+    },
+    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+      type: Number,
+      required: true,
+    },  
   },
   data() {
     return {
-      currentSemester: 'Semestre1',
-      semesters: ['Semestre1', 'Semestre2'],
+      currentSemester: '',
+      semesters: [],
       headers: [
         { title: 'Nom/Prenom', value: 'name' },
         { title: 'Date', value: 'date' },
@@ -116,6 +120,7 @@ export default {
     },
     changeSemester(semester) {
       this.currentSemester = semester;
+      this.fetchSemesters();
       this.getStudents();
     },
     async getStudents() {
@@ -132,6 +137,20 @@ export default {
         console.error('Erreur lors de la récupération des élèves:', error);
       }
     },
+    async fetchSemesters() {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
+        this.semesters = response.data;
+
+        // Définir le premier semestre récupéré comme sélectionné par défaut
+        if (this.semesters.length > 0) {
+          this.currentSemester = this.semesters[0].nom;
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des semestres', error);
+      }
+    },
+
     async save() {
       try {
         const dataToSave = this.students
@@ -144,6 +163,7 @@ export default {
             subjectId: this.subjectId,
             classeId: this.classeId,
             semesterName: this.currentSemester, // Ajout du nom du semestre
+            etablissementId: this.etablissementId,
           }));
 
         if (dataToSave.length === 0) {
@@ -193,6 +213,7 @@ export default {
 
   created() {
     this.getStudents();
+    this.fetchSemesters();
   },
   mounted() {
     console.log(this.subjectId);

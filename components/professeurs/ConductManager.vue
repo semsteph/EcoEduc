@@ -1,19 +1,21 @@
 <template>
   <v-card>
     <!-- Expansion Panel for Semester Selection -->
-    <v-expansion-panels>
-      <v-expansion-panel v-model="currentSemester">
-        <v-expansion-panel-header>
-          <span class="font-weight-bold">Choisir Semestre</span>
-        </v-expansion-panel-header>
-        <v-expansion-panel-content>
-          <v-btn-toggle v-model="currentSemester" mandatory>
-            <v-btn value="Semestre1">Semestre 1</v-btn>
-            <v-btn value="Semestre2">Semestre 2</v-btn>
-          </v-btn-toggle>
-        </v-expansion-panel-content>
-      </v-expansion-panel>
-    </v-expansion-panels>
+    <v-row>
+      <v-col
+        v-for="semester in semesters"
+        :key="semester.id"
+        cols="auto"
+      >
+        <v-btn
+          :color="getButtonColor(semester.nom)"
+          @click="changeSemester(semester.nom)"
+          :class="{ 'v-btn--active': currentSemester === semester.nom }"
+        >
+          {{ semester.nom }}
+        </v-btn>
+      </v-col>
+    </v-row>
 
     <!-- Toolbar with Title and Save Button -->
     <v-toolbar color="blue lighten-1" dark>
@@ -28,7 +30,7 @@
         <v-data-table
           :headers="headers"
           :items="conductRecords"
-          item-key="id"
+          item-key="studentId"
           :items-per-page="5"
           class="elevation-2 rounded"
         >
@@ -84,7 +86,6 @@
                   style="width: 200px;"
                 ></v-textarea>
               </td>
-              <!-- Total hours calculated -->
               <td>
                 <span class="font-weight-bold">{{ item.totalHours }} heures</span>
               </td>
@@ -121,11 +122,16 @@ export default {
     classeId: {
       type: Number,
       required: true
-    }
+    },
+    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+      type: Number,
+      required: true,
+    },
   },
   data() {
     return {
-      currentSemester: 'Semestre1',
+      currentSemester: '',
+      semesters: [],
       headers: [
         { title: 'Élève', value: 'studentId' },
         { title: 'Date', value: 'date' },
@@ -144,7 +150,7 @@ export default {
     async fetchStudents() {
       try {
         const response = await axios.get(`http://localhost:8080/api/classes/${this.classeId}/eleves`);
-        this.students = response.data.map((student) => ({
+        this.students = response.data.map(student => ({
           id: student.id,
           fullName: `${student.nom} ${student.prenom}`
         }));
@@ -153,13 +159,16 @@ export default {
         console.error("Erreur lors de la récupération des élèves :", error);
       }
     },
+    getButtonColor(semester) {
+      return this.currentSemester === semester ? 'primary' : 'secondary';
+    },
     changeSemester(semester) {
       this.currentSemester = semester;
       this.fetchConductRecords();
     },
     async fetchConductRecords() {
       try {
-        this.conductRecords = await Promise.all(this.students.map(async (student) => {
+        this.conductRecords = await Promise.all(this.students.map(async student => {
           const totalHours = await this.fetchTotalHours(student.id);
           return {
             studentId: student.id,
@@ -168,7 +177,7 @@ export default {
             hour: '',
             punition: '',
             motif: '',
-            totalHours: totalHours || 0, // Calcul des heures de punition
+            totalHours: totalHours || 0,
             auteur: ''
           };
         }));
@@ -179,16 +188,27 @@ export default {
     async fetchTotalHours(studentId) {
       try {
         const response = await axios.get(`http://localhost:8080/api/punitions/somme-heures/${studentId}`);
-        return response.data.totalHours; // API retourne la somme des heures
+        return response.data.totalHours;
       } catch (error) {
         console.error('Erreur lors de la récupération des heures de punition :', error);
         return 0;
       }
     },
+    async fetchSemesters() {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
+        this.semesters = response.data;
+
+        if (this.semesters.length > 0) {
+          this.currentSemester = this.semesters[0].nom;
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des semestres', error);
+      }
+    },
     async save() {
       try {
-        // Filtrer les enregistrements avec les champs requis remplis
-        const validRecords = this.conductRecords.filter((record) => {
+        const validRecords = this.conductRecords.filter(record => {
           return record.date && record.hour && record.punition && record.motif && record.auteur;
         });
 
@@ -199,18 +219,18 @@ export default {
 
         const payload = {
           semester: this.currentSemester,
-          records: validRecords, // Seuls les enregistrements valides seront envoyés
+          etablissementId:this.etablissementId,
+          records: validRecords,
         };
 
         await axios.post('http://localhost:8080/api/save/conduct', payload);
 
-        // Réinitialiser les champs après la sauvegarde pour les enregistrements valides uniquement
-        validRecords.forEach((record) => {
+        validRecords.forEach(record => {
           record.punition = '';
           record.motif = '';
           record.date = '';
           record.hour = '';
-          record.auteur = ''; // Ne pas réinitialiser l'auteur
+          record.auteur = '';
         });
       } catch (error) {
         console.error('Erreur lors de la sauvegarde des données :', error);
@@ -219,6 +239,7 @@ export default {
   },
   created() {
     this.fetchStudents();
+    this.fetchSemesters();
   },
 };
 </script>
@@ -230,33 +251,12 @@ export default {
   background-color: #f5f5f5;
 }
 
-.v-expansion-panel-header {
-  background-color: #2196f3;
-  color: white;
-}
-
-.v-btn-toggle .v-btn {
-  color: white;
-  background-color: #ffca28;
-}
-
-.v-btn-toggle .v-btn--active {
+.v-btn--active {
   background-color: #ffc107 !important;
-}
-
-.v-toolbar {
-  background-color: #2196f3;
 }
 
 .v-toolbar-title {
   font-size: 24px;
-  color: white;
-}
-
-.v-card-text {
-  background-color: white;
-  border-radius: 12px;
-  padding: 20px;
 }
 
 .v-data-table tr td {

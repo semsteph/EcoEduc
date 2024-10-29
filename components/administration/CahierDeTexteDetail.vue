@@ -70,6 +70,14 @@ export default {
       type: Number,
       required: true,
     },
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
   },
   data() {
     return {

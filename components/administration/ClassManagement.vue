@@ -2,12 +2,11 @@
   <div>
     <!-- Boutons de gestion des classes -->
     <div class="button-group">
-      <v-btn color="primary" @click="showForm = true" v-if="!showProgram && !showConductForm">Ajouter Classe</v-btn>
-      <v-btn color="primary" @click="fetchClasses" v-if="!showProgram && !showConductForm">Mes Classes</v-btn>
-      <v-btn @click="toggleProgram" :color="showProgram ? 'secondary' : 'primary'">
-        Programme
-      </v-btn>
-      <v-btn color="primary" @click="showConductForm = true" v-if="!showProgram && !showForm">Note de conduite</v-btn>
+      <v-btn color="primary" @click="showForm = true" v-if="!showProgram && !showConductForm && !showSemesterForm">Ajouter Classe</v-btn>
+      <v-btn color="primary" @click="toggleClasses" v-if="!showProgram && !showConductForm && !showSemesterForm">Mes Classes</v-btn>
+      <v-btn @click="toggleProgram" :color="showProgram ? 'secondary' : 'primary'">Programme</v-btn>
+      <v-btn color="primary" @click="showConductForm = true" v-if="!showProgram && !showForm && !showSemesterForm">Note de conduite</v-btn>
+      <v-btn color="primary" @click="showSemesterForm = true" v-if="!showProgram && !showForm && !showConductForm">Ajouter Semestre/Trimestre</v-btn>
     </div>
 
     <!-- Formulaire pour ajouter une nouvelle classe -->
@@ -25,6 +24,17 @@
         <div class="d-flex justify-space-between mt-4">
           <v-btn color="primary" type="submit">Ajouter</v-btn>
           <v-btn @click="cancelForm">Annuler</v-btn>
+        </div>
+      </v-form>
+    </v-card>
+
+    <!-- Formulaire pour ajouter un semestre/trimestre -->
+    <v-card v-if="showSemesterForm" class="pa-4 mt-4">
+      <v-form @submit.prevent="submitSemester">
+        <v-text-field v-model="newSemesterName" label="Nom du semestre/trimestre" required></v-text-field>
+        <div class="d-flex justify-space-between mt-4">
+          <v-btn color="primary" type="submit">Ajouter</v-btn>
+          <v-btn @click="cancelSemesterForm">Annuler</v-btn>
         </div>
       </v-form>
     </v-card>
@@ -50,7 +60,6 @@
           label="Sélectionnez le semestre"
           required
         ></v-select>
-        
         <div class="d-flex justify-space-between mt-4">
           <v-btn color="primary" type="submit">Ajouter</v-btn>
           <v-btn @click="cancelConductForm">Annuler</v-btn>
@@ -58,10 +67,10 @@
       </v-form>
     </v-card>
 
-    <!-- Liste des classes par promotion -->
-    <div v-if="!showForm && !showProgram && !showConductForm && classesByPromotion && Object.keys(classesByPromotion).length > 0">
+    <!-- Liste des classes par promotion, affichée après le clic sur "Mes Classes" -->
+    <div v-if="showClasses && classesByPromotion && Object.keys(classesByPromotion).length > 0">
       <div v-for="(classes, promotion) in classesByPromotion" :key="promotion">
-        <h3>Promotion: {{ promotion }}</h3>
+        <h3>Promotion : {{ promotion }}</h3>
         <v-card v-for="classe in classes" :key="classe.id" class="mt-3">
           <v-card-title>
             {{ classe.name }} ({{ classe.studentCount }} élèves)
@@ -75,7 +84,7 @@
     </div>
 
     <!-- Affichage du composant enfant si showProgram est vrai -->
-    <Programme-cours v-if="showProgram" />
+    <Programme-cours v-if="showProgram" :etablissement-id="etablissementId"/>
 
     <!-- Snackbar pour afficher les messages -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color">
@@ -92,9 +101,20 @@ import ProgrammeCours from './ProgrammeCours.vue';
 export default {
   name: 'ClassManagement',
   components: { ProgrammeCours },
+  props: {
+    etablissementId: {
+      type: Number,
+      required: true
+    },
+    etablissementNom: {
+      type: String,
+      required: true
+    }
+  },
   data() {
     return {
       classesByPromotion: {},
+      showClasses: false, // Variable pour gérer l'affichage des classes
       showForm: false,
       showConductForm: false,
       newClassName: '',
@@ -111,19 +131,23 @@ export default {
         message: '',
         color: 'success'
       },
-      showProgram: false
+      showProgram: false,
+      showSemesterForm: false, // Ajouté pour gérer l'affichage du formulaire de semestre
+      newSemesterName: '' // Ajouté pour le nom du semestre
     };
   },
   methods: {
     submitForm() {
+      console.log(this.etablissementId);
       const url = this.editClassId
         ? `http://localhost:8080/api/Classes/${this.editClassId}`
-        : 'http://localhost:8080/api/Classes';
+        : 'http://localhost:8080/api/Classes'; // URL pour la création (POST) sans l'ID de l'établissement dans l'URL
       const method = this.editClassId ? 'put' : 'post';
-      
+
       axios[method](url, {
         nom: this.newClassName,
-        promotion_id: this.selectedPromotionId
+        promotion_id: this.selectedPromotionId,
+        etablissement_id: this.etablissementId // Ajouter l'ID de l'établissement dans le corps de la requête
       })
       .then(() => {
         this.fetchClasses();
@@ -135,12 +159,46 @@ export default {
         this.showSnackbar('Erreur lors de l\'ajout/modification de la classe.', 'error');
       });
     },
+    toggleClasses() {
+      this.showClasses = !this.showClasses;
+      if (this.showClasses) {
+        this.fetchClasses(); // Récupérer les classes
+      }
+    },
+    submitSemester() {
+      if (!this.newSemesterName) {
+        this.showSnackbar('Le nom du semestre/trimestre est requis.', 'error');
+        return;
+      }
+
+      axios.post('http://localhost:8080/api/semestres', {
+        nom: this.newSemesterName,
+        etablissement_id: this.etablissementId
+      })
+      .then(response => {
+        this.fetchSemestre();
+        this.cancelSemesterForm();
+        this.showSnackbar(response.data.message || 'Semestre/Trimestre ajouté avec succès.', 'success');
+      })
+      .catch(error => {
+        console.error('Erreur lors de l\'ajout du semestre/trimestre :', error);
+        this.showSnackbar('Erreur lors de l\'ajout du semestre/trimestre.', 'error');
+      });
+    },
+
     fetchSemestre() {
-      axios.get('http://localhost:8080/api/semesters')
+      // Assurez-vous que l'ID de l'établissement est défini et est un nombre
+      if (!this.etablissementId || isNaN(this.etablissementId)) {
+        console.error('ID de l\'établissement non défini ou invalide.');
+        return;
+      }
+
+      // Envoyer l'ID de l'établissement à l'API
+      axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`)
         .then(response => {
           const data = response.data;
-          if (typeof data === 'object') {
-            this.semestresOptions = Object.values(data).map(semestre => ({
+          if (Array.isArray(data)) {  // Vérifier si les données sont un tableau
+            this.semestresOptions = data.map(semestre => ({
               id: semestre.id,
               name: semestre.nom
             }));
@@ -152,28 +210,49 @@ export default {
           console.error('Erreur lors de la récupération des semestres :', error);
         });
     },
-    submitConductForm() {
-  // Vérifiez si tous les champs requis sont remplis
-  if (!this.conductNote || this.selectedClassIds.length === 0 || !this.selectedSemestreId) {
-    this.showSnackbar('Veuillez remplir tous les champs.', 'error');
-    return;
-  }
 
-  // Effectuer la requête POST avec tous les identifiants de classe
-  axios.post('http://localhost:8080/api/conduite', {
-    note_conduite: this.conductNote,
-    classe_ids: this.selectedClassIds,  // Envoyer tous les identifiants de classe
-    semestre_id: this.selectedSemestreId
-  })
-  .then(response => {
-    this.cancelConductForm();
-    this.showSnackbar(response.data.message, 'success');  // Utiliser le message de succès de la réponse
-  })
-  .catch(error => {
-    console.error('Erreur lors de l\'ajout des notes de conduite :', error.response ? error.response.data : error.message);
-    this.showSnackbar(error.response?.data?.error || 'Erreur lors de l\'ajout des notes de conduite.', 'error');  // Afficher le message d'erreur approprié
-  });
-},
+    submitConductForm() {
+      // Vérifiez si tous les champs requis sont remplis
+      if (!this.conductNote || this.selectedClassIds.length === 0 || !this.selectedSemestreId) {
+        this.showSnackbar('Veuillez remplir tous les champs.', 'error');
+        return;
+      }
+
+      // Effectuer la requête POST avec tous les identifiants de classe
+      axios.post('http://localhost:8080/api/conduite', {
+        note_conduite: this.conductNote,
+        classe_ids: this.selectedClassIds,
+        semestre_id: this.selectedSemestreId,
+        etablissement_id: this.etablissementId // Ajouter l'ID de l'établissement dans la requête
+      })
+      .then(() => {
+        this.cancelConductForm();
+        this.showSnackbar('Note de conduite ajoutée avec succès.', 'success');
+      })
+      .catch(error => {
+        console.error('Erreur lors de l\'ajout de la note de conduite :', error);
+        this.showSnackbar('Erreur lors de l\'ajout de la note de conduite.', 'error');
+      });
+    },
+
+    cancelForm() {
+      this.showForm = false;
+      this.newClassName = '';
+      this.selectedPromotionId = null;
+      this.editClassId = null; // Réinitialiser l'ID de la classe à éditer
+    },
+
+    cancelSemesterForm() {
+      this.showSemesterForm = false;
+      this.newSemesterName = '';
+    },
+
+    cancelConductForm() {
+      this.showConductForm = false;
+      this.conductNote = '';
+      this.selectedClassIds = [];
+      this.selectedSemestreId = null; // Réinitialiser l'ID du semestre sélectionné
+    },
     fetchPromotions() {
       axios.get('http://localhost:8080/api/Promotions')
         .then(response => {
@@ -184,116 +263,97 @@ export default {
         });
     },
     fetchClasses() {
-      axios.get('http://localhost:8080/api/Classes')
-        .then(response => {
-          const data = response.data;
-          if (typeof data === 'object') {
-            this.classesByPromotion = data;
-            this.classesOptions = Object.values(data).flat().map(classe => ({
-              id: classe.id,
-              name: classe.name
-            }));
-          } else {
-            console.error('Format de données inattendu.');
-          }
-        })
-        .catch(error => {
-          console.error('Erreur lors de la récupération des classes :', error);
-        });
-    },
-    editClass(classe) {
-      this.newClassName = classe.name;
-      this.selectedPromotionId = classe.promotion_id;
-      this.editClassId = classe.id;
-      this.showForm = true;
-    },
-    confirmDeleteClass(classId) {
-      if (confirm('Êtes-vous sûr de vouloir supprimer cette classe ?')) {
-        this.deleteClass(classId);
+  axios.get(`http://localhost:8080/api/classetablissement/${this.etablissementId}`)
+    .then(response => {
+      const data = response.data;
+
+      if (typeof data === 'object' && data !== null) {
+        console.log('Données de la réponse :', data);
+        this.classesByPromotion = data;
+        
+        // Extraire les options de classes pour le formulaire
+        this.classesOptions = Object.values(data).flat().map(classe => ({
+          id: classe.id,
+          name: classe.name
+        }));
+      } else {
+        console.error('Les données récupérées ne sont pas dans le format attendu', data);
+        this.classesByPromotion = {};
       }
+    })
+    .catch(error => {
+      console.error('Erreur lors de la récupération des classes :', error);
+    });
+},
+
+
+
+    groupByPromotion(classes) {
+      return classes.reduce((acc, classe) => {
+        const promotionName = classe.promotion.nom; // Supposons que 'promotion' est une propriété de 'classe'
+        if (!acc[promotionName]) {
+          acc[promotionName] = [];
+        }
+        acc[promotionName].push(classe);
+        return acc;
+      }, {});
     },
-    deleteClass(classId) {
-      axios.delete(`http://localhost:8080/api/Classes/${classId}`)
-        .then(response => {
-          this.fetchClasses();
-          this.showSnackbar(response.data.message, 'success');
-        })
-        .catch(error => {
-          this.showSnackbar(error.response.data.error || 'Erreur lors de la suppression de la classe.', 'error');
-        });
-    },
-    cancelForm() {
-      this.newClassName = '';
-      this.selectedPromotionId = null;
-      this.editClassId = null;
-      this.showForm = false;
-    },
-    cancelConductForm() {
-      this.conductNote = '';
-      this.selectedClassIds = [];
-      this.showConductForm = false;
-      this.selectedSemestreId = null;
-    },
+
     showSnackbar(message, color) {
       this.snackbar.message = message;
       this.snackbar.color = color;
       this.snackbar.show = true;
     },
+
     toggleProgram() {
       this.showProgram = !this.showProgram;
-      if (this.showProgram) {
-        this.showForm = false;
-        this.showConductForm = false;
+    },
+
+    confirmDeleteClass(classId) {
+      const confirmed = confirm('Êtes-vous sûr de vouloir supprimer cette classe ?');
+      if (confirmed) {
+        this.deleteClass(classId);
       }
     },
-    goBack() {
-      this.$emit('back');
+
+    deleteClass(classId) {
+      axios.delete(`http://localhost:8080/api/Classes/${classId}`, {
+        data: {
+          etablissement_id: this.etablissementId
+        }
+      })
+      .then(() => {
+        this.fetchClasses();
+        this.showSnackbar('Classe supprimée avec succès.', 'success');
+      })
+      .catch(error => {
+        console.error('Erreur lors de la suppression de la classe :', error);
+        this.showSnackbar('Impossible de supprimer cette classe car elle contient aumoins un eleve.', 'error');
+      });
     },
-    navigateTo(route) {
-      this.$emit('navigate', route);
+    editClass(classe) {
+      this.newClassName = classe.nom;
+      this.selectedPromotionId = classe.promotion_id; // Assurez-vous que 'promotion_id' existe
+      this.editClassId = classe.id; // Enregistrer l'ID de la classe pour la mise à jour
+      this.showForm = true;
     }
   },
   mounted() {
-    this.fetchPromotions();
     this.fetchClasses();
-    this.fetchSemestre();
+    this.fetchSemestre(); // Assurez-vous d'appeler cette méthode ici
+    this. fetchPromotions()  ;        // Fetch promotions if necessary, e.g. this.fetchPromotions();
   }
-}
+};
 </script>
+
 
 <style scoped>
 .button-group {
-  margin-bottom: 16px;
-}
-
-.pa-4 {
-  padding: 16px;
-}
-
-.mt-4 {
-  margin-top: 16px;
-}
-
-.d-flex {
   display: flex;
-}
-
-.justify-space-between {
-  justify-content: space-between;
-}
-
-.v-card {
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.v-card-title {
-  font-weight: bold;
-  color: #3f51b5;
-}
-
-.v-btn {
-  border-radius: 5px;
-  padding: 8px 16px;
+  justify-content: center;
+  align-items: center;
+  gap: 16px; /* Espace entre les boutons */
+  margin: 20px 0; /* Espacement par rapport au haut et au bas */
+  height: 200px; /* Ajustez la hauteur pour centrer verticalement */
 }
 </style>

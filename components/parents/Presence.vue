@@ -2,46 +2,46 @@
   <div>
     <h1>Présences pour le :</h1>
     
-    <!-- Boutons pour sélectionner les semestres -->
-    <div class="semestre-buttons">
-      <v-btn @click="fetchPresenceData('semestre1')" :class="{ active: semestre === 'semestre1' }" color="primary" depressed>
-        Semestre 1
-      </v-btn>
-      <v-btn @click="fetchPresenceData('semestre2')" :class="{ active: semestre === 'semestre2' }" color="primary" depressed>
-        Semestre 2
-      </v-btn>
-    </div>
-
-    <!-- Tableau des présences -->
-    <v-data-table :headers="headers" :items="filteredPresence" item-key="id" class="elevation-1">
-      <template v-slot:item.date="{ item }">
-        <td>{{ formaterDate(item.date) }}</td> <!-- Utilisation de la méthode de formatage -->
-      </template>
-      <template v-slot:item.matiere="{ item }">
-        <td>{{ item.matiere }}</td>
-      </template>
-      <template v-slot:item.heure="{ item }">
-        <td>{{ item.heure }}</td>
-      </template>
-      <template v-slot:item.presence="{ item }">
-        <td>{{ item.presence }}</td>
-      </template>
-      <template v-slot:item.motif="{ item }">
-        <td>
-          <v-textarea
-            v-model="item.motif"
-            label="Motif"
-            rows="2"
-            auto-grow
-            @input="handleMotifChange(item.id, item.motif)"
-            :style="{ maxHeight: '120px' }"
-            class="elevation-0"
-            outlined
-            dense
-          ></v-textarea>
-        </td>
-      </template>
-    </v-data-table>
+    <!-- Liste dynamique des semestres avec v-expansion-panels -->
+    <v-expansion-panels v-model="selectedPanel" multiple>
+      <v-expansion-panel v-for="(semestre, index) in semestres" :key="index">
+        <v-expansion-panel-title>
+          {{ semestre }}
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <!-- Tableau des présences pour le semestre sélectionné -->
+          <v-data-table :headers="headers" :items="filteredPresence(semestre)" item-key="id" class="elevation-1">
+            <template v-slot:item.date="{ item }">
+              <td>{{ formaterDate(item.date) }}</td>
+            </template>
+            <template v-slot:item.matiere="{ item }">
+              <td>{{ item.matiere }}</td>
+            </template>
+            <template v-slot:item.heure="{ item }">
+              <td>{{ item.heure }}</td>
+            </template>
+            <template v-slot:item.presence="{ item }">
+              <td>{{ item.presence }}</td>
+            </template>
+            <template v-slot:item.motif="{ item }">
+              <td>
+                <v-textarea
+                  v-model="item.motif"
+                  label="Motif"
+                  rows="2"
+                  auto-grow
+                  @input="handleMotifChange(item.id, item.motif)"
+                  :style="{ maxHeight: '120px' }"
+                  class="elevation-0"
+                  outlined
+                  dense
+                ></v-textarea>
+              </td>
+            </template>
+          </v-data-table>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
 
     <!-- Boutons d'action -->
     <div class="action-buttons">
@@ -62,7 +62,7 @@
 
 <script>
 import axios from 'axios';
-import dayjs from 'dayjs'; // Importation de dayjs
+import dayjs from 'dayjs';
 
 export default {
   props: {
@@ -73,7 +73,8 @@ export default {
   },
   data() {
     return {
-      semestre: 'semestre1',
+      semestres: [],
+      selectedPanel: null,
       headers: [
         { title: 'Date', value: 'date' },
         { title: 'Matière', value: 'matiere' },
@@ -82,7 +83,7 @@ export default {
         { title: 'Motif', value: 'motif' },
       ],
       presenceData: [],
-      modifiedMotifs: {}, // Suivi des motifs modifiés
+      modifiedMotifs: {},
       snackbar: {
         show: false,
         message: '',
@@ -90,14 +91,8 @@ export default {
       },
     };
   },
-  computed: {
-    filteredPresence() {
-      return this.presenceData;
-    },
-  },
   methods: {
-    async fetchPresenceData(semestre) {
-      this.semestre = semestre;
+    async fetchPresenceData() {
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -111,22 +106,26 @@ export default {
           },
           params: {
             childId: this.childId,
-            semestre: this.semestre,
           },
         });
 
         this.presenceData = response.data;
-        this.modifiedMotifs = {}; // Réinitialise les motifs modifiés après récupération
+        // Extraire les noms des semestres de manière unique
+        this.semestres = [...new Set(this.presenceData.map(item => item.semestreNom))];
+        this.modifiedMotifs = {};
       } catch (error) {
         console.error('Erreur lors de la récupération des données de présence :', error);
         this.$router.push('/login');
       }
     },
+    filteredPresence(semestre) {
+      // Filtrer les données de présence selon le semestre sélectionné
+      return this.presenceData.filter(item => item.semestreNom === semestre);
+    },
     formaterDate(date) {
-      return dayjs(date).format('DD/MM/YYYY'); // Formater la date au format jour/mois/année
+      return dayjs(date).format('DD/MM/YYYY');
     },
     handleMotifChange(id, motif) {
-      // Mise à jour directe de l'objet modifié
       this.modifiedMotifs[id] = motif;
     },
     async submitMotifs() {
@@ -137,7 +136,6 @@ export default {
           return;
         }
 
-        // Ne soumettre que les motifs modifiés
         const updatePromises = Object.keys(this.modifiedMotifs).map(async id => {
           const response = await axios.post(`http://localhost:8080/api/presence/${id}/motif`, { motif: this.modifiedMotifs[id] }, {
             headers: {
@@ -145,16 +143,13 @@ export default {
             },
           });
           if (response.status !== 200) {
-            throw new Error(`Failed to update motif for ID ${id}`);
+            throw new Error(`Échec de la mise à jour du motif pour l'ID ${id}`);
           }
         });
 
         await Promise.all(updatePromises);
 
-        // Afficher un message de succès stylisé
-        this.showSnackbar('Les motifs modifiés ont été mis à jour avec succès', 'success');
-
-        // Réinitialiser les motifs modifiés
+        this.showSnackbar('Le motif a été enregistrer  avec succès', 'success');
         this.modifiedMotifs = {};
       } catch (error) {
         console.error('Erreur lors de la mise à jour des motifs :', error);
@@ -168,19 +163,14 @@ export default {
     },
   },
   mounted() {
-    this.fetchPresenceData(this.semestre);
+    this.fetchPresenceData();
   },
 };
 </script>
 
 <style scoped>
-.semestre-buttons {
+.v-expansion-panels {
   margin-bottom: 20px;
-}
-
-.active {
-  background-color: #1976d2;
-  color: white;
 }
 
 .v-textarea {

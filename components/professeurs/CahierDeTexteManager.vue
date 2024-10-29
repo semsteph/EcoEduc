@@ -2,33 +2,47 @@
   <v-card>
     <v-card-title>Cahier de Texte</v-card-title>
     <v-card-text>
-      <v-tabs v-model="selectedTerm" background-color="deep-purple accent-4" dark>
-        <v-tab v-for="term in terms" :key="term.id">{{ term.name }}</v-tab>
-      </v-tabs>
+      <!-- Sélection des semestres -->
+      <v-row>
+        <v-col v-for="semester in semesters" :key="semester.id" cols="auto">
+          <v-btn
+            :color="getButtonColor(semester.nom)"
+            @click="changeSemester(semester.nom)"
+            :class="{ 'v-btn--active': currentSemester === semester.nom }"
+          >
+            {{ semester.nom }}
+          </v-btn>
+        </v-col>
+      </v-row>
 
-      <v-tabs-items v-model="selectedTerm">
-        <v-tab-item v-for="term in terms" :key="term.id">
-          <div class="table-container" v-if="activities[term.name] && activities[term.name].length">
-            <div class="table-header">
-              <div class="table-title">Date</div>
-              <div class="table-title">Horaire</div>
-              <div class="table-title">Activité</div>
-            </div>
-            <div v-for="(item, index) in activities[term.name]" :key="item.id" class="table-row">
-              <v-text-field :value="formatDate(item.date)" outlined dense readonly></v-text-field>
-              <v-text-field v-model="item.horaire" outlined dense readonly></v-text-field>
-              <v-textarea v-model="item.activite" outlined rows="2" dense readonly></v-textarea>
-            </div>
-          </div>
-          
-          <v-toolbar flat>
-            <v-spacer></v-spacer>
-            <v-btn @click="openAddActivityDialog(term.name)" color="primary">
-              Ajouter une activité
-            </v-btn>
-          </v-toolbar>
-        </v-tab-item>
-      </v-tabs-items>
+      <div class="table-container" v-if="currentActivities.length">
+        <div class="table-header">
+          <div class="table-title">Date</div>
+          <div class="table-title">Horaire</div>
+          <div class="table-title">Activité</div>
+          <div class="table-title">Actions</div>
+        </div>
+        <div
+          v-for="(item, index) in currentActivities"
+          :key="item.id"
+          class="table-row"
+          v-show="!item.hidden"
+        >
+          <v-text-field :value="formatDate(item.date)" outlined dense readonly></v-text-field>
+          <v-text-field v-model="item.horaire" outlined dense readonly></v-text-field>
+          <v-textarea v-model="item.activite" outlined rows="2" dense readonly></v-textarea>
+          <v-btn color="red" @click="openHideActivityDialog(item)">
+            Masquer
+          </v-btn>
+        </div>
+      </div>
+
+      <v-toolbar flat>
+        <v-spacer></v-spacer>
+        <v-btn @click="openAddActivityDialog" color="primary">
+          Ajouter une activité
+        </v-btn>
+      </v-toolbar>
     </v-card-text>
 
     <!-- Dialog pour ajouter une activité -->
@@ -55,12 +69,27 @@
       </v-card>
     </v-dialog>
 
+    <!-- Dialog de confirmation pour masquer une activité -->
+    <v-dialog v-model="hideDialog" max-width="400px">
+      <v-card>
+        <v-card-title>Confirmer le masquage</v-card-title>
+        <v-card-text>
+          Êtes-vous sûr de vouloir masquer cette activité ?
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" @click="hideActivity">Oui</v-btn>
+          <v-btn @click="closeHideDialog">Non</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Messages de succès et d'erreur -->
     <v-snackbar v-model="successMessage" color="green" top right timeout="3000">
-      Activité ajoutée avec succès !
+      Action réalisée avec succès !
     </v-snackbar>
     <v-snackbar v-model="errorMessage" color="red" top right timeout="3000">
-      Erreur lors de l'ajout de l'activité.
+      Erreur lors de l'action.
     </v-snackbar>
   </v-card>
 </template>
@@ -79,18 +108,21 @@ export default {
       type: String,
       required: true,
     },
+    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+      type: Number,
+      required: true,
+    },
   },
   data() {
     return {
-      selectedTerm: 0,
       dialog: false,
+      hideDialog: false,
       successMessage: false,
       errorMessage: false,
-      terms: [
-        { id: 5, name: 'Semestre1' },
-        { id: 6, name: 'Semestre2' },
-      ],
-      activities: {}, // Utiliser un objet pour gérer les activités par semestre
+      currentSemester: '',
+      semesters: [],
+      activities: {}, // Stockage des activités triées par semestre
+      activityToHide: null,
       newActivity: {
         classeId: this.classeId,
         matiereId: this.subjectId,
@@ -105,21 +137,39 @@ export default {
     teacherId() {
       return this.$route.query.id;
     },
+    currentActivities() {
+      return this.activities[this.currentSemester] || [];
+    },
   },
   methods: {
-    openAddActivityDialog(termName) {
+    getButtonColor(semester) {
+      return this.currentSemester === semester ? 'primary' : 'secondary';
+    },
+
+    changeSemester(semester) {
+      this.currentSemester = semester;
+      this.fetchNotesData(); // Charger les données pour le semestre sélectionné
+    },
+    openAddActivityDialog() {
       if (!this.classeId || !this.subjectId || !this.teacherId) {
         this.errorMessage = 'Veuillez vérifier que tous les champs sont remplis.';
         return;
       }
 
       this.dialog = true;
-      this.newActivity.termName = termName;
       this.newActivity.teacherId = this.teacherId;
     },
     closeDialog() {
       this.dialog = false;
       this.resetForm();
+    },
+    openHideActivityDialog(activity) {
+      this.activityToHide = activity;
+      this.hideDialog = true;
+    },
+    closeHideDialog() {
+      this.hideDialog = false;
+      this.activityToHide = null;
     },
     resetForm() {
       this.newActivity = {
@@ -131,61 +181,84 @@ export default {
         activite: '',
       };
     },
+    async fetchSemesters() {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
+        this.semesters = response.data;
+
+        // Sélectionner le premier semestre par défaut
+        if (this.semesters.length > 0) {
+          this.currentSemester = this.semesters[0].nom;
+          this.fetchNotesData();
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des semestres', error);
+      }
+    },
     async addActivity() {
   if (this.$refs.form.validate()) {
+    const newActivity = {
+      teacherId: this.newActivity.teacherId,
+      subjectId: this.newActivity.matiereId,
+      activity: this.newActivity.activite,
+      date: this.newActivity.date,
+      hours: this.newActivity.horaire,
+      classId: this.newActivity.classeId,
+      semesterName: this.currentSemester,
+      etablissementId: this.etablissementId,
+    };
+
     try {
-      const response = await axios.post('http://localhost:8080/api/addActivity', {
-        classId: this.newActivity.classeId,
-        subjectId: this.newActivity.matiereId,
-        teacherId: this.newActivity.teacherId,
-        termName: this.terms[this.selectedTerm].name,
-        date: this.newActivity.date,
-        hours: this.newActivity.horaire,
-        activity: this.newActivity.activite,
-      });
-
-      // Vérifiez si le tableau d'activités existe déjà
-      if (!this.activities[this.terms[this.selectedTerm].name]) {
-        this.activities[this.terms[this.selectedTerm].name] = []; // Utilisez l'assignation directe
-      }
-
-      // Ajoutez la nouvelle activité au tableau
-      this.activities[this.terms[this.selectedTerm].name].push(response.data);
-
+      const response = await axios.post('http://localhost:8080/api/addActivity', newActivity);
+      console.log('Activité ajoutée avec succès:', response.data);
       this.successMessage = true;
       this.closeDialog();
     } catch (error) {
-      console.error('Erreur lors de l\'ajout de l\'activité :', error);
-      this.errorMessage = true;
+      console.error('Erreur lors de l\'ajout de l\'activité:', error.response.data);
     }
   }
 },
+
+
+    hideActivity() {
+      if (this.activityToHide) {
+        // Masquer l'activité en réglant sa propriété "hidden" sur true
+        this.activityToHide.hidden = true;
+        this.successMessage = true;
+        this.closeHideDialog();
+      }
+    },
     formatDate(date) {
       const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
       return new Date(date).toLocaleDateString('fr-FR', options);
     },
+    async fetchNotesData() {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/getActivities/${this.classeId}/${this.subjectId}`);
+
+        this.activities = {};
+
+        if (response.data) {
+          response.data.forEach(activity => {
+            const semesterName = this.semesters.find(semester => semester.id === activity.semestre_id)?.nom;
+
+            if (!this.activities[semesterName]) {
+              this.activities[semesterName] = [];
+            }
+
+            // Ajouter une propriété "hidden" pour gérer la visibilité
+            activity.hidden = false;
+            this.activities[semesterName].push(activity);
+          });
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des activités :', error);
+      }
+    },
   },
   async mounted() {
-  try {
-    const response = await axios.get(`http://localhost:8080/api/getActivities/${this.classeId}/${this.subjectId}`);
-
-    if (response.data) {
-      response.data.forEach(activity => {
-        const termName = this.terms.find(term => term.id === activity.semestre_id)?.name;
-
-        // Vérifiez si le tableau d'activités existe déjà
-        if (!this.activities[termName]) {
-          this.activities[termName] = []; // Utilisez l'assignation directe
-        }
-
-        // Ajoutez l'activité au tableau
-        this.activities[termName].push(activity);
-      });
-    }
-  } catch (error) {
-    console.error('Erreur lors du chargement des activités :', error);
+    this.fetchSemesters();
   }
-}
 };
 </script>
 

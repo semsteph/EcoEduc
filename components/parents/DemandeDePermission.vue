@@ -74,6 +74,11 @@ export default {
       type: Number,
       required: true,
     },
+    etablissementId: {
+      type: Number,
+      required: true,
+    },
+
   },
   data() {
     return {
@@ -96,9 +101,10 @@ export default {
   },
   methods: {
     fetchPermissions() {
-      axios.get('http://localhost:8080/api/permissions')
+      axios.get(`http://localhost:8080/api/permissions/${this.childId}/${this.etablissementId}`)
         .then(response => {
           this.permissions = response.data;
+          console.log(this.etablissementId);
         })
         .catch(error => {
           console.error('Erreur lors de la récupération des permissions:', error);
@@ -116,7 +122,8 @@ export default {
         duree: this.newPermission.duree,
         contact: this.newPermission.contact,
         statut: 'En attente', // Statut par défaut
-        childId: this.childId  // Ajout de l'ID de l'enfant dans la requête
+        childId: this.childId , // Ajout de l'ID de l'enfant dans la requête
+        etablissementId:this.etablissementId
       
       })
       .then(response => {

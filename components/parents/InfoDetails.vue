@@ -26,6 +26,7 @@ export default {
     return {
       labels: [
         { name: 'Notes', route: 'notes', color: 'primary' },
+        { name: 'Bulletin', route: 'bulletin', color: 'info' },
         { name: 'Présence', route: 'presence', color: 'success' },
         { name: 'Conduite', route: 'conduite', color: 'warning' },
         { name: 'Scolarité', route: 'scolarite', color: 'info' },

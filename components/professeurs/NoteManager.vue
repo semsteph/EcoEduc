@@ -147,6 +147,10 @@ export default {
       type: Number,
       required: true,
     },
+    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+      type: Number,
+      required: true,
+    },
   },
   data: () => ({
     dialog: false,
@@ -154,8 +158,8 @@ export default {
     snackbarMessage: '',
     search: '',
     matiereNom: '',
-    currentSemester: 'Semestre1',
-    semesters: ['Semestre1', 'Semestre2'],
+    currentSemester: '',
+    semesters: [],
     headers: [
       { title: "Nom/Prénom", value: 'studentName', sortable: false },
       { title: 'Inter 1', value: 'inter1' },
@@ -174,12 +178,13 @@ export default {
     selectedFile: null,
     valid: false,
   }),
-
+  
   methods: {
+   
     getButtonColor(semester) {
       return this.currentSemester === semester ? 'primary' : 'secondary';
     },
-    
+  
     changeSemester(semester) {
       this.currentSemester = semester;
       this.fetchNotesData();
@@ -205,13 +210,21 @@ export default {
     },
 
     async fetchSemesters() {
+      console.log(this.etablissementId);
       try {
-        const response = await axios.get('http://localhost:8080/api/semesters');
+        const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
         this.semesters = response.data;
+
+        // Définir le premier semestre récupéré comme sélectionné par défaut
+        if (this.semesters.length > 0) {
+          this.currentSemester = this.semesters[0].nom;
+          this.fetchNotesData();
+        }
       } catch (error) {
         console.error('Erreur lors de la récupération des semestres', error);
       }
     },
+
 
     openImportForm() {
       this.dialog = true;
@@ -232,6 +245,7 @@ export default {
       formData.append('semestreId', this.getSemesterId(this.currentSemester));
       formData.append('matiereId', this.subjectId);
       formData.append('classeId', this.classeId);
+      formData.append('etablissementId', this.etablissementId);
 
       try {
         await axios.post(`http://localhost:8080/api/upload/excel`, formData, {
@@ -291,12 +305,14 @@ export default {
           classeId: this.classeId,
           subjectId: this.subjectId,
           semesterId: semestreId,
+          etablissementId: this.etablissementId,
           notes: this.students.map((student) => ({
             nom:student.nom,
             prenom:student.prenom,
             MoyI: student.MoyI ,
             Moy: student.Moy ,
-            Moycoef: student.Moycoef
+            Moycoef: student.Moycoef,
+          
           })),
         };
 

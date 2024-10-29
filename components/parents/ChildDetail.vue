@@ -23,6 +23,7 @@ export default {
         { label: 'Programme' },
         { label: 'Scolarité' },
         { label: 'Activité' },
+        { label: 'Bulltin' },
         { label: 'Demande de Permission' }
       ]
     };
