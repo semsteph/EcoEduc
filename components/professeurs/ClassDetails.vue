@@ -21,7 +21,9 @@ export default {
           { label: 'Gérer Note' },
           { label: 'Gérer Conduite' },
           { label: 'Gérer Présence' },
-          { label: 'Cahier de Texte' }
+          { label: 'Les derniers Absents' },
+          { label: 'Cahier de Texte' },
+          
         ]
     };
   },

@@ -1,13 +1,16 @@
 <template>
   <v-container class="custom-table-container">
     <!-- Barre d'outils avec le bouton "Ajouter une permission" -->
+    <v-btn icon  @click="$emit('back')" class="back-button">
+      <v-icon>mdi-arrow-left</v-icon>
+    </v-btn>
     <v-toolbar flat>
       <v-spacer></v-spacer>
       <v-btn color="primary" @click="dialog = true">
         Ajouter une permission
       </v-btn>
     </v-toolbar>
-
+    
     <!-- Tableau des permissions -->
     <v-simple-table class="custom-table">
       <thead>
@@ -34,7 +37,6 @@
       </tbody>
     </v-simple-table>
 
-   
     <!-- Dialog pour ajouter une nouvelle permission -->
     <v-dialog v-model="dialog" max-width="500px">
       <v-card>
@@ -62,9 +64,12 @@
       {{ snackbarMessage }}
       <v-btn color="white" text @click="snackbarVisible = false">Fermer</v-btn>
     </v-snackbar>
-   
+
+    <!-- Bouton de retour -->
+     <v-btn block color="secondary" @click="$emit('back')" class="mt-4">Retour</v-btn>
   </v-container>
 </template>
+
 <script>
 import axios from 'axios';
 
@@ -78,7 +83,6 @@ export default {
       type: Number,
       required: true,
     },
-
   },
   data() {
     return {
@@ -104,7 +108,6 @@ export default {
       axios.get(`http://localhost:8080/api/permissions/${this.childId}/${this.etablissementId}`)
         .then(response => {
           this.permissions = response.data;
-          console.log(this.etablissementId);
         })
         .catch(error => {
           console.error('Erreur lors de la récupération des permissions:', error);
@@ -115,16 +118,14 @@ export default {
       return new Date(date).toLocaleDateString(undefined, options);
     },
     addPermission() {
-      // Requête POST pour ajouter une nouvelle permission
       axios.post(`http://localhost:8080/api/permissions/${this.childId}`, {
         date: this.newPermission.date,
         motif: this.newPermission.motif,
         duree: this.newPermission.duree,
         contact: this.newPermission.contact,
-        statut: 'En attente', // Statut par défaut
-        childId: this.childId , // Ajout de l'ID de l'enfant dans la requête
-        etablissementId:this.etablissementId
-      
+        statut: 'En attente',
+        childId: this.childId,
+        etablissementId: this.etablissementId
       })
       .then(response => {
         this.permissions.push({
@@ -144,7 +145,6 @@ export default {
       });
     },
     deletePermission(permissionId) {
-      // Requête DELETE pour supprimer la permission
       axios.delete(`http://localhost:8080/api/permissions/${permissionId}`)
         .then(() => {
           this.permissions = this.permissions.filter(permission => permission.id !== permissionId);
@@ -155,7 +155,6 @@ export default {
         });
     },
     resetForm() {
-      // Réinitialisation du formulaire après l'ajout
       this.newPermission = {
         date: '',
         motif: '',
@@ -165,18 +164,17 @@ export default {
       this.$refs.form.resetValidation();
     },
     goBack() {
-      this.currentView = 'default';
-      this.selectedChild = null
+      this.$emit("default", "InfoDetails");
     },
     showSnackbar(message, color) {
       this.snackbarMessage = message;
       this.snackbarColor = color;
       this.snackbarVisible = true;
     },
-    
   }
 };
 </script>
+
 <style>
 /* Conteneur général du tableau avec largeur réduite et centrage */
 .custom-table-container {
@@ -235,5 +233,9 @@ export default {
 .clickable-icon {
   cursor: pointer;
 }
-</style>
 
+/* Style du bouton de retour */
+.back-button {
+  margin-bottom: 16px;
+}
+</style>

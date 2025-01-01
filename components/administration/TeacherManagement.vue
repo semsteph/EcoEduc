@@ -2,9 +2,9 @@
   <v-container >
     <v-row class="button-group">
       <v-col class="d-flex justify-center">
+        <v-btn @click="showAddSubjectForm = true" class="mx-2">Ajouter Matière</v-btn>
         <v-btn @click="showInscriptionForm = true" class="mx-2">Inscrire un Enseignant</v-btn>
         <v-btn @click="showAddForm = true" class="mx-2">Ajouter un Enseignant</v-btn>
-        <v-btn @click="showAddSubjectForm = true" class="mx-2">Ajouter Matière</v-btn>
       </v-col>
     </v-row>
 

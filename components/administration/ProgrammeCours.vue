@@ -17,7 +17,7 @@
               <v-card
                 class="ma-2"
                 outlined
-                @click="goToClass(classe.id)"
+                @click="goToClass(classe.id, classe.nom)"
               >
                 <v-card-title>{{ classe.nom }}</v-card-title>
               </v-card>
@@ -33,61 +33,65 @@
         </v-row>
       </v-card-text>
     </v-card>
-      <!-- Affiche le composant enfant si une classe est sélectionnée -->
-      <ProgrammeDetail v-else :class-id="selectedClassId" :etablissement-id="etablissementId" @back="clearSelection" />
-    </div>
-  </template>
-  
-  <script>
-  import ProgrammeDetail from './ProgrammeDetail.vue';
-  import axios from 'axios';
-  
-  export default {
-    name: 'ProgrammeCours',
-    components:{
-      ProgrammeDetail,
-      
-    },
+    <!-- Affiche le composant enfant si une classe est sélectionnée -->
+    <ProgrammeDetail 
+      v-else 
+      :class-id="selectedClassId" 
+      :class-name="selectedClassName" 
+      :etablissement-id="etablissementId" 
+      @back="clearSelection" 
+    />
+  </div>
+</template>
 
-    props: {
+<script>
+import ProgrammeDetail from './ProgrammeDetail.vue';
+import axios from 'axios';
+
+export default {
+  name: 'ProgrammeCours',
+  components: {
+    ProgrammeDetail,
+  },
+  props: {
     etablissementId: {
       type: Number,
-      required: true
+      required: true,
     },
     etablissementNom: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
   },
-    data() {
-      return {
-        classes: [],
-        selectedClassId: null,
-      };
+  data() {
+    return {
+      classes: [],
+      selectedClassId: null,
+      selectedClassName: null, // Ajout pour stocker le nom de la classe sélectionnée
+    };
+  },
+  methods: {
+    fetchClasses() {
+      console.log('ID envoyé:', this.etablissementId); // Log pour debug
+      axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
+        .then(response => {
+          this.classes = response.data;
+        })
+        .catch(error => {
+          console.error('Erreur lors de la récupération des classes:', error);
+        });
     },
-    methods: {
-      fetchClasses() {
-  console.log('ID envoyé:', this.etablissementId); // Ajoute ce log pour voir la valeur
-  axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
-    .then(response => {
-      this.classes = response.data;
-    })
-    .catch(error => {
-      console.error('Erreur lors de la récupération des classes:', error);
-    });
-},
-
-
-      goToClass(classId) {
-        this.selectedClassId = classId;
-      },
-      clearSelection() {
-        this.selectedClassId = null;
-      }
+    goToClass(classId, className) {
+      this.selectedClassId = classId;
+      this.selectedClassName = className; // Met à jour le nom de la classe sélectionnée
     },
-    created() {
-      this.fetchClasses();
-    }
-  }
-  </script>
-  
+    clearSelection() {
+      this.selectedClassId = null;
+      this.selectedClassName = null; // Réinitialise le nom de la classe
+    },
+  },
+  created() {
+    this.fetchClasses();
+  },
+};
+</script>

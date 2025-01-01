@@ -1,6 +1,8 @@
 <template>
-  <v-container>
-    <h1>Informations de l'élève</h1>
+  <v-container>\ <v-btn icon  @click="$emit('back')">
+      <v-icon>mdi-arrow-left</v-icon>
+    </v-btn>
+    <h1 class="title">Informations de l'élève</h1>
     <v-card class="mb-5">
       <v-img :src="child.photo || defaultPhoto" height="200px"></v-img>
       <v-card-title>{{ child.prenom }} {{ child.nom }}</v-card-title>
@@ -33,6 +35,7 @@ export default {
         { name: 'Programme', route: 'programme', color: 'purple' },
         { name: 'Demande de Permission', route: 'permission', color: 'purple' },
         { name: 'Activité', route: 'activite', color: 'warning' },
+        { name: 'Assistances', route: 'assistances', color: 'success' },
       ],
       currentView: 'default',  // Vue actuelle (par défaut sur la liste)
       defaultPhoto: '/_nuxt/assets/parents/istockphoto-1495088043-612x612.jpg',  // Chemin vers l'image par défaut
@@ -82,5 +85,8 @@ export default {
 <style scoped>
 .v-card {
   cursor: pointer;
+}
+.title{
+  color:black;
 }
 </style>

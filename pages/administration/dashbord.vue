@@ -1,30 +1,27 @@
 <template>
   <v-app>
     <!-- Barre latérale de navigation -->
-    <v-navigation-drawer app color="blue darken-3" v-model="drawer">
+    <v-navigation-drawer app color="indigo darken-4" v-model="drawer" dark>
       <v-list dense>
         <v-list-item>
           <v-list-item-content>
             <h1 class="etablissement-title">{{ etablissementNom }}</h1>
           </v-list-item-content>
         </v-list-item>
-        <v-list-item @click="changeComponent('ClassManagement')">
-          <v-list-item-content>Gestion Classe</v-list-item-content>
-        </v-list-item>
-        <v-list-item @click="changeComponent('StudentManagement')">
-          <v-list-item-content>Gestion Élève</v-list-item-content>
-        </v-list-item>
-        <v-list-item @click="changeComponent('TeacherManagement')">
-          <v-list-item-content>Gestion Enseignant</v-list-item-content>
-        </v-list-item>
-        <v-list-item @click="changeComponent('ParentManagement')">
-          <v-list-item-content>Gestion Parent</v-list-item-content>
+        <v-divider></v-divider>
+        <v-list-item v-for="item in menuItems" :key="item.title" @click="changeComponent(item.component)">
+          <v-list-item-icon>
+            <v-icon>{{ item.icon }}</v-icon>
+          </v-list-item-icon>
+          <v-list-item-content>
+            <v-list-item-title>{{ item.title }}</v-list-item-title>
+          </v-list-item-content>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
 
     <!-- Barre d'applications -->
-    <v-app-bar app color="blue darken-3" dark>
+    <v-app-bar app color="indigo darken-4" dark>
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-toolbar-title class="app-title">EchoEducation</v-toolbar-title>
       <v-spacer></v-spacer>
@@ -43,17 +40,19 @@
       </v-btn>
     </v-app-bar>
 
-    <!-- Composant principal affiché -->
-    <v-main class="background ">
-      <v-container>
-        <component :is="currentComponent"
-                   :etablissement-id="etablissementId"
-                   @component-selected="selectComponent"
-                   @back="currentComponent = previousComponent"
-                   @update-notification-count="updateNotificationCount"
-        />
-      </v-container>
-    </v-main>
+    <!-- Conteneur principal avec l'image de fond -->
+    <div class="background-container">
+      <div class="background-image"></div>
+      <v-main class="foreground">
+        <v-container class="py-5">
+          <component :is="currentComponent"
+                     :etablissement-id="etablissementId"
+                     @component-selected="selectComponent"
+                     @back="currentComponent = previousComponent"
+                     @update-notification-count="updateNotificationCount" />
+        </v-container>
+      </v-main>
+    </div>
 
     <!-- Boîte de dialogue de déconnexion -->
     <logout-dialog ref="logoutDialog" @confirm-logout="logout"></logout-dialog>
@@ -61,6 +60,7 @@
 </template>
 
 <script>
+// Importation des composants (inchangée)
 import ParentManagement from '@/components/administration/ParentManagement.vue';
 import MessageComponent from '@/components/administration/MessageComponent.vue';
 import NotificationComponent from '@/components/administration/NotificationComponent.vue';
@@ -100,6 +100,12 @@ export default {
       notificationBadgeColor: 'red',
       etablissementId: null,
       etablissementNom: '',
+      menuItems: [
+        { title: 'Gestion Classe', component: 'ClassManagement', icon: 'mdi-school' },
+        { title: 'Gestion Élève', component: 'StudentManagement', icon: 'mdi-account-group' },
+        { title: 'Gestion Enseignant', component: 'TeacherManagement', icon: 'mdi-teach' },
+        { title: 'Gestion Parent', component: 'ParentManagement', icon: 'mdi-account-child' },
+      ],
     };
   },
   created() {
@@ -122,7 +128,6 @@ export default {
       this.$refs.logoutDialog.dialog = true;
     },
     logout() {
-      // Logique de déconnexion (ex. suppression du token, etc.)
       this.$router.push('/administration/connexion');
     },
     selectComponent(component) {
@@ -137,55 +142,61 @@ export default {
 </script>
 
 <style scoped>
-.background {
+/* Arrière-plan avec image floue */
+.background-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.background-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background-image: url('assets/administration/Image collée.png');
   background-size: cover;
   background-position: center;
-  min-height: 100vh;
+  filter: blur(10px); /* Flou appliqué à l'image */
+  z-index: 1;
+}
+
+.foreground {
+  position: relative;
+  z-index: 2;
+  background-color: rgba(255, 255, 255, 0.1); /* Fond semi-transparent */
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  overflow-y: auto; /* Permet le défilement vertical */
 }
 
 .app-title {
-  font-size: 28px;
-  font-weight: bold;
+  font-size: 24px;
+  font-weight: 700;
   text-transform: capitalize;
 }
 
 .etablissement-title {
-  font-size: 22px;
-  font-weight: bold;
+  font-size: 20px;
+  font-weight: 600;
   color: white;
   text-align: center;
-  margin-top: 20px;
+  margin: 16px 0;
 }
 
-.v-list-item-content {
+.v-list-item {
   color: white;
   font-weight: 500;
 }
 
-.v-list-item-content:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+.v-list-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
   cursor: pointer;
-  border-radius: 5px;
-  padding: 8px;
-}
-
-.v-navigation-drawer {
-  background-color: #0d47a1;
-}
-
-.v-app-bar {
-  background-color: #0d47a1;
-}
-
-.v-btn .v-icon {
-  color: white;
-}
-
-.v-main {
-  background-color: rgba(255, 255, 255, 0.8);
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
 }
 </style>

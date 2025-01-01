@@ -1,6 +1,9 @@
 <template>
   <div>
-    <h1 class="No"> Veulliez cliquer sur un semestre pour afficher les notes de l'eleve pour le semestre </h1>
+    <v-btn icon  @click="$emit('back')">
+      <v-icon>mdi-arrow-left</v-icon>
+    </v-btn>
+    <h1 class="No">Veuillez cliquer sur un semestre pour afficher/masquer les notes de l'élève.</h1>
 
     <div v-if="error" class="error">
       {{ error }}
@@ -12,47 +15,56 @@
 
     <div v-else>
       <div v-if="semestres.length">
-        <div class="semestre-buttons">
-          <button
-            v-for="semestre in semestres"
-            :key="semestre.id"
-            @click="selectedSemestre = semestre.id"
-            :class="{ active: selectedSemestre === semestre.id }"
+        <div class="semestre-list">
+          <div 
+            v-for="semestre in semestres" 
+            :key="semestre.id" 
+            class="semestre-item"
           >
-            {{ semestre.nom }}
-          </button>
+            <button 
+              @click="toggleSemestre(semestre.id)" 
+              :class="{ active: selectedSemestre === semestre.id }"
+            >
+              {{ semestre.nom }}
+            </button>
+            <table 
+              v-if="selectedSemestre === semestre.id && notesBySemestre[semestre.id]" 
+              class="notes-table"
+            >
+              <thead>
+                <tr>
+                  <th>Matière</th>
+                  <th>Inter1</th>
+                  <th>Inter2</th>
+                  <th>Inter3</th>
+                  <th>Inter4</th>
+                  <th>Moy Inter</th>
+                  <th>Dev1</th>
+                  <th>Dev2</th>
+                  <th>Moy</th>
+                  <th>Moy Coef</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr 
+                  v-for="note in notesBySemestre[semestre.id].notes" 
+                  :key="note.matiere"
+                >
+                  <td>{{ note.matiere }}</td>
+                  <td>{{ note.inter1 || '' }}</td>
+                  <td>{{ note.inter2 || '' }}</td>
+                  <td>{{ note.inter3 || '' }}</td>
+                  <td>{{ note.inter4 || '' }}</td>
+                  <td>{{ note.moyInter || '' }}</td>
+                  <td>{{ note.dev1 || '' }}</td>
+                  <td>{{ note.dev2 || '' }}</td>
+                  <td>{{ note.moy || '' }}</td>
+                  <td>{{ note.moycoef || '' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-
-        <table v-if="selectedSemestre && notesBySemestre[selectedSemestre]" class="notes-table">
-          <thead>
-            <tr>
-              <th>Matière</th>
-              <th>Inter1</th>
-              <th>Inter2</th>
-              <th>Inter3</th>
-              <th>Inter4</th>
-              <th>Moy Inter</th>
-              <th>Dev1</th>
-              <th>Dev2</th>
-              <th>Moy</th>
-              <th>Moy Coef</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="note in notesBySemestre[selectedSemestre].notes" :key="note.matiere">
-              <td>{{ note.matiere }}</td>
-              <td>{{ note.inter1 || '' }}</td>
-              <td>{{ note.inter2 || '' }}</td>
-              <td>{{ note.inter3 || '' }}</td>
-              <td>{{ note.inter4 || '' }}</td>
-              <td>{{ note.moyInter || '' }}</td>
-              <td>{{ note.dev1 || '' }}</td>
-              <td>{{ note.dev2 || '' }}</td>
-              <td>{{ note.moy || '' }}</td>
-              <td>{{ note.moycoef || '' }}</td>
-            </tr>
-          </tbody>
-        </table>
       </div>
       <div v-else>
         <p>Aucun semestre disponible.</p>
@@ -93,7 +105,6 @@ export default {
           },
         });
 
-        // Regrouper les notes par matière et sélectionner la première valeur non nulle
         const rawData = response.data;
         const processedData = {};
         
@@ -128,8 +139,7 @@ export default {
               return acc;
             }, {}),
           };
-          
-          // Convertir les notes en tableau pour l'affichage
+
           processedData[semestreId].notes = Object.values(processedData[semestreId].notes);
         }
 
@@ -138,16 +148,15 @@ export default {
           id: key,
           nom: this.notesBySemestre[key].semestre,
         }));
-
-        if (this.semestres.length > 0) {
-          this.selectedSemestre = this.semestres[0].id;
-        }
       } catch (error) {
         this.error = 'Erreur lors de la récupération des données. Veuillez réessayer plus tard.';
         console.error('Erreur lors de la récupération des données:', error);
       } finally {
         this.loading = false;
       }
+    },
+    toggleSemestre(semestreId) {
+      this.selectedSemestre = this.selectedSemestre === semestreId ? null : semestreId;
     },
   },
 };
@@ -157,23 +166,37 @@ export default {
 .error {
   color: red;
 }
-.semestre-buttons {
-  display: flex;
-  gap: 10px;
+.back-button {
   margin-bottom: 20px;
-}
-.semestre-buttons button {
   padding: 10px;
+  background-color: #f0f0f0;
+  border: none;
   cursor: pointer;
 }
-.semestre-buttons button.active {
+.back-button:hover {
+  background-color: #ddd;
+}
+.semestre-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.semestre-item button {
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  background-color: #f4f4f4;
+  border: 1px solid #ddd;
+}
+.semestre-item button.active {
   background-color: #007bff;
   color: #fff;
 }
 .notes-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 20px;
+  margin-top: 10px;
 }
 .notes-table th,
 .notes-table td {
@@ -184,7 +207,8 @@ export default {
 .notes-table tr {
   background-color: #f4f4f4;
 }
-.No{
-  color: #ddd;
+.No {
+  color: #555;
+  margin-bottom: 20px;
 }
 </style>

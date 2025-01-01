@@ -23,7 +23,8 @@
           </v-card-subtitle>
           <v-card-text>
             <p>Téléphone: {{ enseignant.telephone }}</p>
-            <p>Nom d'utilisateur: {{ enseignant.nom_utilisateur }}</p>
+            <p>Classes: {{ enseignant.classes.join(', ') }}</p>
+            <p>Matières: {{ enseignant.matieres.join(', ') }}</p>
           </v-card-text>
           <v-card-actions>
             <v-btn color="primary" @click="editEnseignant(enseignant)">
@@ -103,8 +104,8 @@ export default {
   },
   computed: {
     filteredEnseignants() {
-      return this.enseignants.filter(enseignant => 
-        enseignant.nom.toLowerCase().includes(this.searchQuery.toLowerCase()) || 
+      return this.enseignants.filter(enseignant =>
+        enseignant.nom.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
         enseignant.prenom.toLowerCase().includes(this.searchQuery.toLowerCase())
       );
     },
@@ -134,7 +135,7 @@ export default {
         this.dialog = false;
         this.fetchEnseignants();
       } catch (error) {
-        console.error('Erreur lors de la mise à jour de l\'enseignant', error);
+        console.error("Erreur lors de la mise à jour de l'enseignant", error);
       }
     },
     async deleteEnseignant(id) {
@@ -142,7 +143,7 @@ export default {
         await axios.delete(`http://localhost:8080/api/Enseignants/${id}`);
         this.fetchEnseignants();
       } catch (error) {
-        console.error('Erreur lors de la suppression de l\'enseignant', error);
+        console.error("Erreur lors de la suppression de l'enseignant", error);
       }
     },
   },
@@ -150,5 +151,7 @@ export default {
 </script>
 
 <style scoped>
-/* Ajoutez vos styles ici */
+.mb-4 {
+  color: aliceblue;
+}
 </style>

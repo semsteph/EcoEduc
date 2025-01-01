@@ -1,8 +1,10 @@
 <template>
   <div class="background">
+    <!-- Couche floue appliquée à l'image de fond -->
+    <div class="overlay"></div>
+
     <div class="content">
       <form @submit.prevent="submitForm" class="form-container">
-        
         <!-- Champ nom d'utilisateur avec label -->
         <label for="nom_utilisateur" class="input-label">Nom d'utilisateur</label>
         <input 
@@ -101,8 +103,10 @@ export default {
 };
 </script>
 
-<style>
+<style scoped>
+/* Fond avec une image de fond */
 .background {
+  position: relative; /* Nécessaire pour superposer les calques */
   background-image: url('assets/administration/depositphotos_91369982-stock-photo-notebook-stack-with-apple-and.webp'); /* Remplacez par le chemin de votre image */
   background-size: cover;
   background-position: center;
@@ -113,7 +117,21 @@ export default {
   padding: 40px;
 }
 
+/* Couche floue */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(15px); /* Applique un flou de 15px */
+  z-index: 1; /* Place la couche derrière le contenu principal */
+  background-color: rgba(255, 255, 255, 0.2); /* Optionnel : ajoute une légère teinte */
+}
+
+/* Contenu principal */
 .content {
+  position: relative; /* Nécessaire pour superposer sur la couche floue */
   background-color: rgba(255, 255, 255, 0.8); /* Fond légèrement transparent */
   border-radius: 10px;
   padding: 30px;
@@ -121,8 +139,10 @@ export default {
   max-width: 400px;
   width: 100%;
   text-align: center;
+  z-index: 2; /* Place le contenu au-dessus de la couche floue */
 }
 
+/* Formulaire */
 .form-container {
   display: flex;
   flex-direction: column;
@@ -171,11 +191,11 @@ export default {
   background-color: #5a6268;
 }
 
-/* Nouveau style pour les labels */
+/* Labels des champs */
 .input-label {
   text-align: left;
   font-size: 14px;
-  margin-bottom: -12px; /* Pour réduire l'espace entre le label et l'input */
+  margin-bottom: -12px;
   color: #333;
 }
 </style>

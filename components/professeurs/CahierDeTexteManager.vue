@@ -2,6 +2,9 @@
   <v-card>
     <v-card-title>Cahier de Texte</v-card-title>
     <v-card-text>
+      <!-- Bouton de retour -->
+      <v-btn color="primary" @click="$emit('back')" class="mb-4">Retour</v-btn>
+
       <!-- Sélection des semestres -->
       <v-row>
         <v-col v-for="semester in semesters" :key="semester.id" cols="auto">
@@ -15,34 +18,24 @@
         </v-col>
       </v-row>
 
-      <div class="table-container" v-if="currentActivities.length">
-        <div class="table-header">
-          <div class="table-title">Date</div>
-          <div class="table-title">Horaire</div>
-          <div class="table-title">Activité</div>
-          <div class="table-title">Actions</div>
-        </div>
-        <div
-          v-for="(item, index) in currentActivities"
-          :key="item.id"
-          class="table-row"
-          v-show="!item.hidden"
-        >
-          <v-text-field :value="formatDate(item.date)" outlined dense readonly></v-text-field>
-          <v-text-field v-model="item.horaire" outlined dense readonly></v-text-field>
-          <v-textarea v-model="item.activite" outlined rows="2" dense readonly></v-textarea>
-          <v-btn color="red" @click="openHideActivityDialog(item)">
-            Masquer
-          </v-btn>
-        </div>
-      </div>
-
-      <v-toolbar flat>
+      <v-toolbar flat class="mt-4">
+        <v-toolbar-title>Activités</v-toolbar-title>
         <v-spacer></v-spacer>
-        <v-btn @click="openAddActivityDialog" color="primary">
-          Ajouter une activité
-        </v-btn>
+        <!-- Bouton ajouter une activité -->
+        <v-btn @click="openAddActivityDialog" color="primary">Ajouter une activité</v-btn>
       </v-toolbar>
+
+      <!-- Table d'activités -->
+      <v-data-table
+        :headers="tableHeaders"
+        :items="currentActivities"
+        class="elevation-1 mt-3"
+        item-key="id"
+      >
+        <template v-slot:item.actions="{ item }">
+          <v-btn color="red" @click="openHideActivityDialog(item)">Masquer</v-btn>
+        </template>
+      </v-data-table>
     </v-card-text>
 
     <!-- Dialog pour ajouter une activité -->
@@ -108,7 +101,7 @@ export default {
       type: String,
       required: true,
     },
-    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+    etablissementId: {
       type: Number,
       required: true,
     },
@@ -121,16 +114,22 @@ export default {
       errorMessage: false,
       currentSemester: '',
       semesters: [],
-      activities: {}, // Stockage des activités triées par semestre
+      activities: {},
       activityToHide: null,
       newActivity: {
         classeId: this.classeId,
         matiereId: this.subjectId,
-        teacherId: '', // Sera rempli automatiquement
+        teacherId: '',
         date: '',
         horaire: '',
         activite: '',
       },
+      tableHeaders: [
+        { text: 'Date', value: 'date' },
+        { text: 'Horaire', value: 'horaire' },
+        { text: 'Activité', value: 'activite' },
+        { text: 'Actions', value: 'actions', sortable: false },
+      ],
     };
   },
   computed: {
@@ -138,7 +137,8 @@ export default {
       return this.$route.query.id;
     },
     currentActivities() {
-      return this.activities[this.currentSemester] || [];
+      // Retourne les activités visibles pour le semestre courant
+      return (this.activities[this.currentSemester] || []).filter(activity => !activity.hidden);
     },
   },
   methods: {
@@ -148,7 +148,7 @@ export default {
 
     changeSemester(semester) {
       this.currentSemester = semester;
-      this.fetchNotesData(); // Charger les données pour le semestre sélectionné
+      this.fetchNotesData();
     },
     openAddActivityDialog() {
       if (!this.classeId || !this.subjectId || !this.teacherId) {
@@ -186,7 +186,6 @@ export default {
         const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
         this.semesters = response.data;
 
-        // Sélectionner le premier semestre par défaut
         if (this.semesters.length > 0) {
           this.currentSemester = this.semesters[0].nom;
           this.fetchNotesData();
@@ -196,34 +195,41 @@ export default {
       }
     },
     async addActivity() {
-  if (this.$refs.form.validate()) {
-    const newActivity = {
-      teacherId: this.newActivity.teacherId,
-      subjectId: this.newActivity.matiereId,
-      activity: this.newActivity.activite,
-      date: this.newActivity.date,
-      hours: this.newActivity.horaire,
-      classId: this.newActivity.classeId,
-      semesterName: this.currentSemester,
-      etablissementId: this.etablissementId,
-    };
+      if (this.$refs.form.validate()) {
+        const newActivity = {
+          teacherId: this.newActivity.teacherId,
+          subjectId: this.newActivity.matiereId,
+          activity: this.newActivity.activite,
+          date: this.newActivity.date,
+          hours: this.newActivity.horaire,
+          classId: this.newActivity.classeId,
+          semesterName: this.currentSemester,
+          etablissementId: this.etablissementId,
+        };
 
-    try {
-      const response = await axios.post('http://localhost:8080/api/addActivity', newActivity);
-      console.log('Activité ajoutée avec succès:', response.data);
-      this.successMessage = true;
-      this.closeDialog();
-    } catch (error) {
-      console.error('Erreur lors de l\'ajout de l\'activité:', error.response.data);
-    }
-  }
-},
+        try {
+          const response = await axios.post('http://localhost:8080/api/addActivity', newActivity);
+          this.successMessage = true;
 
-
+          // Ajouter l'activité localement sans rechargement de page
+          if (!this.activities[this.currentSemester]) {
+            this.activities[this.currentSemester] = [];
+          }
+          this.activities[this.currentSemester].push({
+            ...newActivity,
+            id: response.data.id, // Supposons que l'ID soit renvoyé par l'API
+            hidden: false, // La nouvelle activité est visible par défaut
+          });
+          this.closeDialog();
+        } catch (error) {
+          this.errorMessage = true;
+          console.error('Erreur lors de l\'ajout de l\'activité:', error.response.data);
+        }
+      }
+    },
     hideActivity() {
       if (this.activityToHide) {
-        // Masquer l'activité en réglant sa propriété "hidden" sur true
-        this.activityToHide.hidden = true;
+        this.activityToHide.hidden = true; // Cacher l'activité localement
         this.successMessage = true;
         this.closeHideDialog();
       }
@@ -246,8 +252,7 @@ export default {
               this.activities[semesterName] = [];
             }
 
-            // Ajouter une propriété "hidden" pour gérer la visibilité
-            activity.hidden = false;
+            activity.hidden = false; // Assurez-vous que les activités sont visibles par défaut
             this.activities[semesterName].push(activity);
           });
         }
@@ -267,24 +272,15 @@ export default {
   display: flex;
   flex-direction: column;
 }
-.table-header {
-  display: flex;
-  flex-direction: row;
-  background-color: #ddd;
-  padding: 8px;
+.v-data-table {
+  border-radius: 8px;
+  background-color: #fff;
 }
-.table-title {
-  flex: 1;
-  text-align: left;
+.v-data-table-header th {
+  background-color: #3f51b5;
+  color: white;
 }
-.table-row {
-  display: flex;
-  flex-direction: row;
-  margin-bottom: 8px;
-}
-.table-row v-text-field,
-.table-row v-textarea {
-  flex: 1;
-  margin-right: 8px;
+.v-btn--active {
+  font-weight: bold;
 }
 </style>

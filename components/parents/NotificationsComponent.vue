@@ -1,34 +1,29 @@
 <template>
-  <div>
+  <div class="notifications-container">
     <!-- Bouton de retour avec flèche -->
-    <v-btn icon @click="goBack" class="mb-4">
+    <v-btn icon @click="goBack" class="mb-4 back-button">
       <v-icon>mdi-arrow-left</v-icon>
     </v-btn>
 
-    <h2>Notifications</h2>
-    
-    <!-- Alerte en cas de message d'alerte -->
-    <v-alert
-      v-if="alertMessages.length"
-      type="error"
-      class="alert-space"
-      v-for="(message, index) in alertMessages"
-      :key="index"
-    >
-      {{ message }}
+    <h2 class="title">Notifications</h2>
+
+    <!-- Conteneur pour les alertes -->
+    <div class="alerts-container">
+      <v-alert
+        v-for="(message, index) in alertMessages"
+        :key="index"
+        type="error"
+        outlined
+        class="alert-message"
+      >
+        {{ message }}
+      </v-alert>
+    </div>
+
+    <!-- Message si aucune notification n'est disponible -->
+    <v-alert v-if="!alertMessages.length" type="info" class="no-notifications" outlined>
+      Aucune notification disponible.
     </v-alert>
-
-    <!-- Liste des notifications -->
-    <v-list v-if="notifications.length">
-      <v-list-item v-for="notification in notifications" :key="notification.id">
-        <v-list-item-content>
-          <v-list-item-title>{{ notification.message }}</v-list-item-title>
-        </v-list-item-content>
-      </v-list-item>
-    </v-list>
-
-    <!-- Message si aucune notification n'est trouvée -->
-    <p v-else>Aucune notification disponible.</p>
   </div>
 </template>
 
@@ -40,7 +35,7 @@ export default {
   data() {
     return {
       notifications: [],
-      alertMessages: [], // Stocke tous les messages d'alerte séparés
+      alertMessages: [], // Stocke tous les messages d'alerte
       parentId: null,
     };
   },
@@ -63,7 +58,7 @@ export default {
         }
 
         const response = await axios.get(
-          `http://localhost:8080/api/notifications/${this.parentId}`,
+          `http://localhost:8080/api/notificationed/${this.parentId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -81,73 +76,27 @@ export default {
         }
 
         this.notifications = response.data.notifications;
+        
+        // Créer un message pour chaque notification d'absence
+        this.notifications
+          .filter(notification => notification.statut === "Absent")
+          .forEach(absence => {
+            const formattedDate = new Date(absence.date).toLocaleDateString();
+            const formattedTime = absence.heures;
+            const message = `Votre enfant ${absence.studentPrenom} ${absence.studentName} est absent le ${formattedDate} au cours de ${formattedTime}. Merci de bien vouloir notifier la raison de son absence.`;
+            this.alertMessages.push(message);
+          });
 
-        const today = new Date();
-        const yesterday = new Date(today);
-        const dayBeforeYesterday = new Date(today);
-
-        yesterday.setDate(today.getDate() - 1);
-        dayBeforeYesterday.setDate(today.getDate() - 2);
-
-        // Filtrer les absences d'aujourd'hui, d'hier et d'avant-hier
-        const absencesToday = this.notifications.filter(
-          (presence) =>
-            this.isSameDate(new Date(presence.date), today) && presence.statut === "Absent"
-        );
-        const absencesYesterday = this.notifications.filter(
-          (presence) =>
-            this.isSameDate(new Date(presence.date), yesterday) && presence.statut === "Absent"
-        );
-        const absencesDayBeforeYesterday = this.notifications.filter(
-          (presence) =>
-            this.isSameDate(new Date(presence.date), dayBeforeYesterday) &&
-            presence.statut === "Absent"
-        );
-        const otherAbsences = this.notifications.filter((presence) => {
-          const presenceDate = new Date(presence.date);
-          return (
-            presence.statut === "Absent" &&
-            !this.isSameDate(presenceDate, today) &&
-            !this.isSameDate(presenceDate, yesterday) &&
-            !this.isSameDate(presenceDate, dayBeforeYesterday)
-          );
-        });
-
-        // Générer des messages d'alerte pour chaque enfant
-        this.generateAlertMessages(absencesToday, "aujourd'hui");
-        this.generateAlertMessages(absencesYesterday, "hier");
-        this.generateAlertMessages(absencesDayBeforeYesterday, "avant-hier");
-        this.generateAlertMessages(otherAbsences);
-
-        // Mettre à jour le badge avec le nombre d'alertes d'aujourd'hui
-        this.$emit("updateBadgeCount", absencesToday.length);
+        // Mettre à jour le compteur de badge
+        this.$emit("updateBadgeCount", this.alertMessages.length);
       } catch (error) {
         console.error("Erreur lors de la récupération des notifications :", error);
         this.alertMessages.push("Erreur lors de la récupération des notifications.");
       }
     },
 
-    isSameDate(date1, date2) {
-      return (
-        date1.getFullYear() === date2.getFullYear() &&
-        date1.getMonth() === date2.getMonth() &&
-        date1.getDate() === date2.getDate()
-      );
-    },
-
-    generateAlertMessages(absences, label = null) {
-      absences.forEach((absence) => {
-        const formattedDate = new Date(absence.date).toLocaleDateString();
-        const formattedTime = absence.heures;
-        const message = label
-          ? `Votre enfant ${absence.studentPrenom} ${absence.studentName} est absent ${label} (${formattedDate}) au cours de ${formattedTime}. Merci de bien vouloir notifier la raison de son absence.`
-          : `Votre enfant ${absence.studentPrenom} ${absence.studentName} est absent le ${formattedDate} au cours de ${formattedTime}. Merci de bien vouloir notifier la raison de son absence.`;
-        this.alertMessages.push(message);
-      });
-    },
-
     goBack() {
-      this.$router.go(-1); // Retourner à la page précédente
+      this.$emit("showComponent", "Acceuil"); // Émet un événement pour indiquer le retour à l'accueil
     },
   },
   mounted() {
@@ -157,7 +106,43 @@ export default {
 </script>
 
 <style scoped>
-.alert-space {
-  margin-top: 20px; /* Ajoute un espacement entre l'alerte et le haut de la page */
+.notifications-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.back-button {
+  color: #1976d2;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: bold;
+  color: #1976d2;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.alerts-container {
+  margin-bottom: 16px;
+  background-color: #e3f2fd;
+}
+
+.alert-message {
+  margin-bottom: 10px;
+  color: #fff;
+  background-color: #ff5252;
+  border-color: #ff5252;
+}
+
+.no-notifications {
+  text-align: center;
+  margin-top: 20px;
+  color: #424242;
+  font-weight: bold;
+  background-color: #e3f2fd;
+  padding: 16px;
+  border-radius: 8px;
 }
 </style>

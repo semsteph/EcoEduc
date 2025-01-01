@@ -20,12 +20,21 @@
 
       <!-- Bouton de génération et téléchargement des fichiers Excel -->
       <v-row class="my-4" justify="center">
-        <v-col cols="12" md="6">
+        <v-col cols="12" md="4">
           <v-btn block color="green darken-1" @click="generateExcelFile">
             Generer  un fichier Excel
           </v-btn>
         </v-col>
+        <!-- Bouton de génération et téléchargement des fichiers Excel -->
+        <v-col cols="12" md="4">
+          <v-btn block color="green darken-1" @click="openImportForm2">
+            Renseigner les notes 
+          </v-btn>
+        </v-col>
+
       </v-row>
+
+      
 
       <v-spacer class="my-4"></v-spacer>
 
@@ -44,7 +53,7 @@
             <span>{{ matiereNom }}</span>
             <span class="ml-9">{{ currentSemester }}</span>
             <v-spacer></v-spacer>
-            <v-btn color="blue darken-1" @click="openImportForm">Valider les notes</v-btn>
+            <v-btn color="blue darken-1" @click="openImportForm1">Valider les notes</v-btn>
             <v-btn color="red darken-1" @click="saveNotes">Sauvegarder</v-btn>
           </v-toolbar>
         </template>
@@ -131,6 +140,69 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
+
+      <!-- Formulaire modal pour l'importation des notes -->
+       <!-- Première modale -->
+       <v-dialog v-model="dialog1" max-width="500px">
+        <v-card>
+          <v-card-title>
+            <span class="headline">Importer des notes</span>
+          </v-card-title>
+          <v-card-text>
+            <v-form ref="form1" v-model="valid1">
+              <v-select
+                v-model="selectedNoteType"
+                :items="noteTypes"
+                label="Type de note"
+                required
+              ></v-select>
+              <v-file-input
+                v-model="selectedFile"
+                label="Fichier Excel"
+                accept=".xlsx, .xls"
+                prepend-icon="mdi-upload"
+                required
+              ></v-file-input>
+            </v-form>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="blue darken-1" text @click="closeImportForm1">Annuler</v-btn>
+            <v-btn color="green darken-1" text @click="handleFileUpload">Importer</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Deuxième modale -->
+      <v-dialog v-model="dialog2" max-width="500px">
+        <v-card>
+          <v-card-title>
+            <span class="headline">Renseigner les notes</span>
+          </v-card-title>
+          <v-card-text>
+            <v-form ref="form2" v-model="valid2">
+              <v-select
+                v-model="selectedNoteType"
+                :items="noteTypes1"
+                label="Type de note"
+                required
+              ></v-select>
+              <v-file-input
+                v-model="selectedFile"
+                label="Fichier Excel"
+                accept=".xlsx, .xls"
+                prepend-icon="mdi-upload"
+                required
+              ></v-file-input>
+            </v-form>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="blue darken-1" text @click="closeImportForm2">Annuler</v-btn>
+            <v-btn color="green darken-1" text @click="handleFileUpload22">Renseigner</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-container>
   </v-app>
 </template>
@@ -153,10 +225,13 @@ export default {
     },
   },
   data: () => ({
-    dialog: false,
+    dialog1: false, // Contrôle de la première modale
+    dialog2: false, // Contrôle de la deuxième modale
     snackbar: false,
     snackbarMessage: '',
     search: '',
+    valid1: false,
+    valid2: false,
     matiereNom: '',
     currentSemester: '',
     semesters: [],
@@ -174,6 +249,7 @@ export default {
     ],
     students: [],
     noteTypes: ['Inter1', 'Inter2', 'Inter3', 'Inter4',  'Devoir1', 'Devoir2'],
+    noteTypes1: ['Inter1', 'Inter2', 'Inter3', 'Inter4'],
     selectedNoteType: null,
     selectedFile: null,
     valid: false,
@@ -224,14 +300,17 @@ export default {
         console.error('Erreur lors de la récupération des semestres', error);
       }
     },
-
-
-    openImportForm() {
-      this.dialog = true;
+    openImportForm1() {
+      this.dialog1 = true;
     },
-
-    closeImportForm() {
-      this.dialog = false;
+    closeImportForm1() {
+      this.dialog1 = false;
+    },
+    openImportForm2() {
+      this.dialog2 = true;
+    },
+    closeImportForm2() {
+      this.dialog2 = false;
     },
 
     async handleFileUpload() {
@@ -249,6 +328,35 @@ export default {
 
       try {
         await axios.post(`http://localhost:8080/api/upload/excel`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        
+        this.snackbarMessage = 'Importation réussie!';
+        this.snackbar = true;
+        this.dialog = false;
+        this.fetchNotesData();
+        this.$refs.form.reset();
+      } catch (error) {
+        console.error('Erreur lors de l\'importation du fichier Excel', error);
+      }
+    },
+    async handleFileUpload22() {
+      if (!this.selectedNoteType || !this.selectedFile) {
+        return; // Valide les champs avant d'envoyer
+      }
+
+      const formData = new FormData();
+      formData.append('typeNote', this.selectedNoteType);
+      formData.append('file', this.selectedFile);
+      formData.append('semestreId', this.getSemesterId(this.currentSemester));
+      formData.append('matiereId', this.subjectId);
+      formData.append('classeId', this.classeId);
+      formData.append('etablissementId', this.etablissementId);
+
+      try {
+        await axios.post(`http://localhost:8080/api/upload/excel22`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },

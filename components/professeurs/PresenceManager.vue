@@ -1,6 +1,7 @@
 <template>
   <v-app>
     <v-container>
+      <h1> Veulliez Informez que les absences</h1>
       <!-- Semester Buttons -->
       <v-row>
         <v-col

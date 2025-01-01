@@ -6,6 +6,9 @@
       <v-btn color="primary" @click="afficherFormulaire">
         Ajouter Programme
       </v-btn>
+      <v-btn color="success" @click="telechargerProgrammePDF">
+        Télécharger PDF
+      </v-btn>
     </v-toolbar>
 
     <!-- Formulaire d'ajout de programme -->
@@ -53,112 +56,60 @@
     </v-snackbar>
 
     <!-- Tableau des programmes -->
-    <div class="table-responsive">
+    <div class="table-wrapper">
       <v-simple-table>
-        <thead>
-          <tr>
-            <th>Matières / Jours</th>
-            <th>Lundi</th>
-            <th>Mardi</th>
-            <th>Mercredi</th>
-            <th>Jeudi</th>
-            <th>Vendredi</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="matiere in matieres" :key="matiere.id" class="hide">
-            <td>{{ matiere.nom }}</td>
-            <td>
-              <v-layout>
-                <v-btn icon small @click="supprimerProgramme(matiere.id, 'lundi')">
-                  <v-icon color="blue">mdi-delete</v-icon>
-                </v-btn>
-                <v-text-field 
-                  v-model="matiere.lundi" 
-                  label="Programme" 
-                  dense hide-details 
-                  readonly
-                ></v-text-field>
-              </v-layout>
-            </td>
-            <td>
-              <v-layout>
-                <v-btn icon small @click="supprimerProgramme(matiere.id, 'mardi')">
-                  <v-icon color="blue">mdi-delete</v-icon>
-                </v-btn>
-                <v-text-field 
-                  v-model="matiere.mardi" 
-                  label="Programme" 
-                  dense hide-details 
-                  readonly
-                ></v-text-field>
-              </v-layout>
-            </td>
-            <td>
-              <v-layout>
-                <v-btn icon small @click="supprimerProgramme(matiere.id, 'mercredi')">
-                  <v-icon color="blue">mdi-delete</v-icon>
-                </v-btn>
-                <v-text-field 
-                  v-model="matiere.mercredi" 
-                  label="Programme" 
-                  dense hide-details 
-                  readonly
-                ></v-text-field>
-              </v-layout>
-            </td>
-            <td>
-              <v-layout>
-                <v-btn icon small @click="supprimerProgramme(matiere.id, 'jeudi')">
-                  <v-icon color="blue">mdi-delete</v-icon>
-                </v-btn>
-                <v-text-field 
-                  v-model="matiere.jeudi" 
-                  label="Programme" 
-                  dense hide-details 
-                  readonly
-                ></v-text-field>
-              </v-layout>
-            </td>
-            <td>
-              <v-layout>
-                <v-btn icon small @click="supprimerProgramme(matiere.id, 'vendredi')">
-                  <v-icon color="blue">mdi-delete</v-icon>
-                </v-btn>
-                <v-text-field 
-                  v-model="matiere.vendredi" 
-                  label="Programme" 
-                  dense hide-details 
-                  readonly
-                ></v-text-field>
-              </v-layout>
-            </td>
-          </tr>
-        </tbody>
+        <template v-slot:default>
+          <!-- En-tête -->
+          <thead>
+            <tr>
+              <th class="matiere-header">Matières / Jours</th>
+              <th>Lundi</th>
+              <th>Mardi</th>
+              <th>Mercredi</th>
+              <th>Jeudi</th>
+              <th>Vendredi</th>
+            </tr>
+          </thead>
+          <!-- Corps du tableau -->
+          <tbody>
+            <tr v-for="matiere in matieres" :key="matiere.id">
+              <td class="matiere-cell">{{ matiere.nom }}</td>
+              <td v-for="jour in joursDeLaSemaine" :key="jour.value" class="programme-cell">
+                <div class="programme-content">
+                  <v-textarea 
+                    v-model="matiere[jour.value]" 
+                    label="Programme" 
+                    dense 
+                    hide-details 
+                    auto-grow
+                    readonly
+                    class="programme-textarea"
+                  ></v-textarea>
+                  <v-btn icon small @click="supprimerProgramme(matiere.id, jour.value)">
+                    <v-icon color="red">mdi-delete</v-icon>
+                  </v-btn>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </template>
       </v-simple-table>
     </div>
   </v-container>
 </template>
 
-
 <script>
 import axios from 'axios';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default {
   name: 'ProgrammeDetail',
   props: {
-    classId: {
-      type: Number,
-      required: true,
-    },
-    etablissementId: {
-      type: Number,
-      required: true
-    },
-    etablissementNom: {
-      type: String,
-      required: true
-    }
+    classId: { type: Number, required: true },
+    className: {type: String, required: true},
+    etablissementId: { type: Number, required: true },
+    etablissementNom: { type: String, required: true },
   },
   data() {
     return {
@@ -178,31 +129,33 @@ export default {
         { label: 'Mardi', value: 'mardi' },
         { label: 'Mercredi', value: 'mercredi' },
         { label: 'Jeudi', value: 'jeudi' },
-        { label: 'Vendredi', value: 'vendredi' }
+        { label: 'Vendredi', value: 'vendredi' },
       ],
     };
   },
   methods: {
     fetchMatieres() {
-      axios.get(`http://localhost:8080/api/matiere/${this.classId}`)
-        .then(response => {
+      axios
+        .get(`http://localhost:8080/api/matiere/${this.classId}`)
+        .then((response) => {
           this.matiereOptions = response.data;
         })
-        .catch(error => {
+        .catch((error) => {
           console.error('Erreur lors de la récupération des matières:', error);
         });
     },
     fetchProgrammes() {
-      axios.get(`http://localhost:8080/api/programmes/${this.classId}`)
-        .then(response => {
+      axios
+        .get(`http://localhost:8080/api/programmes/${this.classId}`)
+        .then((response) => {
           this.matieres = this.mapProgrammesToMatieres(response.data);
         })
-        .catch(error => {
+        .catch((error) => {
           console.error('Erreur lors de la récupération des programmes:', error);
         });
     },
     mapProgrammesToMatieres(programmes) {
-      const matieres = this.matiereOptions.map(matiere => ({
+      const matieres = this.matiereOptions.map((matiere) => ({
         id: matiere.id,
         nom: matiere.nom,
         lundi: '',
@@ -212,8 +165,8 @@ export default {
         vendredi: '',
       }));
 
-      programmes.forEach(programme => {
-        const matiere = matieres.find(m => m.id === programme.matière_id);
+      programmes.forEach((programme) => {
+        const matiere = matieres.find((m) => m.id === programme.matière_id);
         if (matiere) {
           matiere[programme.jour.toLowerCase()] = programme.horaire;
         }
@@ -232,18 +185,21 @@ export default {
         matiereId: this.nouveauProgramme.matiereId,
         etablissementId: this.etablissementId,
       };
-      
-      axios.post('http://localhost:8080/api/programme', programmeData)
+
+      axios
+        .post('http://localhost:8080/api/programme', programmeData)
         .then(() => {
           this.snackbarMessage = 'Programme ajouté avec succès';
           this.snackbarColor = 'success';
           this.snackbar = true;
           this.dialog = false;
           this.resetForm();
-          this.fetchProgrammes(); // Actualise les programmes après l'ajout
+          this.fetchProgrammes();
         })
-        .catch(error => {
-          this.snackbarMessage = `Erreur lors de l'ajout du programme: ${error.response?.data?.message || error.message}`;
+        .catch((error) => {
+          this.snackbarMessage = `Erreur lors de l'ajout du programme: ${
+            error.response?.data?.message || error.message
+          }`;
           this.snackbarColor = 'error';
           this.snackbar = true;
         });
@@ -255,15 +211,18 @@ export default {
         jour: jour,
       };
 
-      axios.delete('http://localhost:8080/api/programme', { data: programmeData })
+      axios
+        .delete('http://localhost:8080/api/programme', { data: programmeData })
         .then(() => {
           this.snackbarMessage = 'Programme supprimé avec succès';
           this.snackbarColor = 'success';
           this.snackbar = true;
-          this.fetchProgrammes(); // Actualise les programmes après la suppression
+          this.fetchProgrammes();
         })
-        .catch(error => {
-          this.snackbarMessage = `Erreur lors de la suppression du programme: ${error.response?.data?.message || error.message}`;
+        .catch((error) => {
+          this.snackbarMessage = `Erreur lors de la suppression du programme: ${
+            error.response?.data?.message || error.message
+          }`;
           this.snackbarColor = 'error';
           this.snackbar = true;
         });
@@ -272,6 +231,28 @@ export default {
       this.nouveauProgramme.jour = '';
       this.nouveauProgramme.horaire = '';
       this.nouveauProgramme.matiereId = null;
+    },
+    telechargerProgrammePDF() {
+      const doc = new jsPDF();
+      const columns = ['Matières / Jours', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
+      const rows = this.matieres.map((matiere) => [
+        matiere.nom,
+        matiere.lundi || '',
+        matiere.mardi || '',
+        matiere.mercredi || '',
+        matiere.jeudi || '',
+        matiere.vendredi || '',
+      ]);
+
+      doc.text(`Programme Hebdomadaire - ${this.className}`, 14, 10);
+
+      autoTable(doc, {
+        head: [columns],
+        body: rows,
+        startY: 20,
+      });
+
+      doc.save(`programme_hebdomadaire_${this.className}.pdf`);
     },
   },
   created() {
@@ -282,68 +263,33 @@ export default {
 </script>
 
 <style scoped>
-.v-simple-table {
-  margin-top: 20px;
-  background-color: white;
-}
-
-.v-text-field {
-  margin: 10px;
-  width: 150px;
-}
-
-thead th, tbody td {
-  padding: 16px;
-  text-align: center;
-}
-
-.v-dialog {
-  padding: 20px;
-}
-
-.v-toolbar-title {
-  font-size: 24px;
-}
-
-.v-select {
-  margin-top: 10px;
-}
-
-.v-snackbar {
-  max-width: 300px;
-}
-
-.v-layout {
-  align-items: center;
-  justify-content: center;
-}
-
-.v-btn {
-  margin-right: 8px;
-}
-
-/* Pour permettre le défilement horizontal */
-.table-responsive {
+.table-wrapper {
   overflow-x: auto;
-  white-space: nowrap;
+  overflow-y: auto;
+  max-height: 500px;
+  border: 1px solid #ddd;
+  background-color: #f5f5f5;
 }
 
 thead th {
+  background-color: #f5f5f5;
   position: sticky;
   top: 0;
-  background-color: white;
-  z-index: 1;
+  z-index: 2;
 }
-.hide{
-  background-color: aliceblue;
-}
-@media screen and (max-width: 768px) {
-  .v-simple-table {
-    width: 100%;
-  }
 
-  .v-text-field {
-    width: 120px;
-  }
+.programme-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.programme-textarea {
+  flex: 1;
+  font-size: 12px;
+}
+
+.matiere-header {
+  text-align: left;
 }
 </style>

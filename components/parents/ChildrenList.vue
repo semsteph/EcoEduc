@@ -1,47 +1,107 @@
 <template>
   <v-container class="mt-16">
     <template v-if="selectedChild && currentView === 'details'">
-      <InfoDetails :child="selectedChild" :etablissementId="etablissementId" @back="goBack" @navigate="navigateTo" />
+      <InfoDetails 
+        :child="selectedChild" 
+        :etablissementId="etablissementId" 
+        @back="resetView" 
+        @navigate="navigateTo" 
+      />
     </template>
     <template v-else-if="currentView === 'notes'">
-      <Notes :child="selectedChild" :childId="selectedChild.id" :etablissementId="etablissementId" @back="goBack" />
+      <Notes 
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :etablissementId="etablissementId" 
+        @back="goToDetails" 
+      />
     </template>
     <template v-else-if="currentView === 'presence'">
-      <Presence :child="selectedChild" :childId="selectedChild.id" :etablissementId="etablissementId" @back="goBack" />
+      <Presence 
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :etablissementId="etablissementId" 
+        @back="goToDetails" 
+      />
     </template>
     <template v-else-if="currentView === 'conduite'">
-      <Conduite :child="selectedChild" :childId="selectedChild.id" :etablissementId="etablissementId" @back="goBack" />
+      <Conduite 
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :etablissementId="etablissementId" 
+        @back="goToDetails" 
+      />
     </template>
     <template v-else-if="currentView === 'scolarite'">
-      <Scolarite :child="selectedChild" :childId="selectedChild.id" :classId="selectedChild.class" :etablissementId="etablissementId" @back="goBack" />
+      <Scolarite 
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :classId="selectedChild.class" 
+        :etablissementId="etablissementId" 
+        @back="goToDetails" 
+      />
     </template>
     <template v-else-if="currentView === 'programme'">
-      <Programme :child="selectedChild" :childId="selectedChild.id" :etablissementId="etablissementId" @back="goBack" />
+      <Programme 
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :etablissementId="etablissementId" 
+        @back="goToDetails" 
+      />
     </template>
     <template v-else-if="currentView === 'bulletin'">
-      <Bulletin :child="selectedChild" :childId="selectedChild.id" :etablissementId="etablissementId" @back="goBack" />
+      <Bulletin 
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :etablissementId="etablissementId" 
+        @back="goToDetails" 
+      />
     </template>
     <template v-else-if="currentView === 'permission'">
-      <DemandeDePermission :child="selectedChild" :childId="selectedChild.id" :etablissementId="etablissementId" @back="goBack" />
+      <DemandeDePermission 
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :etablissementId="etablissementId" 
+        @back="goToDetails" 
+      />
+    </template>
+    <template v-else-if="currentView === 'assistances'">
+      <Assistances
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :etablissementId="etablissementId" 
+        :childName="selectedChild.prenom + ' ' + selectedChild.nom"
+        :childClass="selectedChild.class"
+        @back="goToDetails" 
+      />
     </template>
     <template v-else-if="currentView === 'activite'">
-      <Activite :child="selectedChild" :childId="selectedChild.id" :etablissementId="etablissementId" @back="goBack" />
+      <Activite 
+        :child="selectedChild" 
+        :childId="selectedChild.id" 
+        :etablissementId="etablissementId" 
+        @back="goToDetails" 
+      />
     </template>
     <template v-else>
-      <h1 class="text-center font-weight-bold mb-4">Veuillez cliquer sur l'élève pour afficher ses informations</h1>
+      <h1 class="text-center font-weight-bold mb-4">
+        Veuillez cliquer sur l'élève pour afficher ses informations
+      </h1>
       <v-row class="mt-15">
         <v-col v-for="child in children" :key="child.id" cols="12" md="4">
           <v-card 
-            @click="selectChild(child)"
+            @click="selectChild(child)" 
             class="elevation-2 rounded-lg cursor-pointer"
           >
             <v-img 
               :src="child.photo || defaultPhoto" 
-              height="200px"
-              contain
+              height="200px" 
+              contain 
               class="rounded-t-lg"
             ></v-img>
-            <v-card-title class="font-weight-bold text-h6">{{ child.prenom }} {{ child.nom }}</v-card-title>
+            <v-card-title class="font-weight-bold text-h6">
+              {{ child.prenom }} {{ child.nom }}
+            </v-card-title>
             <v-card-subtitle class="text-muted">{{ child.class }}</v-card-subtitle>
           </v-card>
         </v-col>
@@ -60,6 +120,7 @@ import Programme from './Programme.vue';
 import DemandeDePermission from './DemandeDePermission.vue';
 import Activite from './Activite.vue';
 import Bulletin from './Bulletin.vue';
+import Assistances from './Assistances.vue';
 import axios from 'axios';
 
 export default {
@@ -73,6 +134,7 @@ export default {
     DemandeDePermission,
     Activite,
     Bulletin,
+    Assistances,
   },
 
   props: {
@@ -100,11 +162,8 @@ export default {
           this.$router.push('/parents/connexion');
           return;
         }
-       
         const response = await axios.get('http://localhost:8080/api/parent/children', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (response.data && Array.isArray(response.data.children)) {
           this.children = response.data.children;
@@ -120,9 +179,12 @@ export default {
       this.selectedChild = child;
       this.currentView = 'details';
     },
-    goBack() {
-      this.currentView = 'default';
+    resetView() {
       this.selectedChild = null;
+      this.currentView = 'default';
+    },
+    goToDetails() {
+      this.currentView = 'details';
     },
     navigateTo(view) {
       this.currentView = view;
@@ -137,7 +199,7 @@ export default {
 }
 
 h1 {
-  color: #F7F9FC;
+  color: black;
 }
 
 .v-card {

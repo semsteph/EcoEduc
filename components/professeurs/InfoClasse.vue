@@ -8,35 +8,30 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-btn color="primary" @click="$emit('goBack')">Retour</v-btn>
+    <v-btn color="primary" @click="$emit('back')">Retour</v-btn>
   </v-container>
 </template>
 
-<script>
-export default {
-  props: {
-    classe: Object
-  },
-  data() {
-    return {
-      labels: [
-        { name: 'Gérer Notes', route: 'NoteManager', color: 'primary' },
-        { name: 'Gérer Présence', route: 'PresenceManager', color: 'success' },
-        { name: 'Gérer Conduite', route: 'ConductManager', color: 'warning' },
-        { name: 'Cahier de texte', route: 'CahierDeTexteManager', color: 'info' }
-      ]
-    }
-  },
-  methods: {
-    navigateTo(route) {
-      this.$emit('navigate', route);
-    },
-    goBack() {
-      this.currentView = 'details';
-      this.selectedClass = null;
-    
-    }
-  }
+<script setup>
+import { defineProps, defineEmits } from 'vue';
+
+const props = defineProps({
+  classe: Object,
+  etablissementId: Number
+});
+
+const emit = defineEmits(['back', 'navigate']);
+
+const labels = [
+  { name: 'Gérer Notes', route: 'NoteManager', color: 'primary' },
+  { name: 'Gérer Présence', route: 'PresenceManager', color: 'success' },
+  { name: 'Derniers Absents', route: 'PresencesPrecedantes', color: 'info' },
+  { name: 'Gérer Conduite', route: 'ConductManager', color: 'warning' },
+  { name: 'Cahier de texte', route: 'CahierDeTexteManager', color: 'info' }
+];
+
+function navigateTo(view) {
+  emit('navigate', view);
 }
 </script>
 

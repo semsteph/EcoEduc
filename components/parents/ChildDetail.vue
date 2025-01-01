@@ -9,6 +9,9 @@
         </v-col>
       </v-row>
     </v-container>
+
+    <!-- Ajout d'un bouton "Back" pour revenir -->
+    <v-btn @click="goBack" v-if="selectedDetail" color="secondary">Retour</v-btn>
   </div>
 </template>
 
@@ -23,14 +26,24 @@ export default {
         { label: 'Programme' },
         { label: 'Scolarité' },
         { label: 'Activité' },
-        { label: 'Bulltin' },
-        { label: 'Demande de Permission' }
-      ]
+        { label: 'Bulletin' },
+        { label: 'Demande de Permission' },
+        { label: 'Assistances' }
+      ],
+      selectedDetail: null, // Garde la trace du détail sélectionné
     };
   },
   methods: {
+    // Méthode pour émettre l'événement de sélection du détail
     selectDetail(label) {
-      this.$emit('selectDetail', label);
+      this.selectedDetail = label;
+      this.$emit('selectDetail', label); // Émettre un événement avec le label sélectionné
+    },
+
+    // Méthode pour revenir en arrière
+    goBack() {
+      this.selectedDetail = null; // Réinitialise la sélection
+      this.$emit('goBack'); // Émettre un événement pour indiquer le retour
     }
   }
 }

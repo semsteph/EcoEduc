@@ -23,9 +23,11 @@ export default defineNuxtConfig({
       },
     },
   },
+
   runtimeConfig: {
+    openaiApiKey: process.env.OPENAI_API_KEY, // Clé OpenAI (uniquement côté serveur)
     public: {
-      baseURL: 'http://localhost:3002',
+      baseURL: 'http://localhost:3002', // Base URL exposée côté client
     },
   },
   compatibilityDate: '2024-07-08',

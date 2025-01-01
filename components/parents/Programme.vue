@@ -1,5 +1,8 @@
 <template>
   <v-container>
+    <v-btn icon  @click="$emit('back')">
+      <v-icon>mdi-arrow-left</v-icon>
+    </v-btn>
     <h1 class="bid">Programme de l'élève</h1>
 
     <!-- Tableau à double entrée -->
@@ -80,7 +83,7 @@ export default {
   background-color: #f4f4f4; /* Couleur de fond pour les en-têtes */
 }
 .bid{
-  color: #ddd;
+  color:black;
 }
 .back-button {
   display: block;

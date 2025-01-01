@@ -1,97 +1,121 @@
 <template>
   <div class="background">
+    <div class="overlay"></div>
     <form @submit.prevent="submitForm" class="form-container">
       <h2 class="form-title">Inscrivez votre établissement</h2>
-      <input 
-        v-model="nom" 
-        type="text" 
-        placeholder="Nom d'établissement" 
-        required 
-        class="input-field"
-      />
-      
-      <input 
-        list="departements" 
-        v-model="selectedDepartement" 
-        placeholder="Sélectionnez un département" 
-        required 
-        class="input-field"
-      />
-      <datalist id="departements">
-        <option 
-          v-for="departement in departements" 
-          :key="departement.id" 
-          :value="departement.nom"
-        ></option>
-      </datalist>
-  
-      <input 
-        list="communes" 
-        v-model="selectedCommune" 
-        placeholder="Sélectionnez une commune" 
-        required 
-        class="input-field"
-      />
-      <datalist id="communes">
-        <option 
-          v-for="commune in communes" 
-          :key="commune.id" 
-          :value="commune.nom"
-        ></option>
-      </datalist>
-  
-      <input 
-        list="statuts" 
-        v-model="selectedStatut" 
-        placeholder="Statut de l'établissement" 
-        required 
-        class="input-field"
-      />
-      <datalist id="statuts">
-        <option value="public">Public</option>
-        <option value="prive">Privé</option>
-      </datalist>
-  
-      <input 
-        v-model="telephone" 
-        type="text" 
-        placeholder="Numéro de téléphone" 
-        required 
-        class="input-field"
-      />
-  
-      <input 
-        v-model="mail" 
-        type="email" 
-        placeholder="Adresse email" 
-        required 
-        class="input-field"
-      />
-  
-      <input 
-        v-model="nom_utilisateur" 
-        type="text" 
-        placeholder="Nom d'utilisateur" 
-        required 
-        class="input-field"
-      />
-  
-      <input 
-        v-model="mot_de_passe" 
-        type="password" 
-        placeholder="Mot de passe" 
-        required 
-        class="input-field"
-      />
-  
-      <input 
-        v-model="confirm_mot_de_passe" 
-        type="password" 
-        placeholder="Confirmez le mot de passe" 
-        required 
-        class="input-field"
-      />
-  
+
+      <div class="form-grid">
+        <!-- Colonne gauche -->
+        <div class="form-item">
+          <input 
+            v-model="nom" 
+            type="text" 
+            placeholder="Nom d'établissement" 
+            required 
+            class="input-field"
+          />
+        </div>
+        
+        <div class="form-item">
+          <input 
+            list="departements" 
+            v-model="selectedDepartement" 
+            placeholder="Sélectionnez un département" 
+            required 
+            class="input-field"
+          />
+          <datalist id="departements">
+            <option 
+              v-for="departement in departements" 
+              :key="departement.id" 
+              :value="departement.nom"
+            ></option>
+          </datalist>
+        </div>
+
+        <div class="form-item">
+          <input 
+            list="communes" 
+            v-model="selectedCommune" 
+            placeholder="Sélectionnez une commune" 
+            required 
+            class="input-field"
+          />
+          <datalist id="communes">
+            <option 
+              v-for="commune in communes" 
+              :key="commune.id" 
+              :value="commune.nom"
+            ></option>
+          </datalist>
+        </div>
+
+        <div class="form-item">
+          <input 
+            list="statuts" 
+            v-model="selectedStatut" 
+            placeholder="Statut de l'établissement" 
+            required 
+            class="input-field"
+          />
+          <datalist id="statuts">
+            <option value="public">Public</option>
+            <option value="prive">Privé</option>
+          </datalist>
+        </div>
+
+        <!-- Colonne droite -->
+        <div class="form-item">
+          <input 
+            v-model="telephone" 
+            type="text" 
+            placeholder="Numéro de téléphone" 
+            required 
+            class="input-field"
+          />
+        </div>
+
+        <div class="form-item">
+          <input 
+            v-model="mail" 
+            type="email" 
+            placeholder="Adresse email" 
+            required 
+            class="input-field"
+          />
+        </div>
+
+        <div class="form-item">
+          <input 
+            v-model="nom_utilisateur" 
+            type="text" 
+            placeholder="Nom d'utilisateur" 
+            required 
+            class="input-field"
+          />
+        </div>
+
+        <div class="form-item">
+          <input 
+            v-model="mot_de_passe" 
+            type="password" 
+            placeholder="Mot de passe" 
+            required 
+            class="input-field"
+          />
+        </div>
+
+        <div class="form-item">
+          <input 
+            v-model="confirm_mot_de_passe" 
+            type="password" 
+            placeholder="Confirmez le mot de passe" 
+            required 
+            class="input-field"
+          />
+        </div>
+      </div>
+
       <button type="submit" class="submit-button">S'inscrire</button>
 
       <p class="login-link">
@@ -99,32 +123,6 @@
         <a @click="redirectLogin" class="link">Se connecter</a>
       </p>
     </form>
-    
-    <!-- Dialog d'erreur pour mot de passe non conforme -->
-    <v-dialog v-model="errorDialog" max-width="500">
-      <v-card>
-        <v-card-title class="headline">Erreur</v-card-title>
-        <v-card-text>
-          Les mots de passe ne sont pas conformes. Veuillez réessayer.
-        </v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" text @click="errorDialog = false">Fermer</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  
-    <!-- Dialog de succès pour inscription réussie -->
-    <v-dialog v-model="dialog" max-width="500">
-      <v-card>
-        <v-card-title class="headline">Inscription réussie</v-card-title>
-        <v-card-text>
-          Votre inscription a été effectuée avec succès.
-        </v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" text @click="dialog = false">Fermer</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </div>
 </template>
 
@@ -220,21 +218,38 @@ export default {
 </script>
 
 <style>
+/* Image de fond pleine page */
 .background {
+  position: relative;
   background-image: url('assets/administration/Image collée.png');
   background-size: cover;
   background-position: center;
   min-height: 100vh;
+  width: 100%;
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
 }
 
+/* Couche floue */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(10px); /* Flou appliqué */
+  z-index: 1;
+  background-color: rgba(255, 255, 255, 0.2); /* Légère teinte blanche */
+}
+
+/* Conteneur du formulaire */
 .form-container {
-  max-width: 600px;
-  margin-top: 50px; /* Pour décaler le formulaire vers le bas */
+  position: relative;
+  z-index: 2; /* Le formulaire est au-dessus de l'overlay */
+  max-width: 800px;
   padding: 30px;
-  background-color: rgba(249, 249, 249, 0.9); /* Légèrement transparent */
+  background-color: rgba(249, 249, 249, 0.9); /* Fond légèrement transparent */
   border-radius: 10px;
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -242,13 +257,20 @@ export default {
   gap: 20px;
 }
 
-.form-title {
-  text-align: center;
-  font-size: 24px;
-  margin-bottom: 20px;
-  color: #333;
+/* Grille du formulaire (2 colonnes) */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2 colonnes égales */
+  gap: 20px; /* Espacement entre les champs */
 }
 
+/* Element individuel dans la grille */
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Style des champs de saisie */
 .input-field {
   padding: 12px;
   border: 1px solid #ddd;
@@ -262,6 +284,7 @@ export default {
   outline: none;
 }
 
+/* Bouton de soumission */
 .submit-button {
   background-color: #007BFF;
   color: white;

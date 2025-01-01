@@ -26,6 +26,15 @@
         @back="goBack"
       />
     </template>
+    <template v-else-if="currentView === 'PresencesPrecedantes'">
+      <PresencesPrecedantes 
+        :classe="selectedClass" 
+        :classeId="selectedClassId" 
+        :subjectId="subjectId" 
+        :etablissement-id="etablissementId" 
+        @back="goBack"
+      />
+    </template>
     <template v-else-if="currentView === 'ConductManager'">
       <ConductManager 
         :classe="selectedClass" 
@@ -57,17 +66,19 @@
 </template>
 
 <script>
-import InfoClasse from './InfoClasse.vue';
-import NoteManager from './NoteManager.vue';
-import PresenceManager from './PresenceManager.vue';
-import ConductManager from './ConductManager.vue';
-import CahierDeTexteManager from './CahierDeTexteManager.vue';
+import InfoClasse from '~/components/professeurs/InfoClasse.vue';
+import NoteManager from '~/components/professeurs/NoteManager.vue';
+import PresenceManager from '~/components/professeurs/PresenceManager.vue';
+import ConductManager from '~/components/professeurs/ConductManager.vue';
+import CahierDeTexteManager from '~/components/professeurs/CahierDeTexteManager.vue';
+import PresencesPrecedantes from '~/components/professeurs/PresencesPrecedantes.vue';
 
 export default {
   components: {
     InfoClasse,
     NoteManager,
     PresenceManager,
+    PresencesPrecedantes,
     ConductManager,
     CahierDeTexteManager,
   },
@@ -79,13 +90,13 @@ export default {
     },
     classes: {
       type: Array,
-      required: true, // Reçoit les classes filtrées basées sur la matière sélectionnée depuis le parent
+      required: true,
     },
     selectedClassId: {
       type: Number,
       required: false,
     },
-    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+    etablissementId: {
       type: Number,
       required: true,
     },
@@ -93,7 +104,7 @@ export default {
   data() {
     return {
       selectedClass: null,
-      currentView: 'details',
+      currentView: null, // Vue par défaut à null pour afficher la liste
     };
   },
   computed: {
@@ -108,8 +119,14 @@ export default {
       this.$emit('class-selected', classe.classe_id);
     },
     goBack() {
-      this.currentView = 'details';
-      this.selectedClass = null;
+      if (this.currentView === 'details') {
+        // Si on est dans 'details', retourne à la liste des classes
+        this.selectedClass = null;
+        this.currentView = null;
+      } else {
+        // Si on est dans une autre vue, retourne aux détails de la classe
+        this.currentView = 'details';
+      }
     },
     navigateTo(view) {
       this.currentView = view;

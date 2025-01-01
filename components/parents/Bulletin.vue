@@ -1,35 +1,35 @@
 <template>
-    <div class="eleve-item">
-      <div v-if="activeEleve === this.child" class="eleve-details">
-        <div class="eleve-info">
-          <h3 class="no-pdf">
-            Détails de l'élève
-            <button @click="downloadPDF" class="download-btn no-pdf">
-              Télécharger PDF
-            </button>
-          </h3>
-          <p><strong>Nom :</strong> {{ childNom }}</p>
-          <p><strong>Prénom :</strong> {{ childPrenom }}</p>
-          <p><strong>Classe :</strong> {{ childClasse }}</p>
-        </div>
-  
-        <div>
-          <label for="semestre">Semestres :</label>
-          <div class="semestres">
-            <button
-              v-for="semestre in semestres"
-              :key="semestre.id"
-              @click="selectSemestre(semestre.id, this.childId)"
-              :class="{ active: selectedSemestre === semestre.id }"
-              class="semestre-btn"
-            >
-              {{ semestre.nom }}
-            </button>
-          </div>
-        </div>
-  
-        <!-- Tableau de données -->
-        <table v-if="filteredData.length" class="notes-table">
+  <div class="eleve-item">
+    <v-btn icon @click="$emit('back')" class="back-button">
+      <v-icon>mdi-arrow-left</v-icon>
+    </v-btn>
+    <div id="bulletin" class="eleve-details">
+      <div class="eleve-info">
+        <h3 class="no-pdf">
+          Détails de l'élève
+          <button @click="downloadPDF" class="download-btn no-pdf">
+            Télécharger PDF
+          </button>
+        </h3>
+        <p><strong>Nom :</strong> {{ childNom }}</p>
+        <p><strong>Prénom :</strong> {{ childPrenom }}</p>
+        <p><strong>Classe :</strong> {{ childClasse }}</p>
+      </div>
+
+      <div class="semestres">
+        <button
+          v-for="semestre in semestres"
+          :key="semestre.semestre_id"
+          @click="selectSemestre(semestre.semestre_id)"
+          :class="{ active: selectedSemestre === semestre.semestre_id }"
+          class="semestre-btn no-pdf"
+        >
+          {{ semestre.nom }}
+        </button>
+      </div>
+
+      <div v-if="filteredData.length" class="table-container">
+        <table class="notes-table">
           <thead>
             <tr>
               <th>Matière</th>
@@ -61,6 +61,14 @@
               <td colspan="2">Moyenne Semestrielle</td>
               <td colspan="2">{{ moySem }}</td>
             </tr>
+            <tr v-if="isLastSemestre(selectedSemestre)">
+              <td colspan="2">Moyenne Annuelle</td>
+              <td colspan="2">{{ moyAn }}</td>
+            </tr>
+            <tr v-if="isLastSemestre(selectedSemestre)">
+              <td colspan="2">Décision</td>
+              <td colspan="2">{{ decision || 'Non définie' }}</td>
+            </tr>
             <tr>
               <td colspan="2">Rang</td>
               <td colspan="2">{{ rang }}</td>
@@ -71,204 +79,294 @@
             </tr>
           </tbody>
         </table>
-  
-        <!-- Message d'alerte en cas de données manquantes -->
-        <div v-else class="no-data">
-          Aucune donnée disponible pour ce semestre.
-        </div>
       </div>
+      <div v-else class="no-data">Aucune donnée disponible pour ce semestre.</div>
     </div>
-  </template>
-  
-  <script>
-  import axios from 'axios';
-  import jsPDF from 'jspdf';
-  import html2canvas from 'html2canvas';
-  
-  export default {
-    props: {
-      childId: {
-        type: Number,
-        required: true,
-      },
+  </div>
+</template>
+<script>
+import axios from "axios";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
+export default {
+  props: {
+    childId: {
+      type: Number,
+      required: true,
     },
-    data() {
-      return {
-        semestres: [],
-        selectedSemestre: null,
-        allData: [],
-        filteredData: [],
-        total: 0,
-        moySem: 0,
-        conduite: 0,
-        rang: '',
-        mention: '',
-        childNom: '',
-        childPrenom: '',
-        childClasse: '',
-      };
-    },
-    methods: {
-      async fetchData() {
-        try {
-          const response = await axios.get(`http://localhost:8080/api/bulletin/${this.childId}`);
-          this.semestres = response.data.semestres;
-          this.allData = response.data.bulletins;
-          this.total = response.data.total;
-          this.moySem = response.data.moySem;
-          this.rang = response.data.rang;
-          this.mention = response.data.mention;
-          this.conduite = response.data.conduite;
-          this.childNom = response.data.eleveNom;
-          this.childPrenom = response.data.elevePrenom;
-          this.childClasse = response.data.classeNom;
+  },
+  data() {
+    return {
+      semestres: [],
+      selectedSemestre: null,
+      filteredData: [],
+      total: 0,
+      moySem: 0,
+      moyAn: null,
+      decision: null,
+      conduite: "",
+      rang: "",
+      mention: "",
+      childNom: "",
+      childPrenom: "",
+      childClasse: "",
+    };
+  },
+  methods: {
+    async fetchData() {
+      try {
+        const response = await axios.get(
+          `http://localhost:8080/api/bulletined/${this.childId}`
+        );
+        const data = response.data;
+
+        this.semestres = data.semestres.map((semestre) => ({
+          semestre_id: semestre.semestre_id,
+          nom: semestre.nom,
+          bulletins: semestre.bulletins,
+          total: semestre.total,
+          moySem: semestre.moySem,
+          moyAn: semestre.moyAn,
+          rang: semestre.rang,
+          mention: semestre.mention,
+          conduite: semestre.conduite,
+          decision: semestre.decision,
+        }));
+
+        this.childNom = data.eleveNom;
+        this.childPrenom = data.elevePrenom;
+        this.childClasse = data.classeNom;
+
+        if (this.semestres.length > 0) {
+          this.selectedSemestre = this.semestres[0].semestre_id;
           this.filterBySemestre();
-        } catch (error) {
-          console.error('Erreur lors de la récupération des données', error);
         }
-      },
-      filterBySemestre() {
-        if (this.selectedSemestre) {
-          this.filteredData = this.allData.filter((data) => data.semestre_id === this.selectedSemestre);
-        } else {
-          this.filteredData = this.allData;
-        }
-      },
-      async downloadPDF() {
-        const elements = document.querySelectorAll('.no-pdf');
-        elements.forEach((element) => (element.style.display = 'none'));
-  
-        const element = document.querySelector('.eleve-details');
-        html2canvas(element, {
-          backgroundColor: '#E3F2FD', 
-          scale: 2, 
-        }).then((canvas) => {
-          const imgData = canvas.toDataURL('image/png');
-          const pdf = new jsPDF('p', 'mm', 'a4');
-  
-          const pageHeight = 295;
-          const imgWidth = 210;
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          let heightLeft = imgHeight;
-  
-          let position = 0;
-  
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
-  
-          while (heightLeft >= 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
+      } catch (error) {
+        console.error("Erreur lors de la récupération des données", error);
+      }
+    },
+    filterBySemestre() {
+      const selectedSemestreData = this.semestres.find(
+        (semestre) => semestre.semestre_id === this.selectedSemestre
+      );
+
+      if (selectedSemestreData) {
+        const uniqueBulletins = selectedSemestreData.bulletins.reduce((acc, curr) => {
+          if (!acc.find((item) => item.matiere === curr.matiere)) {
+            acc.push(curr);
           }
-  
-          pdf.save(`${this.childNom}_${this.childPrenom}_bulletin.pdf`);
-  
-          elements.forEach((element) => (element.style.display = ''));
-        });
-      },
+          return acc;
+        }, []);
+
+        this.filteredData = uniqueBulletins;
+        this.total = selectedSemestreData.total || 0;
+        this.moySem = selectedSemestreData.moySem || 0;
+        this.moyAn = selectedSemestreData.moyAn || 0;
+        this.rang = selectedSemestreData.rang || "";
+        this.mention = selectedSemestreData.mention || "";
+        this.conduite = selectedSemestreData.conduite || "Non définie";
+        this.decision = selectedSemestreData.decision || "Non définie";
+      } else {
+        this.filteredData = [];
+      }
     },
-    mounted() {
-      this.fetchData();
+    selectSemestre(semestreId) {
+      this.selectedSemestre = semestreId;
+      this.filterBySemestre();
     },
-  };
-  </script>
-  
-  <style scoped>
-  .container {
-    font-family: 'Arial', sans-serif;
-    padding: 20px;
-    max-width: 700px;
-    margin: auto;
-    position: relative;
-    background: #f9f9f9;
-    overflow: hidden;
+    isLastSemestre(semestreId) {
+      return this.semestres[this.semestres.length - 1]?.semestre_id === semestreId;
+    },
+    async downloadPDF() {
+  const bulletinElement = document.getElementById("bulletin");
+
+  // Cloner l'élément bulletin
+  const clone = bulletinElement.cloneNode(true);
+  document.body.appendChild(clone);
+
+  // Supprimer les éléments marqués comme "no-pdf"
+  const noPdfElements = clone.querySelectorAll(".no-pdf");
+  noPdfElements.forEach((element) => element.remove());
+
+  // Identifier le bouton actif parmi les boutons de semestre
+  const allSemestreButtons = clone.querySelectorAll(".semestre-btn");
+  const activeButton = [...allSemestreButtons].find((button) =>
+    button.classList.contains("active")
+  );
+
+  // Positionner le bouton actif au-dessus du tableau
+  if (activeButton) {
+    const activeButtonClone = activeButton.cloneNode(true); // Cloner le bouton actif
+    activeButtonClone.style.textAlign = "center"; // Centrer le bouton
+    activeButtonClone.style.marginBottom = "10px"; // Ajouter un espacement en bas
+    activeButtonClone.style.fontWeight = "bold"; // Rendre le texte en gras
+    activeButtonClone.style.display = "block"; // Forcer un affichage en ligne bloqué
+    activeButtonClone.style.backgroundColor = "#f5f5f5"; // Optionnel : couleur de fond du bouton
+    activeButtonClone.style.padding = "5px 10px"; // Optionnel : espacement interne
+    activeButtonClone.style.border = "1px solid #ddd"; // Optionnel : bordure pour un style clair
+
+    // Insérer le bouton au-dessus du tableau principal
+    const tableau = clone.querySelector(".tableau"); // Remplacez ".tableau" par le sélecteur du tableau
+    if (tableau) {
+      tableau.parentNode.insertBefore(activeButtonClone, tableau);
+    }
   }
-  
-  .eleve-item {
-    border: 1px solid #007BFF;
-    margin-bottom: 20px;
-    border-radius: 10px;
-    background-color: #E3F2FD;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    position: relative;
+
+  // Supprimer tous les autres boutons de semestre
+  allSemestreButtons.forEach((button) => {
+    if (!button.classList.contains("active")) {
+      button.remove();
+    }
+  });
+
+  // Appliquer un fond uniforme sur toute la page
+  const backgroundColor = getComputedStyle(
+    document.querySelector(".eleve-item")
+  ).backgroundColor;
+  clone.style.backgroundColor = backgroundColor;
+
+  const allChildren = clone.querySelectorAll("*");
+  allChildren.forEach((child) => {
+    child.style.backgroundColor = backgroundColor; // Appliquer la couleur uniformément
+  });
+
+  // Ajuster la hauteur pour éliminer les zones blanches
+  clone.style.minHeight = "200vh";
+  clone.style.padding = "150px"; 
+
+  // Générer le PDF
+  try {
+    const canvas = await html2canvas(clone, { scale: 2 });
+    const imgData = canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`Bulletin_${this.childNom}_${this.childPrenom}.pdf`);
+  } catch (error) {
+    console.error("Erreur lors de la génération du PDF :", error);
+  } finally {
+    clone.remove();
   }
+}
+
+
+
+  },
+  mounted() {
+    this.fetchData();
+  },
+};
+</script>
+
+
+
   
-  .eleve-details {
-    padding: 20px;
-    position: relative;
-    z-index: 1;
-  }
-  
-  .eleve-info {
-    margin-bottom: 20px;
-  }
-  
-  .download-btn {
-    background-color: #28a745;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-left: 15px;
-    font-size: 14px;
-  }
-  
-  .download-btn:hover {
-    background-color: #218838;
-  }
-  
-  .semestres {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  
+<style scoped>
+/* Conteneur principal */
+.eleve-item {
+  margin: 20px auto;
+  padding: 15px;
+  border: 1px solid #007bff;
+  border-radius: 10px;
+  background-color: #e3f2fd;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 100%;
+}
+
+/* Bouton Télécharger PDF */
+.download-btn {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.download-btn:hover {
+  background-color: #45a049;
+}
+
+/* Boutons des semestres */
+.semestres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.semestre-btn {
+  flex: 0 1 calc(33.33% - 8px); /* Ajuste la taille */
+  text-align: center;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.semestre-btn.active {
+  background-color: #0056b3;
+}
+
+.semestre-btn:hover {
+  background-color: #0056b3;
+}
+
+/* Table adaptative */
+.table-container {
+  overflow-x: auto;
+}
+
+.notes-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.notes-table th,
+.notes-table td {
+  border: 1px solid #007bff;
+  padding: 8px;
+  text-align: center;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
   .semestre-btn {
-    background-color: #007BFF;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    padding: 10px;
-    cursor: pointer;
+    font-size: 12px;
+    padding: 6px;
   }
-  
-  .semestre-btn.active {
-    background-color: #0056b3;
-  }
-  
-  .notes-table {
-    width: 100%;
-    border-collapse: collapse;
-    z-index: 1;
-  }
-  
+
   .notes-table th,
   .notes-table td {
-    border: 1px solid #007BFF;
-    padding: 10px;
-    text-align: center;
+    font-size: 12px;
   }
-  
-  .no-data {
-    color: red;
-    font-weight: bold;
+}
+
+@media (max-width: 480px) {
+  .semestre-btn {
+    font-size: 10px;
+    padding: 4px;
+    flex: 0 1 calc(50% - 8px); /* Sur mobiles, deux boutons par ligne */
   }
-  
-  /* Ajout du filigrane */
-  .eleve-item::before {
-    content: "EcoEducation";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-45deg);
-    font-size: 12rem;
-    color: rgba(0, 123, 255, 0.15); /* Couleur bleu clair avec transparence */
-    white-space: nowrap;
-    z-index: 0;
-    pointer-events: none; 
+
+  .notes-table th,
+  .notes-table td {
+    font-size: 10px;
   }
-  </style>
-  
+
+  .download-btn {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+}
+</style>

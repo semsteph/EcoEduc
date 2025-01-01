@@ -1,3 +1,4 @@
+require('dotenv').config(); 
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
@@ -8,6 +9,8 @@ const multer = require('multer');
 const moment = require('moment');
 const fs = require('fs');  // Ajout de fs
 const path = require('path');  // Ajout de path
+const axios = require('axios'); // Importation d'Axios
+
 
 
 const app = express();
@@ -529,16 +532,52 @@ app.get('/api/Matieres/:etablissementId', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-// API pour obtenir tous les enseignants
 app.get('/api/Enseignant', async (req, res) => {
   try {
-    const [results] = await req.db.query('SELECT * FROM Enseignants');
-    res.json(results);
+    console.log("Début de la récupération des enseignants...");
+
+    const [enseignants] = await req.db.query('SELECT * FROM Enseignants');
+    console.log("Enseignants récupérés :", enseignants);
+
+    // Récupérer les classes et matières enseignées par chaque enseignant
+    const enseignantsWithDetails = await Promise.all(
+      enseignants.map(async (enseignant) => {
+        console.log(`Traitement des détails pour l'enseignant ID: ${enseignant.id}...`);
+
+        const [classes] = await req.db.query(
+          `SELECT Classes.nom AS classe
+           FROM Enseigner
+           JOIN Classes ON Classes.id = Enseigner.classes_id
+           WHERE Enseigner.Enseignants_id = ?`,
+          [enseignant.id]
+        );
+        console.log(`Classes enseignées pour l'enseignant ID: ${enseignant.id} -`, classes);
+
+        const [matieres] = await req.db.query(
+          `SELECT Matieres.nom AS matiere
+           FROM Enseigner
+           JOIN Matieres ON Matieres.id = Enseigner.matiere_id
+           WHERE Enseigner.Enseignants_id = ?`,
+          [enseignant.id]
+        );
+        console.log(`Matières enseignées pour l'enseignant ID: ${enseignant.id} -`, matieres);
+
+        return {
+          ...enseignant,
+          classes: classes.map(c => c.classe),
+          matieres: matieres.map(m => m.matiere),
+        };
+      })
+    );
+
+    console.log("Détails complets des enseignants :", enseignantsWithDetails);
+
+    res.json(enseignantsWithDetails);
   } catch (error) {
+    console.error("Erreur lors de la récupération des enseignants :", error.message);
     res.status(500).json({ error: error.message });
   }
 });
-
 
 app.put('/api/Enseignants/:id', async (req, res) => {
   const id = req.params.id;
@@ -621,17 +660,19 @@ app.post('/api/loginEns', async (req, res) => {
 
     const enseignant = rows[0];
 
-    // Comparer les mots de passe sans espaces supplémentaires
     if (password.trim() !== enseignant.enseignant_mot_de_passe.trim()) {
       return res.status(401).json({ message: 'Mot de passe incorrect' });
     }
 
-    // Génération du token JWT
+    // Génération du token JWT avec les informations supplémentaires
     const token = jwt.sign(
       { 
         id: enseignant.enseignant_id, 
         username: enseignant.enseignant_nom_utilisateur, 
-        etablissement: enseignant.etablissement_id 
+        etablissement: enseignant.etablissement_id,
+        enseignant_nom: enseignant.enseignant_nom,
+        enseignant_prenom: enseignant.enseignant_prenom,
+        etablissement_nom: enseignant.etablissement_nom
       }, 
       secretKey, 
       { expiresIn: '1h' }
@@ -643,7 +684,6 @@ app.post('/api/loginEns', async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur' });
   }
 });
-
 // Middleware pour authentifier les requêtes
 const authenticateJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -821,7 +861,7 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
     const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetNameList[0]]);
     
     // Vérifiez que les colonnes nécessaires existent
-    if (!data.every(row => row.Nom && row.Prénom && row.Note)) {
+    if (!data.every(row => row.Nom && row.Prénom && 'Note' in row)) {
       return res.status(400).send('Le fichier Excel doit contenir des colonnes "Nom", "Prénom" et "Note".');
     }
 
@@ -829,14 +869,14 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
     for (const row of data) {
       const { Nom, Prénom, Note } = row; // Ajustement des noms de colonnes
 
-      // Vérifiez que les champs ne sont pas vides
-      if (!Nom || !Prénom || !Note) {
-        //console.error(`Les champs doivent être complétés pour : ${JSON.stringify(row)}`);
-        continue; // Passer à la ligne suivante si des champs sont manquants
+      // Vérifiez que les champs sont valides et que la note est un nombre
+      if (!Nom || !Prénom || !Note || isNaN(Note)) {
+        console.warn(`Données invalides ignorées : ${JSON.stringify(row)}`);
+        continue; // Ignorer la ligne si les données sont invalides
       }
 
       // 1. Récupérer l'ID de l'élève à partir de son nom et prénom
-      const [eleve] = await db.query('SELECT id FROM Eleve WHERE nom = ? AND prenom = ? ', [Nom, Prénom]);
+      const [eleve] = await db.query('SELECT id FROM Eleve WHERE nom = ? AND prenom = ?', [Nom, Prénom]);
 
       if (eleve.length > 0) {
         const eleveId = eleve[0].id;
@@ -849,7 +889,7 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
           [Note, eleveId, semestreId, matiereId, classeId, etablissementId]
         );
       } else {
-        console.error(`Élève non trouvé : ${Nom} ${Prénom} `);
+        console.error(`Élève non trouvé : ${Nom} ${Prénom}`);
       }
     }
 
@@ -862,6 +902,115 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
     res.status(500).send('Erreur lors de l\'importation');
   }
 });
+
+// API pour l'upload du fichier Excel et mise à jour des notes
+app.post('/api/upload/excel22', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file; // Fichier uploadé
+    if (!file) {
+      return res.status(400).send('Aucun fichier uploadé.');
+    }
+
+    const { typeNote, semestreId, matiereId, classeId, etablissementId } = req.body; // Récupérer les paramètres envoyés par le formulaire
+
+    // Valider le type de note
+    const updateField = mapTypeNoteToField(typeNote);
+    if (!updateField) {
+      return res.status(400).send('Type de note non valide.');
+    }
+
+    // Lire le fichier Excel
+    const workbook = XLSX.readFile(file.path);
+    const sheetNameList = workbook.SheetNames;
+
+    if (sheetNameList.length === 0) {
+      return res.status(400).send('Le fichier Excel ne contient aucune feuille.');
+    }
+
+    const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetNameList[0]]);
+    
+    // Vérifiez que les colonnes nécessaires existent
+    if (!data.every(row => row.Nom && row.Prénom && 'Note' in row)) {
+      return res.status(400).send('Le fichier Excel doit contenir des colonnes "Nom", "Prénom" et "Note".');
+    }
+
+    // Parcourir chaque ligne (chaque étudiant) du fichier Excel
+    for (const row of data) {
+      const { Nom, Prénom, Note } = row; // Ajustement des noms de colonnes
+
+      // Vérifiez que les champs sont valides et que la note est un nombre
+      if (!Nom || !Prénom || !Note || isNaN(Note)) {
+        console.warn(`Données invalides ignorées : ${JSON.stringify(row)}`);
+        continue; // Ignorer la ligne si les données sont invalides
+      }
+
+      // 1. Récupérer l'ID de l'élève à partir de son nom et prénom
+      const [eleve] = await db.query('SELECT id FROM Eleve WHERE nom = ? AND prenom = ?', [Nom, Prénom]);
+
+      if (eleve.length > 0) {
+        const eleveId = eleve[0].id;
+
+        // 2. Insérer ou mettre à jour la note dans la table Note pour l'élève
+        await db.query(
+          `INSERT INTO ToutesNotes (${updateField}, Eleves_id, Semestre_id, matieres_id, classe_id, etablissement_id)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE ${updateField} = VALUES(${updateField})`,
+          [Note, eleveId, semestreId, matiereId, classeId, etablissementId]
+        );
+      } else {
+        console.error(`Élève non trouvé : ${Nom} ${Prénom}`);
+      }
+    }
+
+    // Supprimer le fichier uploadé après traitement
+    fs.unlinkSync(file.path);
+
+    res.send('Données importées avec succès');
+  } catch (error) {
+    console.error('Erreur lors de l\'importation des données Excel', error);
+    res.status(500).send('Erreur lors de l\'importation');
+  }
+});
+
+app.get('/api/absents', async (req, res) => {
+  const { classeId, etablissementId } = req.query;
+
+  if (!classeId || !etablissementId) {
+    return res.status(400).json({ error: 'Les paramètres classeId et etablissementId sont requis.' });
+  }
+
+  try {
+    // Obtenir la date la plus récente avec des absences dans cette classe et cet établissement
+    const [dateRows] = await db.query(
+      `SELECT MAX(date) AS derniere_date 
+       FROM Presence 
+       WHERE classe_id = ? AND etablissement_id = ? AND statut = 'Absent'`,
+      [classeId, etablissementId]
+    );
+
+    const derniereDate = dateRows[0]?.derniere_date;
+
+    if (!derniereDate) {
+      return res.status(404).json({ error: 'Aucune absence trouvée pour cette classe.' });
+    }
+
+    // Récupérer les informations des élèves absents pour cette date
+    const [absents] = await db.query(
+      `SELECT Eleve.nom, Eleve.prenom, Presence.motif
+       FROM Presence
+       INNER JOIN Eleve ON Presence.eleve_id = Eleve.id
+       WHERE Presence.classe_id = ? AND Presence.etablissement_id = ? 
+       AND Presence.statut = 'Absent' AND Presence.date = ?`,
+      [classeId, etablissementId, derniereDate]
+    );
+
+    res.json(absents);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des absents :', error);
+    res.status(500).json({ error: 'Erreur serveur. Veuillez réessayer plus tard.' });
+  }
+});
+
 
 // Endpoint pour récupérer les notes d'une classe et d'une matière spécifiques
 app.get('/api/notes/:classeId/:subjectId/:semesterId', async (req, res) => {
@@ -1829,54 +1978,56 @@ app.post('/api/addActivity', async (req, res) => {
 });
 
 
-// Ajout de la route pour récupérer les notifications
-app.get('/api/notifications', async (req, res) => {
+// Route pour récupérer les notifications d'un établissement et d'un enseignant spécifiques
+app.get('/api/notifications/:etablissementId', async (req, res) => {
   try {
+    const etablissementId = req.params.etablissementId;
     const enseignantId = req.query.enseignantId;
 
     if (!enseignantId) {
       return res.status(400).json({ error: 'enseignantId est requis' });
     }
 
-    // Récupérer les IDs de classe associées à cet enseignant
-    const [classes] = await req.db.query(`
-      SELECT classeId FROM Enseigner WHERE enseignantId = ?
-    `, [enseignantId]);
+    const [classes] = await req.db.query(
+      `SELECT Classes_id 
+       FROM Enseigner 
+       WHERE Enseignants_id = ? AND etablissement_id = ?`,
+      [enseignantId, etablissementId]
+    );
 
     if (classes.length === 0) {
-      return res.status(404).json({ message: 'Aucune classe trouvée pour cet enseignant.' });
+      return res.status(404).json({ message: 'Aucune classe trouvée pour cet enseignant dans cet établissement.' });
     }
 
-    const classeIds = classes.map(classe => classe.classeId);
+    const classeIds = classes.map(classe => classe.Classes_id);
 
-    // Récupérer les permissions pour ces classes
-    const [permissions] = await req.db.query(`
-      SELECT 
-        Eleve.nom AS nom,
-        Eleve.prenom AS prenom,
-        Classe.nomClasse,
-        Permission.date,
-        Permission.duree
-      FROM Permission
-      JOIN Eleve ON Eleve.id = Permission.eleveId
-      JOIN Classe ON Classe.id = Permission.classeId
-      WHERE 
-        Permission.classeId IN (?)
-        AND Permission.statut IN ('autoriser', 'sous reserve de justification')
-    `, [classeIds]);
+    const [permissions] = await req.db.query(
+      `SELECT 
+         Eleve.nom AS nom,
+         Eleve.prenom AS prenom,
+         Classes.nom AS classeNom,
+         Permission.date,
+         Permission.duree
+       FROM Permission
+       JOIN Eleve ON Eleve.id = Permission.eleve_id
+       JOIN Classes ON Classes.id = Eleve.classe_id
+       WHERE 
+         Eleve.classe_id IN (?)
+         AND Permission.statut IN ('autoriser', 'sous reserve de justification')`,
+      [classeIds]
+    );
 
-    // Vérifier si des permissions ont été trouvées
     if (permissions.length === 0) {
       return res.status(404).json({ message: 'Aucune permission trouvée.' });
     }
 
-    // Retourner les notifications sous forme de tableau d'objets
     return res.json(permissions);
   } catch (error) {
     console.error('Erreur lors de la récupération des notifications:', error);
     return res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
+
 
 app.get('/api/getActivities/:classeId/:subjectId', async (req, res) => {
   try {
@@ -1953,7 +2104,7 @@ app.get('/api/programme/:childId', async (req, res) => {
 });
 
 
-app.get('/api/notifications/:parentId', async (req, res) => {
+app.get('/api/notificationed/:parentId', async (req, res) => {
   const parentId = req.params.parentId; // Récupération du parentId
 
   if (!parentId) {
@@ -2208,6 +2359,30 @@ app.get('/api/classes/:classId/details', async (req, res) => {
     }
   });
   
+  app.delete("/api/delete-note", async (req, res) => {
+    const { eleveId, matiereId, semestreId, noteType } = req.body;
+  
+    if (!eleveId || !matiereId || !semestreId || !noteType) {
+      return res.status(400).json({
+        message: "Les informations nécessaires pour supprimer la note sont manquantes.",
+      });
+    }
+  
+    try {
+      await req.db.query(
+        `UPDATE Note
+         SET ?? = NULL
+         WHERE Eleves_id = ? AND matieres_id = ? AND semestre_id = ?`,
+        [noteType, eleveId, matiereId, semestreId]
+      );
+  
+      res.json({ message: "Note supprimée avec succès." });
+    } catch (error) {
+      console.error("Erreur lors de la suppression de la note :", error);
+      res.status(500).json({ message: "Erreur serveur lors de la suppression de la note." });
+    }
+  });
+  
   app.get('/api/bulletin', async (req, res) => {
     const { classeId, etablissementId } = req.query;
 
@@ -2229,7 +2404,7 @@ app.get('/api/classes/:classId/details', async (req, res) => {
             JOIN Matieres m ON m.id = n.matieres_id 
             JOIN Semestre s ON s.id = n.semestre_id 
             JOIN Classes c ON c.id = n.classe_id 
-            LEFT JOIN Punitions p ON e.id = p.eleve_id 
+            LEFT JOIN Punitions p ON e.id = p.eleve_id AND s.id = p.semestre_id
             WHERE n.classe_id = ?
             GROUP BY e.id, m.id, s.id`,
             [classeId]
@@ -2315,70 +2490,143 @@ app.get('/api/classes/:classId/details', async (req, res) => {
     }
 });
 
+// Route pour récupérer le statut de l'établissement
+app.get('/api/etablissementStatut', async (req, res) => {
+  const { etablissementId } = req.query;
 
-// Route pour insérer les données dans la table Bulletin
-app.post('/api/save-bulletin', async (req, res) => {
   try {
-    const bulletins = req.body;
+    // Récupérer le statut de l'établissement
+    const [rows] = await req.db.query(
+      'SELECT statut FROM Etablissement WHERE id = ?',
+      [etablissementId]
+    );
 
-    for (const bulletin of bulletins) {
-      const {
-        eleve_id, semestre_id, matiere_id, coef_id,
-        moy, moycoef, total, moySem, rang, mention, conduite
-      } = bulletin;
-
-      // Conversion des types de données
-      const parsedMoy = parseFloat(moy);
-      const parsedMoycoef = parseFloat(moycoef);
-      const parsedTotal = parseFloat(total);
-      const parsedMoySem = parseFloat(moySem);
-      const parsedRang = parseInt(rang, 10);
-      const parsedConduite = parseInt(conduite);
-
-      // Vérification de l'intégrité des données
-      if (!eleve_id || !semestre_id || !matiere_id || !coef_id) {
-        return res.status(400).json({
-          message: 'Données manquantes : vérifiez les identifiants des élèves, semestres, matières et coefficients.'
-        });
-      }
-      if (isNaN(parsedMoy) || isNaN(parsedMoycoef) || isNaN(parsedTotal) || isNaN(parsedMoySem) || isNaN(parsedRang) || isNaN(parsedConduite)) {
-        return res.status(400).json({
-          message: 'Données invalides : assurez-vous que les moyennes, totaux, rangs, et conduite sont au format numérique.'
-        });
-      }
-
-      // Vérification si un bulletin existe déjà pour cet élève et ce semestre
-      const [existingBulletin] = await db.query(
-        `SELECT bulletin_id FROM Bulletin WHERE eleve_id = ? AND semestre_id = ? AND matiere_id = ?`,
-        [eleve_id, semestre_id, matiere_id]
-      );
-
-      // Si le tableau `existingBulletin` est vide, procéder à l'insertion
-      if (existingBulletin.length === 0) {
-        await db.query(`
-          INSERT INTO Bulletin (eleve_id, semestre_id, matiere_id, coef_id, moy, moycoef, total, moySem, rang, mention, conduite)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            eleve_id, semestre_id, matiere_id, coef_id,
-            parsedMoy, parsedMoycoef, parsedTotal, parsedMoySem,
-            parsedRang, mention, parsedConduite
-          ]
-        );
-      } else {
-        // Si un bulletin existe déjà, retourner une erreur 409 (conflit)
-        return res.status(409).json({
-          message: `Un bulletin a déjà été sauvegardé pour l'élève avec l'ID ${eleve_id} pour le semestre ${semestre_id}.`
-        });
-      }
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Établissement introuvable" });
     }
 
-    // Si toutes les opérations se passent bien, envoyer un message de succès
-    res.status(201).json({ message: 'Bulletins sauvegardés avec succès' });
+    const statut = rows[0].statut;
+    res.json({ statut });
   } catch (error) {
-    console.error('Erreur lors de la sauvegarde des bulletins pour l\'élève ID:', eleve_id, 'et semestre ID:', semestre_id, '-', error);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
+    console.error("Erreur lors de la récupération du statut de l'établissement :", error);
+    res.status(500).json({ message: "Erreur lors de la récupération du statut de l'établissement" });
   }
 });
+
+// API : Sauvegarder les bulletins
+app.post('/api/save-bulletin', async (req, res) => {
+  const { bulletin } = req.body;
+
+  // Log des données reçues
+  console.log('Données reçues :', req.body);
+
+  // Validation des données d'entrée
+  if (!bulletin || !Array.isArray(bulletin)) {
+    console.error('Données manquantes ou invalides:', { bulletin });
+    return res.status(400).json({ message: 'Données manquantes ou invalides.' });
+  }
+
+  try {
+    const connection = await db.getConnection();
+
+    // Log de la connexion réussie à la base de données
+    console.log('Connexion à la base de données réussie.');
+
+    for (const bulletinData of bulletin) {
+      const {
+        eleve_id,
+        semestre_id,
+        matiere_id,
+        coef_id,
+        moy,
+        moycoef,
+        total,
+        moySem,
+        rang,
+        mention,
+        conduite,
+        moyAn,
+        decision,
+        etablissement_id,
+      } = bulletinData;
+
+      if (!eleve_id || !semestre_id || !matiere_id) {
+        console.error('Données manquantes dans un bulletin:', bulletinData);
+        return res.status(400).json({ message: 'Données manquantes dans un bulletin.' });
+      }
+
+      // Vérification de l'existence du bulletin
+      const [existingBulletin] = await connection.query(
+        `SELECT bulletin_id FROM Bulletin WHERE eleve_id = ? AND semestre_id = ?`,
+        [eleve_id, semestre_id]
+      );
+
+      if (existingBulletin.length > 0) {
+        // Récupérer les informations de l'élève et du semestre
+        const [eleve] = await connection.query(
+          `SELECT nom, prenom FROM Eleve WHERE id = ?`,
+          [eleve_id]
+        );
+
+        const [semestre] = await connection.query(
+          `SELECT nom FROM Semestre WHERE id = ?`,
+          [semestre_id]
+        );
+
+        if (eleve.length > 0 && semestre.length > 0) {
+          const { nom: eleveNom, prenom: elevePrenom } = eleve[0];
+          const { nom: semestreNom } = semestre[0];
+
+          return res.status(400).json({
+            message: `Un bulletin a déjà été enregistré pour l'élève ${eleveNom} ${elevePrenom} pour le semestre ${semestreNom}.`,
+          });
+        } else {
+          console.error("Informations manquantes pour l'élève ou le semestre.");
+          return res.status(400).json({
+            message:
+              "Impossible de valider les données. Informations manquantes pour l'élève ou le semestre.",
+          });
+        }
+      }
+
+      // Insérer le nouveau bulletin
+      await connection.query(
+        `
+        INSERT INTO Bulletin (
+          eleve_id, semestre_id, matiere_id, coef_id, moy, moycoef,
+          total, moySem, rang, mention, conduite, moyAn, decision,
+          etablissement_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+        [
+          eleve_id,
+          semestre_id,
+          matiere_id,
+          coef_id,
+          moy,
+          moycoef,
+          total,
+          moySem,
+          rang,
+          mention,
+          conduite,
+          moyAn,
+          decision,
+          etablissement_id,
+        ]
+      );
+    }
+
+    res.status(200).json({ message: 'Bulletin sauvegardé avec succès.' });
+  } catch (error) {
+    console.error('Erreur lors de la sauvegarde des bulletins :', error.message);
+    res.status(500).json({
+      message: 'Erreur lors de la sauvegarde du bulletin.',
+      error: error.message,
+    });
+  }
+});
+
 
 // Endpoint pour récupérer les semestres et les notes d'un élève en une seule requête
 app.get('/api/eleve-notes', async (req, res) => {
@@ -2447,36 +2695,36 @@ app.get('/api/eleve-notes', async (req, res) => {
 });
 
 // API pour récupérer les bulletins, semestres, matières, coefficients et informations d'un élève
-app.get('/api/bulletin/:childId', async (req, res) => {
+// API pour récupérer les bulletins, semestres, matières, coefficients et informations d'un élève
+app.get('/api/bulletined/:childId', async (req, res) => {
   const { childId } = req.params;
 
   try {
-    // Requête SQL avec jointures pour récupérer toutes les données nécessaires
     const [results] = await req.db.query(`
       SELECT 
         e.nom AS eleveNom, 
         e.prenom AS elevePrenom,
         c.nom AS classeNom,
-        s.id As semestre_id,
+        s.id AS semestre_id,
         s.nom AS semestreNom,
-        m.id,
         m.nom AS matiereNom,
-        b.coef_id,
         coef.valeur AS coef,
         b.moy,
         b.moycoef,
         b.total,
         b.moySem,
+        b.moyAn,
         b.rang,
         b.mention,
-        b.conduite
+        b.conduite,
+        b.decision
       FROM Bulletin b
       JOIN Eleve e ON e.id = b.eleve_id
       JOIN Classes c ON c.id = e.classe_id
       JOIN Semestre s ON s.id = b.semestre_id
       JOIN Matieres m ON m.id = b.matiere_id
       JOIN Coefficient coef ON coef.id = b.coef_id
-      WHERE b.eleve_id = 24
+      WHERE b.eleve_id = ?
       ORDER BY s.nom, m.nom
     `, [childId]);
 
@@ -2484,54 +2732,54 @@ app.get('/api/bulletin/:childId', async (req, res) => {
       return res.status(404).json({ message: 'Aucune donnée trouvée pour cet élève.' });
     }
 
-    // Grouper les données par semestre
     const semestres = {};
     const bulletins = [];
 
+    // Regrouper les données par semestre et ajouter les détails comme moySem, rang, mention, etc.
     results.forEach(row => {
-      const {
-        semestre_id, semestreNom, matiereNom, coef, moy, moycoef, total, moySem, rang, mention, conduite
-      } = row;
+      const { semestre_id, semestreNom, matiereNom, coef, moy, moycoef, total, moySem, moyAn, rang, mention, conduite, decision } = row;
 
       if (!semestres[semestre_id]) {
         semestres[semestre_id] = {
           semestre_id,
           nom: semestreNom,
+          bulletins: [],
+          moySem: moySem,
+          total: total,
+          moyAn: moyAn,
+          rang: rang,
+          mention: mention,
+          conduite: conduite,
+          decision: decision
         };
       }
 
-      bulletins.push({
-        semestre_id,
+      semestres[semestre_id].bulletins.push({
         matiere: matiereNom,
         coef,
         moy,
-        moycoef,
-        total,
-        moySem,
-        rang,
-        mention,
-        conduite
+        moycoef
       });
     });
 
-    // Renvoi des données
+    // Organiser les semestres dans un tableau
+    Object.values(semestres).forEach(semestre => {
+      bulletins.push(semestre);
+    });
+
     res.json({
       eleveNom: results[0].eleveNom,
       elevePrenom: results[0].elevePrenom,
       classeNom: results[0].classeNom,
-      semestres: Object.values(semestres),
-      bulletins,
-      total: results[0].total,
-      moySem: results[0].moySem,
-      rang: results[0].rang,
-      mention: results[0].mention,
-      conduite: results[0].conduite
+      semestres: bulletins,
     });
   } catch (error) {
     console.error('Erreur lors de la récupération des données:', error);
     res.status(500).json({ message: 'Erreur serveur lors de la récupération des données.' });
   }
 });
+
+
 
 app.get('/api/departements', async (req, res) => {
   try {
@@ -2653,8 +2901,107 @@ app.post('/api/loginEtablissement', async (req, res) => {
   }
 });
 
+// API OpenAI: Exemple d'utilisation pour une activité éducative
+app.post('/api/assistant', async (req, res) => {
+  const { studentFirstName, studentLastName, subjectName, className, activity, activityDate, userMessage } = req.body;
 
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!studentFirstName || !studentLastName || !subjectName || !className || !activity || !activityDate || !userMessage) {
+    return res.status(400).json({ error: 'Tous les champs sont requis.' });
+  }
+
+  const prompt = `
+    Élève: ${studentFirstName} ${studentLastName}
+    Matière: ${subjectName}
+    Classe: ${className}
+    Activité réalisée: ${activity}
+    Date de l'activité: ${activityDate}
+    Question: ${userMessage}
+
+    Bonjour GPT, veuillez aider cet élève à mieux comprendre l'activité ou répondre à sa question.
+  `;
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 200,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    res.json({ reply: response.data.choices[0].message.content });
+  } catch (error) {
+    console.error('Erreur avec OpenAI:', error.response?.data || error.message);
+    return res.status(error.response?.status || 500).json({
+      error: error.response?.data || 'Erreur avec le service OpenAI.',
+    });
+  }
+});
+
+
+app.get('/api/assistants/:childId', async (req, res) => {
+  const { childId } = req.params;
   
+  try {
+    console.log("Requête API reçue pour l'élève ID :", childId);
+
+    // Vérification 1 : Récupération de l'ID de la classe pour l'élève
+    const [eleveRows] = await db.query(
+      'SELECT classe_id FROM Eleve WHERE id = ?',
+      [childId]
+    );
+
+    if (eleveRows.length === 0) {
+      console.log("Aucune classe trouvée pour l'élève ID :", childId);
+      return res.status(404).json({ message: "Classe introuvable pour cet élève." });
+    }
+
+    const classId = eleveRows[0].classe_id;
+    console.log("Classe ID récupéré :", classId);
+
+    // Vérification 2 : Récupération des matières, activités et dates pour la classe
+    const [testsRows] = await db.query(
+      `SELECT t.date, t.activite, m.nom AS matiereNom
+       FROM Tests t
+       JOIN Matieres m ON t.matière_id = m.id
+       WHERE t.classe_id = ?`,
+      [classId]
+    );
+
+    if (testsRows.length === 0) {
+      console.log("Aucun test trouvé pour la classe ID :", classId);
+      return res.status(404).json({ message: "Aucun test trouvé pour cette classe." });
+    }
+
+    console.log("Données des tests récupérées :", testsRows);
+
+    // Transformation des données pour l'interface
+    const assistants = testsRows.map(test => ({
+      date: test.date,
+      activity: test.activite,
+      subject: test.matiereNom,
+    }));
+
+    console.log("Données finales des assistants envoyées :", assistants);
+
+    // Envoi des données à l'interface
+    res.status(200).json(assistants);
+  } catch (error) {
+    console.error("Erreur lors de la récupération des données pour l'élève :", error);
+    res.status(500).json({ message: "Erreur interne du serveur." });
+  }
+});
+
+
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });

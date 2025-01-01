@@ -8,14 +8,14 @@
     </v-toolbar-title>
     <v-spacer></v-spacer>
 
-    <v-btn icon @click="showMessages" class="white--text">
-      <v-icon>mdi-message</v-icon>
-    </v-btn>
-
-    <v-btn icon @click="showNotifications" class="white--text">
+    <v-btn icon @click="$emit('showNotifications')" class="white--text">
       <v-badge :content="badgeCount" :value="badgeCount" color="red" overlap>
         <v-icon>mdi-bell</v-icon>
       </v-badge>
+    </v-btn>
+
+    <v-btn icon @click="showLogoutDialog" class="white--text">
+      <v-icon>mdi-logout"></v-icon>
     </v-btn>
   </v-app-bar>
 </template>
@@ -31,33 +31,15 @@ export default {
     showMessages() {
       this.$emit('showComponent', 'MessagesComponent');
     },
-    showNotifications() {
-      this.$emit('showComponent', 'NotificationsComponent'); // Émet un événement pour afficher le composant Notifications
-      this.badgeCount = 0; // Réinitialiser le badge
-    },
     showLogoutDialog() {
-      this.$emit('showComponent', 'LogoutDialog');
+      this.$emit('showLogoutDialog');
     },
-    updateBadgeCount(count) {
-      this.badgeCount = count;
-    }
-  }
+  },
 };
 </script>
 
 <style scoped>
-.v-app-bar {
-  background-color: #1976d2;
-}
-
 .v-toolbar-title {
-  font-family: 'Roboto', sans-serif;
-  font-size: 1.25rem;
-  letter-spacing: 0.05em;
-  margin-left: 8px;
-}
-
-.v-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  font-family: 'Poppins', sans-serif;
 }
 </style>

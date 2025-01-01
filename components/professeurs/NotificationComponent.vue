@@ -4,11 +4,12 @@
       <v-card-title>Notifications</v-card-title>
       <v-card-text>
         <div v-if="loading">Chargement des notifications...</div>
+        <div v-else-if="error">{{ error }}</div>
         <div v-else>
           <ul>
             <li v-for="(notification, index) in notifications" :key="index">
               Une permission a été autorisée pour l'élève {{ notification.nom }} {{ notification.prenom }} 
-              de la classe {{ notification.nomClasse }} le {{ notification.date }} pour une durée de {{ notification.duree }}.
+              de la classe {{ notification.classeNom }} le {{ formatDate(notification.date) }} pour une durée de {{ notification.duree }}.
             </li>
           </ul>
           <div v-if="notifications.length === 0">Aucune notification disponible.</div>
@@ -20,39 +21,55 @@
 
 <script>
 import { ref, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
 import axios from 'axios';
 
 export default {
   name: 'NotificationComponent',
   props: {
-    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+    etablissementId: {
+      type: Number,
+      required: true,
+    },
+    enseignantId: {
       type: Number,
       required: true,
     },
   },
-  setup() {
+  setup(props) {
     const notifications = ref([]);
     const loading = ref(true);
-    const route = useRoute();
+    const error = ref(null);
+
+    // Fonction pour formater la date
+    const formatDate = (dateString) => {
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return new Date(dateString).toLocaleDateString(undefined, options);
+    };
 
     const fetchNotifications = async () => {
       try {
-        const enseignantId = route.params.enseignantId;
+        if (!props.etablissementId || !props.enseignantId) {
+          throw new Error("Les identifiants de l'établissement et de l'enseignant sont requis.");
+        }
 
-        const response = await axios.get(`/api/notifications/${this.etablissementId}`, {
-          params: { enseignantId },
+        const response = await axios.get(`http://localhost:8080/api/notifications/${props.etablissementId}`, {
+          params: { enseignantId: props.enseignantId },
         });
 
         notifications.value = response.data.map((item) => ({
           nom: item.nom,
           prenom: item.prenom,
-          nomClasse: item.nomClasse,
+          classeNom: item.classeNom,
           date: item.date,
           duree: item.duree,
         }));
-      } catch (error) {
-        console.error('Erreur lors de la récupération des notifications:', error);
+      } catch (err) {
+        console.error('Erreur lors de la récupération des notifications:', err);
+        if (err.response && err.response.data && err.response.data.message) {
+          error.value = err.response.data.message;
+        } else {
+          error.value = err.message || 'Erreur lors de la récupération des notifications';
+        }
       } finally {
         loading.value = false;
       }
@@ -65,7 +82,13 @@ export default {
     return {
       notifications,
       loading,
+      error,
+      formatDate,
     };
   },
 };
 </script>
+
+<style scoped>
+/* Ajoutez vos styles ici si nécessaire */
+</style>

@@ -13,6 +13,7 @@
           <p class="message-text">
             Une permission est demandée pour l'élève
             <strong>{{ message.eleve ? message.eleve.nom : 'Nom Inconnu' }}</strong>
+            
             <strong>{{ message.eleve ? message.eleve.prenom : '' }}</strong>
             de la classe
             <strong>{{ message.classe ? message.classe.nom : 'Classe Inconnue' }}</strong>.
@@ -29,7 +30,7 @@
       <v-card>
         <v-card-title>
           Détails de la permission
-          <v-btn color="green darken-1" text @click="openStatusDialog">Valider</v-btn>
+          <v-btn color="green darken-1" text @click="openStatusDialog">Repondre</v-btn>
         </v-card-title>
         <v-card-text>
           <div class="table-container">
