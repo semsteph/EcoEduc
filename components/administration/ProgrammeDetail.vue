@@ -110,6 +110,14 @@ export default {
     className: {type: String, required: true},
     etablissementId: { type: Number, required: true },
     etablissementNom: { type: String, required: true },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
+    }
   },
   data() {
     return {
@@ -184,6 +192,7 @@ export default {
         horaire: this.nouveauProgramme.horaire,
         matiereId: this.nouveauProgramme.matiereId,
         etablissementId: this.etablissementId,
+        anneeScolaireId:this.anneeScolaireId,
       };
 
       axios

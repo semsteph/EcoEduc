@@ -105,6 +105,14 @@ export default {
       type: Number,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true,
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true,
+    },
   },
   data() {
     return {
@@ -125,10 +133,10 @@ export default {
         activite: '',
       },
       tableHeaders: [
-        { text: 'Date', value: 'date' },
-        { text: 'Horaire', value: 'horaire' },
-        { text: 'Activité', value: 'activite' },
-        { text: 'Actions', value: 'actions', sortable: false },
+        { title: 'Date', value: 'date' },
+        { title: 'Horaire', value: 'horaire' },
+        { title: 'Activité', value: 'activite' },
+        { title: 'Actions', value: 'actions', sortable: false },
       ],
     };
   },
@@ -205,6 +213,7 @@ export default {
           classId: this.newActivity.classeId,
           semesterName: this.currentSemester,
           etablissementId: this.etablissementId,
+          anneeScolaireId: this.anneeScolaireId,
         };
 
         try {
@@ -235,12 +244,13 @@ export default {
       }
     },
     formatDate(date) {
-      const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+      if (!date) return '';
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
       return new Date(date).toLocaleDateString('fr-FR', options);
     },
     async fetchNotesData() {
       try {
-        const response = await axios.get(`http://localhost:8080/api/getActivities/${this.classeId}/${this.subjectId}`);
+        const response = await axios.get(`http://localhost:8080/api/getActivities/${this.classeId}/${this.subjectId}/${this.anneeScolaireId}`);
 
         this.activities = {};
 
@@ -252,6 +262,7 @@ export default {
               this.activities[semesterName] = [];
             }
 
+            activity.date = this.formatDate(activity.date); // Formater la date avant affichage
             activity.hidden = false; // Assurez-vous que les activités sont visibles par défaut
             this.activities[semesterName].push(activity);
           });

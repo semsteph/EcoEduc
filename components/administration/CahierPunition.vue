@@ -101,6 +101,14 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
   },
   data() {
@@ -155,10 +163,11 @@ export default {
       this.fetchSemestreData();
     },
     fetchSemestreData() {
-      axios.get(`http://localhost:8080/api/incidents`, {
+      axios.get(`http://localhost:8080/api/incident`, {
         params: {
           eleveId: this.studentId,
           semestre: this.currentSemestre,
+          anneeScolaireId: this.anneeScolaireId
         },
       })
       .then(response => {
@@ -188,6 +197,7 @@ export default {
         heure: formattedHeure, // Envoi de l'heure formatée
         motif: this.newPunishment.motif,
         etablissementId: this.etablissementId,
+        anneeScolaireId: this.anneeScolaireId
       })
       .then(response => {
         if (!this.allPunishmentData[this.currentSemestre]) {

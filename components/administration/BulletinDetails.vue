@@ -137,6 +137,14 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
   },
   data() {
@@ -165,7 +173,9 @@ export default {
     async fetchBulletin() {
       try {
         const response = await axios.get('http://localhost:8080/api/bulletin', {
-          params: { classeId: this.classId },
+          params: { classeId: this.classId,
+            anneeScolaireId: this.anneeScolaireId
+          },
         });
         const data = response.data;
 
@@ -419,6 +429,7 @@ async saveBulletin(eleveId) {
         ? (moyenneAnnuelle >= 10 ? "Admis" : "Redoublant") 
         : null,
       etablissement_id: this.etablissementId,
+      Annee_scolaire_id: this.anneeScolaireId
     }));
 
     // Envoi des données au backend
@@ -446,6 +457,7 @@ async saveBulletin(eleveId) {
       // Vérifie si le message d'erreur correspond à un bulletin existant
       if (error.response.data.type === "BULLETIN_EXISTS") {
         const { eleveNom, elevePrenom, semestreNom } = error.response.data.details;
+
         this.message = `Un bulletin a déjà été enregistré pour l'élève ${eleveNom} ${elevePrenom} pour le semestre ${semestreNom}.`;
       } else {
         this.message = error.response.data.message;

@@ -1,17 +1,15 @@
 <template>
   <v-container class="custom-table-container">
-    <!-- Barre d'outils avec le bouton "Ajouter une permission" -->
-    <v-btn icon  @click="$emit('back')" class="back-button">
+    <v-btn icon @click="$emit('back')" class="back-button">
       <v-icon>mdi-arrow-left</v-icon>
     </v-btn>
-    <v-toolbar flat>
+    <v-toolbar flat class="toolbar">
       <v-spacer></v-spacer>
-      <v-btn color="primary" @click="dialog = true">
+      <v-btn color="primary" @click="dialog = true" class="add-button">
         Ajouter une permission
       </v-btn>
     </v-toolbar>
     
-    <!-- Tableau des permissions -->
     <v-simple-table class="custom-table">
       <thead>
         <tr>
@@ -30,14 +28,13 @@
           <td class="custom-cell">{{ permission.Duree }}</td>
           <td class="custom-cell">{{ permission.Contact }}</td>
           <td class="custom-cell">{{ permission.Statut ? permission.Statut : 'En attente' }}</td>
-          <td class="custom-cell">
+          <td class="custom-cell action-cell">
             <v-icon @click="deletePermission(permission.id)" color="red" class="clickable-icon">mdi-delete</v-icon>
           </td>
         </tr>
       </tbody>
     </v-simple-table>
 
-    <!-- Dialog pour ajouter une nouvelle permission -->
     <v-dialog v-model="dialog" max-width="500px">
       <v-card>
         <v-card-title>
@@ -58,17 +55,16 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-    
-    <!-- Snackbar pour les messages de succès -->
+
     <v-snackbar v-model="snackbarVisible" :color="snackbarColor" top>
       {{ snackbarMessage }}
       <v-btn color="white" text @click="snackbarVisible = false">Fermer</v-btn>
     </v-snackbar>
 
-    <!-- Bouton de retour -->
-     <v-btn block color="secondary" @click="$emit('back')" class="mt-4">Retour</v-btn>
+    <v-btn block color="secondary" @click="$emit('back')" class="mt-4">Retour</v-btn>
   </v-container>
 </template>
+
 
 <script>
 import axios from 'axios';
@@ -176,26 +172,23 @@ export default {
 </script>
 
 <style>
-/* Conteneur général du tableau avec largeur réduite et centrage */
 .custom-table-container {
   padding: 20px;
   background-color: #f9f9f9;
   border-radius: 10px;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
+  max-width: 100%;
   margin: 0 auto;
 }
 
-/* Style du tableau */
 .custom-table {
   width: 100%;
   border-collapse: collapse;
   background-color: white;
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
-/* Style des en-têtes */
 .custom-header {
   background-color: #3f51b5;
   color: white;
@@ -205,37 +198,69 @@ export default {
   border-bottom: 2px solid #e0e0e0;
 }
 
-/* Style des cellules */
 .custom-cell {
   padding: 10px 12px;
   border-bottom: 1px solid #e0e0e0;
   color: #333;
+  word-wrap: break-word;
 }
 
-/* Alternance de couleur pour les lignes */
 .custom-row:nth-child(even) {
   background-color: #f5f5f5;
 }
 
-/* Effet survol pour les lignes */
 .custom-row:hover {
   background-color: #ececec;
   transition: background-color 0.3s ease;
 }
 
-/* Alignement pour la dernière colonne */
-.custom-cell:last-child {
+.action-cell {
   text-align: center;
-  border-right: none;
+  white-space: nowrap;
 }
 
-/* Style des icônes cliquables */
 .clickable-icon {
   cursor: pointer;
 }
 
-/* Style du bouton de retour */
 .back-button {
   margin-bottom: 16px;
+}
+
+.add-button {
+  display: block;
+  margin: 10px auto;
+}
+
+@media screen and (max-width: 600px) {
+  .custom-header,
+  .custom-cell {
+    font-size: 14px;
+    padding: 8px;
+  }
+  .custom-table-container {
+    padding: 10px;
+  }
+  .custom-table {
+    display: block;
+    overflow-x: auto;
+  }
+  .v-btn {
+    font-size: 14px;
+    padding: 8px;
+  }
+  .v-card-title {
+    font-size: 18px;
+  }
+  .toolbar {
+    display: flex;
+    justify-content: center;
+  }
+  .add-button {
+    width: 100%;
+    max-width: 250px;
+    display: flex;
+    justify-content: center;
+  }
 }
 </style>

@@ -127,6 +127,14 @@ export default {
       type: Number,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true,
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true,
+    },
   },
   data() {
     return {
@@ -187,7 +195,7 @@ export default {
     },
     async fetchTotalHours(studentId) {
       try {
-        const response = await axios.get(`http://localhost:8080/api/punitions/somme-heures/${studentId}`);
+        const response = await axios.get(`http://localhost:8080/api/punitions/somme-heures/${studentId}/${this.anneeScolaireId}`);
         return response.data.totalHours;
       } catch (error) {
         console.error('Erreur lors de la récupération des heures de punition :', error);
@@ -221,6 +229,7 @@ export default {
           semester: this.currentSemester,
           etablissementId:this.etablissementId,
           records: validRecords,
+          anneeScolaireId: this.anneeScolaireId
         };
 
         await axios.post('http://localhost:8080/api/save/conduct', payload);

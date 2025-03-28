@@ -1,7 +1,8 @@
 <template>
   <v-app>
     <v-container>
-      <h1> Veulliez Informez que les absences</h1>
+      <h1>Veuillez Informez que les absences</h1>
+
       <!-- Semester Buttons -->
       <v-row>
         <v-col
@@ -68,11 +69,34 @@
           <v-row class="mt-4">
             <v-col class="text-center">
               <v-btn color="primary" @click="$emit('back')">Retour</v-btn>
-              <div id="message" style="display: none; padding: 10px; background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; border-radius: 5px; margin-top: 20px;"></div>
             </v-col>
           </v-row>
         </template>
       </v-data-table>
+
+      <!-- Success Dialog -->
+      <v-dialog v-model="successDialog" max-width="500">
+        <v-card>
+          <v-card-title>Succès</v-card-title>
+          <v-card-text>Les données ont été sauvegardées avec succès !</v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="primary" text @click="successDialog = false">OK</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Error Dialog -->
+      <v-dialog v-model="errorDialog" max-width="500">
+        <v-card>
+          <v-card-title>Erreur</v-card-title>
+          <v-card-text>Une erreur est survenue lors de la sauvegarde des données.</v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="primary" text @click="errorDialog = false">OK</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-container>
   </v-app>
 </template>
@@ -84,16 +108,24 @@ export default {
   props: {
     classeId: {
       type: Number,
-      required: true, 
+      required: true,
     },
     subjectId: {
       type: Number,
-      required: true, 
+      required: true,
     },
-    etablissementId: { // Ajout de la prop pour recevoir l'ID de l'établissement
+    etablissementId: {
       type: Number,
       required: true,
-    },  
+    },
+    anneeScolaire: {
+      type: String,
+      required: true,
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true,
+    },
   },
   data() {
     return {
@@ -106,14 +138,10 @@ export default {
         { title: 'Statut', value: 'status' },
       ],
       statuses: ['Présent', 'Absent', 'Permissionaire'],
-      students: [], // Initialement vide
+      students: [],
+      successDialog: false,
+      errorDialog: false,
     };
-  },
-  watch: {
-    subjectId(newVal) {
-      console.log('L\'ID de la matière a été mis à jour:', newVal);
-      // Logique pour mettre à jour les classes en fonction de la nouvelle matière sélectionnée
-    }
   },
   methods: {
     getButtonColor(semester) {
@@ -129,10 +157,10 @@ export default {
         const response = await axios.get(`http://localhost:8080/api/classes/${this.classeId}/eleves`);
         this.students = response.data.map(student => ({
           ...student,
-          name: `${student.nom} ${student.prenom}`, // Concatène nom et prénom
-          date: '', // Date par défaut
-          time: '17h00-18h00', // Heure par défaut
-          status: '', // Statut par défaut
+          name: `${student.nom} ${student.prenom}`,
+          date: '',
+          time: '17h00-18h00',
+          status: '',
         }));
       } catch (error) {
         console.error('Erreur lors de la récupération des élèves:', error);
@@ -142,8 +170,6 @@ export default {
       try {
         const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
         this.semesters = response.data;
-
-        // Définir le premier semestre récupéré comme sélectionné par défaut
         if (this.semesters.length > 0) {
           this.currentSemester = this.semesters[0].nom;
         }
@@ -151,7 +177,6 @@ export default {
         console.error('Erreur lors de la récupération des semestres', error);
       }
     },
-
     async save() {
       try {
         const dataToSave = this.students
@@ -163,8 +188,9 @@ export default {
             status: student.status,
             subjectId: this.subjectId,
             classeId: this.classeId,
-            semesterName: this.currentSemester, // Ajout du nom du semestre
+            semesterName: this.currentSemester,
             etablissementId: this.etablissementId,
+            anneeScolaireId: this.anneeScolaireId,
           }));
 
         if (dataToSave.length === 0) {
@@ -172,77 +198,30 @@ export default {
           return;
         }
 
-        // Envoie les données à l'API
         await axios.post('http://localhost:8080/api/presence', dataToSave);
         console.log('Données sauvegardées:', dataToSave);
-
-        // Réinitialiser les champs des étudiants après la sauvegarde
         this.students = this.students.map(student => ({
           ...student,
           date: '',
-          time: '',  // Réinitialiser l'heure si nécessaire
-          status: '', // Réinitialiser le statut
+          time: '',
+          status: '',
         }));
-
-        // Afficher un message de succès
-        const messageDiv = document.getElementById('message');
-        messageDiv.textContent = 'Les données ont été sauvegardées avec succès !';
-        messageDiv.style.display = 'block';
-        messageDiv.className = 'success-message';
-
-        // Masquer le message après 5 secondes
-        setTimeout(() => {
-          messageDiv.style.display = 'none';
-        }, 5000);
-
+        this.successDialog = true;
       } catch (error) {
         console.error('Erreur lors de la sauvegarde des données:', error);
-
-        // Afficher un message d'erreur
-        const messageDiv = document.getElementById('message');
-        messageDiv.textContent = 'Une erreur est survenue lors de la sauvegarde des données.';
-        messageDiv.style.display = 'block';
-        messageDiv.className = 'error-message';
-
-        // Masquer le message après 5 secondes
-        setTimeout(() => {
-          messageDiv.style.display = 'none';
-        }, 5000);
+        this.errorDialog = true;
       }
-    }
+    },
   },
-
   created() {
     this.getStudents();
     this.fetchSemesters();
   },
-  mounted() {
-    console.log(this.subjectId);
-  }
 };
 </script>
 
 <style>
 .v-btn--active {
   font-weight: bold;
-}
-.success-message {
-  display: none;
-  padding: 10px;
-  background-color: #dff0d8;
-  color: #3c763d;
-  border: 1px solid #d6e9c6;
-  border-radius: 5px;
-  margin-top: 20px;
-}
-
-.error-message {
-  display: none;
-  padding: 10px;
-  background-color: #f2dede;
-  color: #a94442;
-  border: 1px solid #ebccd1;
-  border-radius: 5px;
-  margin-top: 20px;
 }
 </style>

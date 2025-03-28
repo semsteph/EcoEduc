@@ -39,6 +39,8 @@
       :class-id="selectedClassId" 
       :class-name="selectedClassName" 
       :etablissement-id="etablissementId" 
+      :annee-scolaire="anneeScolaire"
+      :annee-scolaire-id="anneeScolaireId"
       @back="clearSelection" 
     />
   </div>
@@ -62,6 +64,14 @@ export default {
       type: String,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
+    }
   },
   data() {
     return {

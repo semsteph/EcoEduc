@@ -1,15 +1,19 @@
 <template>
-  <v-container >
-    <v-row class="button-group">
-      <v-col class="d-flex justify-center">
+  <v-container>
+    <v-row justify="center" class="button-group">
+      <v-col cols="12" sm="4" class="d-flex justify-center">
         <v-btn @click="showAddSubjectForm = true" class="mx-2">Ajouter Matière</v-btn>
+      </v-col>
+      <v-col cols="12" sm="4" class="d-flex justify-center">
         <v-btn @click="showInscriptionForm = true" class="mx-2">Inscrire un Enseignant</v-btn>
+      </v-col>
+      <v-col cols="12" sm="4" class="d-flex justify-center">
         <v-btn @click="showAddForm = true" class="mx-2">Ajouter un Enseignant</v-btn>
       </v-col>
     </v-row>
 
-    <!-- Formulaire d'inscription -->
-    <v-dialog v-model="showInscriptionForm" max-width="600px">
+    <!-- Dialog: Inscription Enseignant -->
+    <v-dialog v-model="showInscriptionForm" max-width="500px">
       <v-card>
         <v-card-title>Inscrire un Enseignant</v-card-title>
         <v-card-text>
@@ -25,7 +29,7 @@
       </v-card>
     </v-dialog>
 
-    <!-- Dialog pour afficher les informations générées -->
+    <!-- Dialog: Informations de Connexion -->
     <v-dialog v-model="showGeneratedInfo" max-width="400px">
       <v-card>
         <v-card-title>Informations de Connexion</v-card-title>
@@ -41,44 +45,16 @@
       </v-card>
     </v-dialog>
 
-    <!-- Formulaire d'ajout d'enseignant -->
-    <v-dialog v-model="showAddForm" max-width="600px">
+    <!-- Dialog: Ajouter Enseignant -->
+    <v-dialog v-model="showAddForm" max-width="500px">
       <v-card>
         <v-card-title>Ajouter un Enseignant</v-card-title>
         <v-card-text>
           <v-form @submit.prevent="handleAdd">
-            <v-autocomplete
-              v-model="selectedTeacher"
-              :items="teachers"
-              item-title="fullname"
-              item-value="id"
-              label="Enseignant"
-              required
-            ></v-autocomplete>
-            <v-autocomplete
-              v-model="selectedClass"
-              :items="classes"
-              item-title="nom"
-              item-value="id"
-              label="Classe"
-              required
-            ></v-autocomplete>
-            <v-autocomplete
-              v-model="selectedSubject"
-              :items="subjects"
-              item-title="nom"
-              item-value="id"
-              label="Matière"
-              required
-            ></v-autocomplete>
-            <v-autocomplete
-              v-model="selectedCoefficient"
-              :items="coefficient"
-              item-title="valeur"
-              item-value="id"
-              label="Coefficient"
-              required
-            ></v-autocomplete>
+            <v-autocomplete v-model="selectedTeacher" :items="teachers" item-title="fullname" item-value="id" label="Enseignant" required></v-autocomplete>
+            <v-autocomplete v-model="selectedClass" :items="classes" item-title="nom" item-value="id" label="Classe" required></v-autocomplete>
+            <v-autocomplete v-model="selectedSubject" :items="subjects" item-title="nom" item-value="id" label="Matière" required></v-autocomplete>
+            <v-autocomplete v-model="selectedCoefficient" :items="coefficient" item-title="valeur" item-value="id" label="Coefficient" required></v-autocomplete>
             <v-btn type="submit" color="primary">Ajouter</v-btn>
             <v-btn @click="showAddForm = false" color="secondary">Annuler</v-btn>
           </v-form>
@@ -86,7 +62,7 @@
       </v-card>
     </v-dialog>
 
-    <!-- Formulaire d'ajout de matière -->
+    <!-- Dialog: Ajouter Matière -->
     <v-dialog v-model="showAddSubjectForm" max-width="400px">
       <v-card>
         <v-card-title>Ajouter une Matière</v-card-title>
@@ -100,20 +76,20 @@
       </v-card>
     </v-dialog>
 
-    <div class="mt-16 d-flex justify-center">
-      <v-col cols="12" md="4">
-        <v-card @click="navigateTo('CahierDeTexte')" color="lime lighten-4">
+    <v-row class="mt-8" justify="center">
+      <v-col cols="12" sm="6">
+        <v-card @click="navigateTo('CahierDeTexte')" color="lime lighten-4" class="clickable-card">
           <v-card-title>Gestion des Cahiers de Texte</v-card-title>
         </v-card>
       </v-col>
-      <v-col cols="12" md="4">
-        <v-card @click="navigateTo('MesEnseignants')" color="lime lighten-4">
+      <v-col cols="12" sm="6">
+        <v-card @click="navigateTo('MesEnseignants')" color="lime lighten-4" class="clickable-card">
           <v-card-title>Mes Enseignants</v-card-title>
         </v-card>
       </v-col>
-    </div>
+    </v-row>
 
-    <component :is="currentComponent" @component-selected="currentComponent = $event" :etablissement-id="etablissementId"></component>
+    <component :is="currentComponent" @component-selected="currentComponent = $event" :annee-scolaire="anneeScolaire" :annee-scolaire-id="anneeScolaireId" :etablissement-id="etablissementId"></component>
   </v-container>
 </template>
 
@@ -135,7 +111,16 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
+
   },
   data() {
     return {
@@ -244,7 +229,8 @@ export default {
           class: this.selectedClass,
           subject: this.selectedSubject,
           coefficient: this.selectedCoefficient,
-          etablissement: this.etablissementId
+          etablissement: this.etablissementId,
+          anneeScolaireId: this.anneeScolaireId
         };
         const response = await axios.post('http://localhost:8080/api/Enseignants/add', data);
         console.log('Teacher added:', response.data);
@@ -290,15 +276,29 @@ export default {
 </script>
 
 <style scoped>
-.v-dialog {
-  max-width: 90vw;
-}
 .button-group {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 16px; /* Espace entre les boutons */
-  margin: 20px 0; /* Espacement par rapport au haut et au bas */
-  height: 200px; /* Ajustez la hauteur pour centrer verticalement */
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.v-btn {
+  width: 100%;
+  max-width: 220px;
+}
+
+.clickable-card {
+  text-align: center;
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.clickable-card:hover {
+  transform: scale(1.05);
 }
 </style>
+

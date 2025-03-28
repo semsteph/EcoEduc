@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="container">
     <!-- Boutons de gestion des classes -->
     <div class="button-group">
       <v-btn color="primary" @click="showForm = true" v-if="!showProgram && !showConductForm && !showSemesterForm">Ajouter Classe</v-btn>
@@ -10,7 +10,7 @@
     </div>
 
     <!-- Formulaire pour ajouter une nouvelle classe -->
-    <v-card v-if="showForm && !showProgram" class="pa-4 mt-4">
+    <v-card v-if="showForm && !showProgram" class="form-card">
       <v-form @submit.prevent="submitForm">
         <v-text-field v-model="newClassName" label="Nom de la classe" required></v-text-field>
         <v-select
@@ -21,58 +21,19 @@
           label="Promotion"
           required
         ></v-select>
-        <div class="d-flex justify-space-between mt-4">
+        <div class="button-container">
           <v-btn color="primary" type="submit">Ajouter</v-btn>
           <v-btn @click="cancelForm">Annuler</v-btn>
         </div>
       </v-form>
     </v-card>
 
-    <!-- Formulaire pour ajouter un semestre/trimestre -->
-    <v-card v-if="showSemesterForm" class="pa-4 mt-4">
-      <v-form @submit.prevent="submitSemester">
-        <v-text-field v-model="newSemesterName" label="Nom du semestre/trimestre" required></v-text-field>
-        <div class="d-flex justify-space-between mt-4">
-          <v-btn color="primary" type="submit">Ajouter</v-btn>
-          <v-btn @click="cancelSemesterForm">Annuler</v-btn>
-        </div>
-      </v-form>
-    </v-card>
-
-    <!-- Formulaire pour ajouter une note de conduite -->
-    <v-card v-if="showConductForm && !showProgram" class="pa-4 mt-4">
-      <v-form @submit.prevent="submitConductForm">
-        <v-text-field v-model="conductNote" label="Note de conduite" required></v-text-field>
-        <v-select
-          v-model="selectedClassIds"
-          :items="classesOptions"
-          item-title="name"
-          item-value="id"
-          label="Sélectionnez les classes"
-          multiple
-          required
-        ></v-select>
-        <v-select
-          v-model="selectedSemestreId"
-          :items="semestresOptions"
-          item-title="name"
-          item-value="id"
-          label="Sélectionnez le semestre"
-          required
-        ></v-select>
-        <div class="d-flex justify-space-between mt-4">
-          <v-btn color="primary" type="submit">Ajouter</v-btn>
-          <v-btn @click="cancelConductForm">Annuler</v-btn>
-        </div>
-      </v-form>
-    </v-card>
-
-    <!-- Liste des classes par promotion, affichée après le clic sur "Mes Classes" -->
+    <!-- Affichage des classes -->
     <div v-if="showClasses && classesByPromotion && Object.keys(classesByPromotion).length > 0">
       <div v-for="(classes, promotion) in classesByPromotion" :key="promotion">
-        <h3>Promotion : {{ promotion }}</h3>
-        <v-card v-for="classe in classes" :key="classe.id" class="mt-3">
-          <v-card-title>
+        <h3 class="section-title">Promotion : {{ promotion }}</h3>
+        <v-card v-for="classe in classes" :key="classe.id" class="class-card">
+          <v-card-title class="class-title">
             {{ classe.name }} ({{ classe.studentCount }} élèves)
           </v-card-title>
           <v-card-actions>
@@ -83,10 +44,10 @@
       </div>
     </div>
 
-    <!-- Affichage du composant enfant si showProgram est vrai -->
-    <Programme-cours v-if="showProgram" :etablissement-id="etablissementId"/>
+    <!-- Affichage du programme -->
+    <Programme-cours v-if="showProgram" :etablissement-id="etablissementId" :annee-scolaire="anneeScolaire" :annee-scolaire-id="anneeScolaireId"/>
 
-    <!-- Snackbar pour afficher les messages -->
+    <!-- Snackbar pour les messages -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color">
       {{ snackbar.message }}
       <v-btn color="white" text @click="snackbar.show = false">Fermer</v-btn>
@@ -108,6 +69,14 @@ export default {
     },
     etablissementNom: {
       type: String,
+      required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
       required: true
     }
   },
@@ -223,7 +192,8 @@ export default {
         note_conduite: this.conductNote,
         classe_ids: this.selectedClassIds,
         semestre_id: this.selectedSemestreId,
-        etablissement_id: this.etablissementId // Ajouter l'ID de l'établissement dans la requête
+        etablissement_id: this.etablissementId, // Ajouter l'ID de l'établissement dans la requête,
+        anneeScolaireId: this.anneeScolaireId
       })
       .then(() => {
         this.cancelConductForm();
@@ -348,12 +318,52 @@ export default {
 
 
 <style scoped>
+.container {
+  padding: 16px;
+  max-width: 900px;
+  margin: auto;
+}
+
 .button-group {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  align-items: center;
-  gap: 16px; /* Espace entre les boutons */
-  margin: 20px 0; /* Espacement par rapport au haut et au bas */
-  height: 200px; /* Ajustez la hauteur pour centrer verticalement */
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.form-card, .class-card {
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.button-container {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.section-title {
+  font-size: 1.4rem;
+  font-weight: bold;
+  margin-top: 16px;
+}
+
+.class-title {
+  font-size: 1.2rem;
+}
+
+@media (max-width: 600px) {
+  .button-group {
+    flex-direction: column;
+    align-items: center;
+  }
+  .section-title {
+    font-size: 1.2rem;
+    text-align: center;
+  }
+  .class-title {
+    font-size: 1rem;
+  }
 }
 </style>

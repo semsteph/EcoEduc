@@ -4,6 +4,8 @@
       <InfoClasse 
         :classe="selectedClass" 
         :etablissement-id="etablissementId" 
+        :annee-scolaire="anneeScolaire"
+        :annee-scolaire-id="anneeScolaireId"
         @back="goBack" 
         @navigate="navigateTo"
       />
@@ -14,6 +16,8 @@
         :classeId="selectedClassId" 
         :subjectId="subjectId" 
         :etablissement-id="etablissementId" 
+        :annee-scolaire="anneeScolaire"
+        :annee-scolaire-id="anneeScolaireId"
         @back="goBack"
       />
     </template>
@@ -22,7 +26,9 @@
         :classe="selectedClass" 
         :classeId="selectedClassId" 
         :subjectId="subjectId" 
-        :etablissement-id="etablissementId" 
+        :etablissement-id="etablissementId"
+        :annee-scolaire="anneeScolaire"
+        :annee-scolaire-id="anneeScolaireId" 
         @back="goBack"
       />
     </template>
@@ -32,6 +38,8 @@
         :classeId="selectedClassId" 
         :subjectId="subjectId" 
         :etablissement-id="etablissementId" 
+        :annee-scolaire="anneeScolaire"
+        :annee-scolaire-id="anneeScolaireId"
         @back="goBack"
       />
     </template>
@@ -41,6 +49,8 @@
         :classeId="selectedClassId" 
         :subjectId="subjectId" 
         :etablissement-id="etablissementId" 
+        :annee-scolaire="anneeScolaire"
+        :annee-scolaire-id="anneeScolaireId"
         @back="goBack"
       />
     </template>
@@ -50,6 +60,8 @@
         :classeId="selectedClassId" 
         :subjectId="subjectId" 
         :etablissement-id="etablissementId" 
+        :annee-scolaire="anneeScolaire"
+        :annee-scolaire-id="anneeScolaireId"
         @back="goBack"
       />
     </template>
@@ -100,6 +112,14 @@ export default {
       type: Number,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
+    }
   },
   data() {
     return {

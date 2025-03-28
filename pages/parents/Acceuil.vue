@@ -11,9 +11,7 @@
     <!-- Bannière avec titre défilant -->
     <v-row justify="center" align="center" class="banner">
       <v-col cols="12" class="text-center">
-        <div class="scrolling-title">
-          <span v-for="i in 10" :key="i">Bienvenue sur EchoEducation &nbsp;&nbsp;&nbsp;</span>
-        </div>
+        <div class="scrolling-title">Bienvenue sur EchoEducation</div>
       </v-col>
     </v-row>
 
@@ -73,7 +71,6 @@ export default {
 
     const goToAbout = () => {
       activeButton.value = 'about';
-      
     };
 
     return {
@@ -122,16 +119,17 @@ export default {
 /* Bannière avec titre défilant */
 .banner {
   padding: 50px 0;
+  overflow: hidden;
 }
 
 .scrolling-title {
   font-size: 32px;
   font-weight: bold;
   text-transform: capitalize;
-  white-space: nowrap;
-  overflow: hidden;
-  animation: scroll 8s linear infinite;
   color: #ffeb3b;
+  white-space: nowrap;
+  display: inline-block;
+  animation: scroll 8s linear infinite;
 }
 
 @keyframes scroll {

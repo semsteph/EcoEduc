@@ -34,6 +34,14 @@ export default {
       type: Number,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true,
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true,
+    },
   },
   setup(props) {
     const notifications = ref([]);
@@ -52,8 +60,11 @@ export default {
           throw new Error("Les identifiants de l'établissement et de l'enseignant sont requis.");
         }
 
-        const response = await axios.get(`http://localhost:8080/api/notifications/${props.etablissementId}`, {
-          params: { enseignantId: props.enseignantId },
+        const response = await axios.get(`http://localhost:8080/api/notifications/${props.etablissementId}/${props.anneeScolaireId}`, {
+          params: { enseignantId: props.enseignantId,
+            anneeScolaireId : props.anneeScolaireId
+
+           },
         });
 
         notifications.value = response.data.map((item) => ({

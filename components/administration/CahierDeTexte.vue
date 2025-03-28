@@ -25,7 +25,8 @@
       </v-card-text>
     </v-card>
     <!-- Affiche le composant enfant si une classe est sélectionnée -->
-    <CahierDeTexteDetail v-else :class-id="selectedClassId" :etablissement-id="etablissementId" @back="clearSelection" />
+    <CahierDeTexteDetail v-else :class-id="selectedClassId" :annee-scolaire="anneeScolaire"
+    :annee-scolaire-id="anneeScolaireId" :etablissement-id="etablissementId" @back="clearSelection" />
   </div>
 </template>
 
@@ -45,6 +46,14 @@ export default {
     },
     etablissementNom: {
       type: String,
+      required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
       required: true
     }
   },

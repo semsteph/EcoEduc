@@ -44,6 +44,14 @@
         type: Number,
         required: true,
       },
+      anneeScolaire: {
+      type: String,
+      required: true,
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true,
+    },
     },
     data() {
       return {
@@ -65,6 +73,7 @@
               params: {
                 classeId: this.classeId,
                 etablissementId: this.etablissementId,
+                anneeScolaireId: this.anneeScolaireId
               },
             }
           );

@@ -102,6 +102,14 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
   },
   data() {
@@ -117,7 +125,7 @@ export default {
   methods: {
     async fetchPermissions() {
       try {
-        const response = await axios.get(`http://localhost:8080/api/permissions/${this.etablissementId}`);
+        const response = await axios.get(`http://localhost:8080/api/permissions/${this.etablissementId}/${this.anneeScolaireId}`);
         this.permissions = response.data;
 
         console.log('Permissions récupérées :', this.permissions);

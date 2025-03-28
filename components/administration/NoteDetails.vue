@@ -82,6 +82,15 @@ export default {
       type: Number,
       required: true,
     },
+
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
+    }
   },
   data() {
     return {
@@ -99,6 +108,8 @@ export default {
         const response = await axios.get('http://localhost:8080/api/classe-details', {
           params: {
             classeId: this.classId,
+            anneeScolaireId: this.anneeScolaireId,
+
           },
         });
 

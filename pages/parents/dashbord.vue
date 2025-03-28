@@ -1,14 +1,16 @@
 <template>
   <v-app>
-    <!-- Barre d'outils avec bouton pour ouvrir le menu latéral -->
     <ToolbarComponent @toggleDrawer="toggleDrawer" @showComponent="showComponent" />
-    
-    <!-- Menu latéral de navigation -->
+
     <v-navigation-drawer v-model="drawer" app color="primary" dark>
       <v-list dense>
         <v-subheader class="white--text">Menu Principal</v-subheader>
-
-        <!-- Option pour afficher l'accueil -->
+        <v-list-item>
+          <v-list-item-content class="white--text text-center">
+            Année scolaire: {{ anneeScolaireNom || 'Non définie' }}
+          </v-list-item-content>
+        </v-list-item>
+        <v-divider></v-divider>
         <v-list-item @click="showComponent('Acceuil')">
           <v-list-item-icon>
             <v-icon class="white--text">mdi-home</v-icon>
@@ -17,8 +19,6 @@
             <v-list-item-title class="white--text">Accueil</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
-
-        <!-- Option pour afficher la liste des enfants -->
         <v-list-item @click="showComponent('ChildrenList')">
           <v-list-item-icon>
             <v-icon class="white--text">mdi-account-child</v-icon>
@@ -27,8 +27,6 @@
             <v-list-item-title class="white--text">Mes enfants</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
-
-        <!-- Option pour afficher le formulaire de contact de l'administration -->
         <v-list-item @click="showComponent('ContactAdmin')">
           <v-list-item-icon>
             <v-icon class="white--text">mdi-email</v-icon>
@@ -37,10 +35,7 @@
             <v-list-item-title class="white--text">Contacter administration</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
-
         <v-divider></v-divider>
-
-        <!-- Option pour se déconnecter -->
         <v-list-item @click="openLogoutDialog">
           <v-list-item-icon>
             <v-icon class="white--text">mdi-logout</v-icon>
@@ -51,24 +46,18 @@
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
-
-    <!-- Contenu principal qui affiche dynamiquement les composants -->
     <v-main class="background">
-      <!-- Superposition pour rendre le fond flou -->
       <div class="background-overlay"></div>
-
-      <!-- Contenu principal -->
       <div class="content-overlay">
         <component
           :is="currentComponent"
           v-if="currentComponent"
           :etablissementId="etablissementId"
+          :anneeScolaireId="anneeScolaireId"
           @showComponent="showComponent"
         ></component>
       </div>
     </v-main>
-
-    <!-- Composant de dialogue pour la déconnexion -->
     <LogoutDialog v-model="logoutDialogVisible" @logout="logout" />
   </v-app>
 </template>
@@ -76,7 +65,7 @@
 <script>
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-
+import axios from 'axios';
 import ToolbarComponent from '@/components/parents/ToolbarComponent.vue';
 import ChildrenList from '@/components/parents/ChildrenList.vue';
 import Acceuil from '@/components/parents/Acceuil.vue';
@@ -94,15 +83,50 @@ export default {
   setup() {
     const router = useRouter();
     const route = useRoute();
-
     const currentComponent = ref("Acceuil");
     const drawer = ref(false);
     const logoutDialogVisible = ref(false);
     const etablissementId = ref(null);
+    const anneeScolaireId = ref(null);
+    const anneeScolaireNom = ref(null); 
 
-    onMounted(() => {
+    onMounted(async () => {
       etablissementId.value = Number(route.query.etablissement) || null;
+      if (etablissementId.value) {
+        await fetchAnneeScolaire();
+      }
     });
+
+    const fetchAnneeScolaire = async () => {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/annees-scolaires/${etablissementId.value}`);
+        console.log("API response:", response.data);
+
+        let data = response.data;
+        // Adapte l'extraction en fonction de la structure de la réponse :
+        if (Array.isArray(data)) {
+          if (data.length > 0) {
+            data = data[0]; // Extraction du premier élément du tableau
+          } else {
+            data = null;
+          }
+        }
+        // Si la réponse est un objet contenant une propriété "data", adapte ici :
+        // if(data && data.data) {
+        //   data = data.data;
+        // }
+
+        if (data) {
+          anneeScolaireId.value = data.id || null;
+          anneeScolaireNom.value = data.nom || null;
+          console.log("Année scolaire récupérée :", anneeScolaireNom.value);
+        } else {
+          console.warn("Aucune donnée d'année scolaire trouvée.");
+        }
+      } catch (error) {
+        console.error("Erreur lors de la récupération de l'année scolaire :", error);
+      }
+    };
 
     const toggleDrawer = () => {
       drawer.value = !drawer.value;
@@ -131,25 +155,25 @@ export default {
       openLogoutDialog,
       logout,
       etablissementId,
+      anneeScolaireId,
+      anneeScolaireNom,
     };
   },
 };
 </script>
 
 <style scoped>
-/* Contexte général */
 .background {
   position: relative;
   min-height: 100vh;
   overflow: hidden;
 }
 
-/* Superposition pour rendre le fond flou */
 .background-overlay {
   background-image: url('/assets/parents/ecolier-fait-ses-devoirs-ses-parents_1290988-1159.jpg');
   background-size: cover;
   background-position: center;
-  filter: blur(8px); /* Applique un flou uniquement à l'image de fond */
+  filter: blur(8px);
   position: absolute;
   top: 0;
   left: 0;
@@ -158,11 +182,10 @@ export default {
   z-index: 1;
 }
 
-/* Superposition pour le contenu principal */
 .content-overlay {
   position: relative;
   z-index: 2;
-  background-color: rgba(255, 255, 255, 0.3); /* Transparence légère pour une esthétique moderne */
+  background-color: rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   padding: 24px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
@@ -170,13 +193,11 @@ export default {
   max-width: 1200px;
 }
 
-/* Amélioration des listes */
 .v-list-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
   transition: background-color 0.3s ease;
 }
 
-/* Texte */
 .v-subheader {
   font-weight: bold;
   letter-spacing: 1px;

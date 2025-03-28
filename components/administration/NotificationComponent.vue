@@ -57,6 +57,14 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
   },
   data() {
@@ -69,7 +77,7 @@ export default {
   },
   async created() {
   try {
-    const response = await axios.get(`http://localhost:8080/api/presenceid/${this.etablissementId}`);
+    const response = await axios.get(`http://localhost:8080/api/presenceid/${this.etablissementId}/${this.anneeScolaireId}`);
     const presenceData = response.data;
 
     const absentStudentIds = this.findAbsentStudent(presenceData);

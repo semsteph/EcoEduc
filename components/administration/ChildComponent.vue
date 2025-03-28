@@ -44,6 +44,14 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
   },
   data() {
@@ -84,9 +92,10 @@ export default {
       this.fetchSemestreData(semestreNom); // Récupérer les données pour le semestre sélectionné
     },
     fetchSemestreData(semestreNom) {
-      axios.get(`http://localhost:8080/api/presence/${this.studentId}/${semestreNom}`)
+      axios.get(`http://localhost:8080/api/presence/${this.studentId}/${semestreNom}/${this.anneeScolaireId}`)
         .then(response => {
           console.log(response.data); // Pour vérifier les données reçues
+          console.log(this.anneeScolaireId);
           
           // Mettre à jour les données du semestre courant
           const semestreData = this.semestre.find(sem => sem.nom === semestreNom);
@@ -96,6 +105,7 @@ export default {
         })
         .catch(error => {
           console.error('Erreur lors de la récupération des données:', error);
+         
         });
     },
   },

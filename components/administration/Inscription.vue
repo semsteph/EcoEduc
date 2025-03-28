@@ -81,6 +81,14 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
   },
   data() {
@@ -92,7 +100,8 @@ export default {
         sexe: '',
         classe: '', // ID de la classe
         parentId: '', // ID du parent
-        etablissementId: this.etablissementId
+        etablissementId: this.etablissementId,
+        anneeScolaireId: this.anneeScolaireId
       },
       submitted: false,
       showForm: false,

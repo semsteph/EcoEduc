@@ -1,67 +1,69 @@
 <template>
-  <v-row class="button-group">
-    <v-col cols="12" md="4">
-      <v-card @click="navigateTo('Inscription')"  color="cyan lighten-4">
-        <v-card-title>Inscription</v-card-title>
-      </v-card>
-    </v-col>
-    <v-col cols="12" md="4">
-      <v-card @click="navigateTo('PresenceManagement')"  color="pink lighten-4">
-        <v-card-title>Gestion de Présence</v-card-title>
-      </v-card>
-    </v-col>
-    <v-col cols="12" md="4">
-      <v-card @click="navigateTo('PunishmentManagement')"  color="lime lighten-4">
-        <v-card-title>Gestion de Punition</v-card-title>
-      </v-card>
-    </v-col>
-    <v-col cols="12" md="4">
-      <v-card @click="navigateTo('NoteConsultation')"  color="amber lighten-4">
-        <v-card-title>Consulter Note</v-card-title>
-      </v-card>
-    </v-col>
-    <v-col cols="12" md="4">
-      <v-card @click="navigateTo('BulletinManagement')"  color="teal lighten-4">
-        <v-card-title>Gestion Bulletin</v-card-title>
-      </v-card>
-    </v-col>
-    <v-col cols="12" md="4">
-      <v-card @click="navigateTo('ScolariteManagement')"  color="purple lighten-4">
-        <v-card-title>Gestion Scolarité</v-card-title>
-      </v-card>
-    </v-col>
-  </v-row>
+  <v-container class="scrollable-container">
+    <v-row justify="center">
+      <v-col cols="12" sm="6" md="4" v-for="(label, index) in labels" :key="index">
+        <v-card 
+          @click="navigateTo(label.route)" 
+          :color="label.color" 
+          dark 
+          class="mb-4 text-center d-flex align-center justify-center v-card-custom"
+        >
+          <v-card-title class="text-h6 font-weight-bold">{{ label.name }}</v-card-title>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script>
-
 export default {
   name: 'StudentManagement',
   props: {
-    etablissementId: {
-      type: Number,
-      required: true
-    },
-    etablissementNom: {
-      type: String,
-      required: true
-    }
+    etablissementId: { type: Number, required: true },
+    etablissementNom: { type: String, required: true },
+    anneeScolaire: { type: String, required: true },
+    anneeScolaireId: { type: Number, required: true }
+  },
+  data() {
+    return {
+      labels: [
+        { name: 'Inscription', route: 'Inscription', color: 'cyan darken-2' },
+        { name: 'Gestion de Présence', route: 'PresenceManagement', color: 'pink darken-2' },
+        { name: 'Gestion de Punition', route: 'PunishmentManagement', color: 'lime darken-2' },
+        { name: 'Consulter Note', route: 'NoteConsultation', color: 'amber darken-2' },
+        { name: 'Gestion Bulletin', route: 'BulletinManagement', color: 'teal darken-2' },
+        { name: 'Gestion Scolarité', route: 'ScolariteManagement', color: 'purple darken-2' }
+      ]
+    };
   },
   methods: {
-    navigateTo(component) {
-      this.$emit('component-selected', component);
+    navigateTo(route) {
+      this.$emit('component-selected', route);
     }
   }
 }
 </script>
+
 <style scoped>
-.button-group {
+/* Active le scroll sur mobile */
+.scrollable-container {
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Assure une bonne disposition des cartes */
+.v-card-custom {
+  cursor: pointer;
+  min-height: 100px; /* Taille uniforme */
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 16px; /* Espace entre les boutons */
-  margin: 20px 0; /* Espacement par rapport au haut et au bas */
-  height: 200px; /* Ajustez la hauteur pour centrer verticalement */
-  padding-block: 200px;
+  text-align: center;
+}
+
+/* Centrage du texte */
+.v-card-title {
+  width: 100%;
 }
 </style>

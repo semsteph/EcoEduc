@@ -95,6 +95,14 @@ export default {
       type: Number,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
+    },
   },
   data() {
     return {
@@ -115,37 +123,47 @@ export default {
   },
   methods: {
     async fetchData() {
-      try {
-        const response = await axios.get(
-          `http://localhost:8080/api/bulletined/${this.childId}`
-        );
-        const data = response.data;
+  try {
+    const response = await axios.get(
+      `http://localhost:8080/api/bulletined/${this.childId}/${this.anneeScolaireId}`
+    );
+    const data = response.data;
 
-        this.semestres = data.semestres.map((semestre) => ({
-          semestre_id: semestre.semestre_id,
-          nom: semestre.nom,
-          bulletins: semestre.bulletins,
-          total: semestre.total,
-          moySem: semestre.moySem,
-          moyAn: semestre.moyAn,
-          rang: semestre.rang,
-          mention: semestre.mention,
-          conduite: semestre.conduite,
-          decision: semestre.decision,
-        }));
+    // Vérification si data est vide ou non structuré comme prévu
+    if (!data || !data.semestres || data.semestres.length === 0) {
+      this.semestres = [];
+      this.childNom = "";
+      this.childPrenom = "";
+      this.childClasse = "";
+      return;
+    }
 
-        this.childNom = data.eleveNom;
-        this.childPrenom = data.elevePrenom;
-        this.childClasse = data.classeNom;
+    this.semestres = data.semestres.map((semestre) => ({
+      semestre_id: semestre.semestre_id,
+      nom: semestre.nom,
+      bulletins: semestre.bulletins,
+      total: semestre.total,
+      moySem: semestre.moySem,
+      moyAn: semestre.moyAn,
+      rang: semestre.rang,
+      mention: semestre.mention,
+      conduite: semestre.conduite,
+      decision: semestre.decision,
+    }));
 
-        if (this.semestres.length > 0) {
-          this.selectedSemestre = this.semestres[0].semestre_id;
-          this.filterBySemestre();
-        }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des données", error);
-      }
-    },
+    this.childNom = data.eleveNom;
+    this.childPrenom = data.elevePrenom;
+    this.childClasse = data.classeNom;
+
+    if (this.semestres.length > 0) {
+      this.selectedSemestre = this.semestres[0].semestre_id;
+      this.filterBySemestre();
+    }
+  } catch (error) {
+    console.error("Erreur lors de la récupération des données", error);
+  }
+},
+
     filterBySemestre() {
       const selectedSemestreData = this.semestres.find(
         (semestre) => semestre.semestre_id === this.selectedSemestre

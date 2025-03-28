@@ -49,7 +49,7 @@
             </thead>
             <tbody>
               <tr v-for="test in filteredTests" :key="test.date">
-                <td>{{ test.date }}</td>
+                <td>{{ formatDate(test.date) }}</td>
                 <td>{{ test.horaire }}</td>
                 <td>{{ test.activite }}</td>
               </tr>
@@ -77,6 +77,14 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
   },
   data() {
@@ -98,7 +106,7 @@ export default {
   },
   methods: {
     fetchDetails() {
-      axios.get(`http://localhost:8080/api/classes/${this.classId}/details`)
+      axios.get(`http://localhost:8080/api/classes/${this.classId}/${this.anneeScolaireId}/details`)
         .then(response => {
           this.matieres = response.data.matieres;
         })
@@ -122,6 +130,16 @@ export default {
       });
       return Object.values(semestresMap);
     },
+    formatDate(date) {
+      // Formater la date dans un format lisible par les utilisateurs
+      try {
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        return new Intl.DateTimeFormat('fr-FR', options).format(new Date(date));
+      } catch (e) {
+        console.error("Erreur lors du formatage de la date :", e);
+        return date; // Retourner la date brute en cas d'erreur
+      }
+    }
   },
   mounted() {
     this.fetchDetails();

@@ -9,8 +9,8 @@
         <!-- Entête avec nom de l'établissement -->
         <v-card class="pa-3 white--text text-center" flat>
           <v-list-item-content>
-            <h3 class="mb-2">{{ nomEtablissement }}</h3>
-            <p>{{ enseignantPrenom }} {{ enseignantNom }}</p>
+            <h3 class="mb-2"> <strong>Etablissement:</strong> {{ nomEtablissement }}</h3>
+            <p> <strong>Enseignant:</strong> {{ enseignantPrenom }} {{ enseignantNom }}</p>
           </v-list-item-content>
         </v-card>
 
@@ -47,10 +47,19 @@
     <!-- Contenu principal -->
     <v-main>
       <v-container class="py-5 content-container">
+         <!-- Message d'alerte si l'année scolaire n'est pas définie -->
+         <v-alert v-if="!anneeScolaireId" type="warning" class="mb-4">
+          L'année scolaire n'est pas encore définie.
+        </v-alert>
         <!-- Notifications -->
         <v-row v-if="showNotificationsComponent">
           <v-col>
-            <NotificationComponent :enseignant-id="enseignantId" :etablissement-id="etablissementId" />
+            <NotificationComponent
+              :enseignant-id="enseignantId"
+              :annee-scolaire="anneeScolaire"
+              :annee-scolaire-id="anneeScolaireId"
+              :etablissement-id="etablissementId"
+            />
           </v-col>
         </v-row>
 
@@ -62,6 +71,8 @@
               :subject-id="selectedSubjectId"
               :etablissement-id="etablissementId"
               :classes="classes"
+              :annee-scolaire="anneeScolaire"
+              :annee-scolaire-id="anneeScolaireId"
               :selected-class-id="selectedClassId"
               @class-selected="showClassDetails"
             />
@@ -75,6 +86,8 @@
               v-if="selectedClassId"
               :class-id="selectedClassId"
               :etablissement-id="etablissementId"
+              :annee-scolaire="anneeScolaire"
+              :annee-scolaire-id="anneeScolaireId"
             />
           </v-col>
         </v-row>
@@ -111,7 +124,6 @@ export default {
   },
   data() {
     return {
-      currentComponent: null,
       selectedSubjectId: null,
       selectedClassId: null,
       subjects: [],
@@ -122,6 +134,8 @@ export default {
       enseignantPrenom: '',
       enseignantId: null,
       logoutDialog: false,
+      anneeScolaire: '', // Année scolaire en cours
+      anneeScolaireId: null, // ID de l'année scolaire
       drawer: false,
       showNotificationsComponent: false,
     };
@@ -153,16 +167,35 @@ export default {
         this.enseignantNom = decodedToken.enseignant_nom;
         this.enseignantPrenom = decodedToken.enseignant_prenom;
 
+        await this.fetchAnneeScolaire();
+
         const response = await axios.get(`http://localhost:8080/api/enseignant/matieres-classes/${this.enseignantId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         this.subjects = response.data;
       } catch (error) {
-        console.error('Erreur lors de la récupération des matières et des classes', error);
+        console.error('Erreur lors de la récupération des données', error);
       }
     }
   },
   methods: {
+    async fetchAnneeScolaire() {
+  try {
+    const response = await axios.get(`http://localhost:8080/api/annees-scolaires/${this.etablissementId}`);
+    
+    if (response.data && response.data.id) {
+      this.anneeScolaire = response.data.nom || 'Année scolaire non spécifiée';
+      this.anneeScolaireId = response.data.id;
+    } else {
+      this.anneeScolaire = null;
+      this.anneeScolaireId = null;
+      console.warn("L'année scolaire est clôturée ou non disponible.");
+    }
+  } catch (error) {
+    console.error("Erreur lors de la récupération de l'année scolaire :", error);
+  }
+},
+
     selectSubject(id) {
       this.selectedSubjectId = id;
       this.selectedClassId = null;
@@ -190,7 +223,7 @@ export default {
 </script>
 
 <style scoped>
-/* Image de fond floutée */
+/* Styles inchangés */
 .background-blur {
   position: fixed;
   top: 0;
@@ -200,10 +233,8 @@ export default {
   background-image: url('/assets/professeurs/istockphoto-1328488607-1024x1024.jpg');
   background-size: cover;
   background-position: center;
-  filter: blur(8px); /* Effet de flou */
+  filter: blur(8px);
 }
-
-/* Conteneur principal */
 .content-container {
   background-color: rgba(255, 255, 255, 0.95);
   border-radius: 16px;
@@ -211,21 +242,5 @@ export default {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   position: relative;
   z-index: 1;
-}
-
-/* Couleurs et polices */
-.v-card {
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-}
-
-.v-btn {
-  font-family: 'Poppins', sans-serif;
-  font-weight: bold;
-}
-
-h3 {
-  font-family: 'Poppins', sans-serif;
-  color: black;
 }
 </style>

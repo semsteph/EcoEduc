@@ -1,85 +1,59 @@
 <template>
   <v-container class="button-group">
-    <v-card>
-      <v-card-title>
-        <span class="headline">Gestion des Parents</span>
+    <v-card class="mx-auto" max-width="600">
+      <v-card-title class="text-h5 text-center">
+        Gestion des Parents
       </v-card-title>
-      <v-card-subtitle>
-        <v-btn @click="openForm">Inscrire un Parent</v-btn>
+      <v-card-subtitle class="text-center">
+        <v-btn color="primary" @click="openForm">Inscrire un Parent</v-btn>
       </v-card-subtitle>
       <v-card-text>
-        <!-- Afficher le formulaire d'inscription si showForm est vrai -->
-        <v-form v-if="showForm">
+        <v-form v-if="showForm" class="px-3">
           <v-text-field v-model="newParent.name" label="Nom" required></v-text-field>
           <v-text-field v-model="newParent.firstName" label="Prénom" required></v-text-field>
           <v-text-field v-model="newParent.contact" label="Contact" required></v-text-field>
           <v-text-field v-model="newParent.email" label="Email" required></v-text-field>
           <v-text-field v-model="newParent.username" label="Nom d'utilisateur" required></v-text-field>
-          <v-text-field v-model="newParent.password" label="Mot de passe" type="password" required></v-text-field>
-          <v-text-field v-model="confirmPassword" label="Confirmer Mot de passe" type="password" required></v-text-field>
-          <v-btn @click="registerParent">Enregistrer</v-btn>
-          <v-btn @click="showForm = false">Annuler</v-btn>
+          
+          <v-text-field 
+            v-model="newParent.password" 
+            :type="showPassword ? 'text' : 'password'" 
+            label="Mot de passe" required>
+            <template v-slot:append-inner>
+              <v-icon @click="showPassword = !showPassword">{{ showPassword ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+            </template>
+          </v-text-field>
+          
+          <v-text-field 
+            v-model="confirmPassword" 
+            :type="showConfirmPassword ? 'text' : 'password'" 
+            label="Confirmer Mot de passe" required>
+            <template v-slot:append-inner>
+              <v-icon @click="showConfirmPassword = !showConfirmPassword">{{ showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
+            </template>
+          </v-text-field>
+          
+          <v-btn color="success" class="mr-2" @click="registerParent">Enregistrer</v-btn>
+          <v-btn color="error" @click="showForm = false">Annuler</v-btn>
         </v-form>
 
-        <!-- Tableau affiché si showForm est faux -->
-        <v-data-table
-          v-else
-          :headers="headers"
-          :items="parents"
-          item-key="id"
-          class="elevation-1"
-        >
+        <v-data-table v-else :headers="headers" :items="parents" item-key="id" class="elevation-1 mt-4">
           <template v-slot:top>
             <v-toolbar flat>
               <v-toolbar-title>Liste des Parents</v-toolbar-title>
               <v-spacer></v-spacer>
-              <v-text-field
-                v-model="search"
-                append-icon="mdi-magnify"
-                label="Rechercher"
-                single-line
-                hide-details
-              ></v-text-field>
+              <v-text-field v-model="search" append-icon="mdi-magnify" label="Rechercher" single-line hide-details></v-text-field>
             </v-toolbar>
           </template>
           <template v-slot:item.action="{ item }">
-            <v-icon small @click="editParent(item)">mdi-pencil</v-icon>
-            <v-icon small @click="promptDeleteParent(item)">mdi-delete</v-icon>
+            <v-icon small class="mr-2" color="blue" @click="editParent(item)">mdi-pencil</v-icon>
+            <v-icon small color="red" @click="promptDeleteParent(item)">mdi-delete</v-icon>
           </template>
         </v-data-table>
       </v-card-text>
     </v-card>
-
-    <!-- Dialog pour confirmation de suppression -->
-    <v-dialog v-model="confirmDeleteDialog" max-width="500px">
-      <v-card>
-        <v-card-title class="headline">Confirmation de suppression</v-card-title>
-        <v-card-text>
-          Êtes-vous sûr de vouloir supprimer ce parent ?
-        </v-card-text>
-        <v-card-actions>
-          <v-btn color="red" text @click="confirmDelete">Oui, supprimer</v-btn>
-          <v-btn text @click="confirmDeleteDialog = false">Annuler</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Dialog pour succès/erreur avec gestion des longs messages -->
-    <v-dialog v-model="dialog" max-width="500px">
-      <v-card>
-        <v-card-title class="headline">Message</v-card-title>
-        <v-card-text class="dialog-content">
-          {{ dialogMessage }}
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="primary" text @click="dialog = false">OK</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </v-container>
 </template>
-
 <script>
 import axios from 'axios';
 
@@ -92,6 +66,14 @@ export default {
     etablissementNom: {
       type: String,
       required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     }
   },
   data() {
@@ -100,6 +82,8 @@ export default {
       confirmDeleteDialog: false,
       dialog: false,
       dialogMessage: '',
+      showPassword: false,
+      showConfirmPassword: false,
       parentToDelete: null, // Stocke le parent sélectionné pour suppression
       newParent: {
         id: null,
@@ -235,19 +219,46 @@ export default {
 </script>
 
 <style scoped>
+.content-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.main-card {
+  width: 100%;
+  max-width: 900px;
+  padding: 20px;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.form-card {
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 10px;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dialog-content {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.edit-icon {
+  color: #1976D2;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.delete-icon {
+  color: #D32F2F;
+  cursor: pointer;
+}
 .button-group {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
-  margin: 20% 10%;
-  height: 100px;
-  padding-block: 100px;
-}
-
-.dialog-content {
-  max-height: 200px; /* Limite la hauteur du message */
-  overflow-y: auto;  /* Permet le défilement si le contenu dépasse la hauteur */
-  word-wrap: break-word; /* Coupe les mots trop longs */
+  margin: 20px;
 }
 </style>
+

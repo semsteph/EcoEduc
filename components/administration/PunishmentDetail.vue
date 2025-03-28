@@ -34,7 +34,8 @@
         </v-row>
       </v-card-text>
     </v-card>
-    <cahier-punition v-else :studentId="selectedStudentId" :etablissement-id="etablissementId" @back="clearSelection"/>
+    <cahier-punition v-else :studentId="selectedStudentId" :annee-scolaire="anneeScolaire"
+    :annee-scolaire-id="anneeScolaireId" :etablissement-id="etablissementId" @back="clearSelection"/>
   </div>
 </template>
 
@@ -58,6 +59,14 @@ export default {
     },
     etablissementNom: {
       type: String,
+      required: true
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
       required: true
     }
   },

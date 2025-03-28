@@ -1,36 +1,33 @@
 <template>
-  <div>
-    <v-btn icon  @click="$emit('back')">
+  <div class="container">
+    <v-btn icon class="back-button" @click="$emit('back')">
       <v-icon>mdi-arrow-left</v-icon>
     </v-btn>
-    <h1 class="No">Veuillez cliquer sur un semestre pour afficher/masquer les notes de l'élève.</h1>
+    <h1 class="info-message">Veuillez cliquer sur un semestre pour afficher/masquer les notes de l'élève.</h1>
 
-    <div v-if="error" class="error">
+    <div v-if="error" class="error-message">
       {{ error }}
     </div>
 
-    <div v-if="loading">
+    <div v-if="loading" class="loading-message">
       Chargement des données...
     </div>
 
     <div v-else>
-      <div v-if="semestres.length">
-        <div class="semestre-list">
-          <div 
-            v-for="semestre in semestres" 
-            :key="semestre.id" 
-            class="semestre-item"
+      <div v-if="semestres.length" class="semestre-list">
+        <div 
+          v-for="semestre in semestres" 
+          :key="semestre.id" 
+          class="semestre-item"
+        >
+          <button 
+            @click="toggleSemestre(semestre.id)" 
+            :class="{ active: selectedSemestre === semestre.id }"
           >
-            <button 
-              @click="toggleSemestre(semestre.id)" 
-              :class="{ active: selectedSemestre === semestre.id }"
-            >
-              {{ semestre.nom }}
-            </button>
-            <table 
-              v-if="selectedSemestre === semestre.id && notesBySemestre[semestre.id]" 
-              class="notes-table"
-            >
+            {{ semestre.nom }}
+          </button>
+          <div class="table-container" v-if="selectedSemestre === semestre.id && notesBySemestre[semestre.id]">
+            <table class="notes-table">
               <thead>
                 <tr>
                   <th>Matière</th>
@@ -66,13 +63,12 @@
           </div>
         </div>
       </div>
-      <div v-else>
+      <div v-else class="no-semestre">
         <p>Aucun semestre disponible.</p>
       </div>
     </div>
   </div>
 </template>
-
 <script>
 import axios from 'axios';
 
@@ -81,6 +77,14 @@ export default {
     childId: {
       type: Number,
       required: true,
+    },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
     },
   },
   data() {
@@ -102,6 +106,7 @@ export default {
         const response = await axios.get('http://localhost:8080/api/eleve-notes', {
           params: {
             childId: this.childId,
+            anneeScolaireId: this.anneeScolaireId,
           },
         });
 
@@ -163,52 +168,113 @@ export default {
 </script>
 
 <style>
-.error {
-  color: red;
+.container {
+  max-width: 100%;
+  padding: 20px;
 }
+
 .back-button {
   margin-bottom: 20px;
-  padding: 10px;
-  background-color: #f0f0f0;
-  border: none;
-  cursor: pointer;
 }
-.back-button:hover {
-  background-color: #ddd;
+
+.info-message {
+  color: #555;
+  margin-bottom: 20px;
+  text-align: center;
 }
+
+.error-message {
+  color: red;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.loading-message {
+  text-align: center;
+  font-weight: bold;
+}
+
 .semestre-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+
 .semestre-item button {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   text-align: left;
   cursor: pointer;
-  background-color: #f4f4f4;
-  border: 1px solid #ddd;
-}
-.semestre-item button.active {
   background-color: #007bff;
-  color: #fff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  transition: background 0.3s;
 }
+
+.semestre-item button:hover {
+  background-color: #0056b3;
+}
+
+.semestre-item button.active {
+  background-color: #28a745;
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
 .notes-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
+  background-color: #f9f9f9;
 }
+
 .notes-table th,
 .notes-table td {
   border: 1px solid #ddd;
   padding: 8px;
-  text-align: left;
+  text-align: center;
+  white-space: nowrap;
 }
-.notes-table tr {
-  background-color: #f4f4f4;
+
+.notes-table th {
+  background-color: #007bff;
+  color: white;
 }
-.No {
-  color: #555;
-  margin-bottom: 20px;
+
+.no-semestre {
+  text-align: center;
+  font-weight: bold;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .notes-table {
+    font-size: 12px;
+  }
+  .semestre-item button {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .info-message {
+    font-size: 14px;
+  }
+  .table-container {
+    overflow-x: scroll;
+  }
+  .notes-table th,
+  .notes-table td {
+    font-size: 10px;
+    padding: 6px;
+  }
+  .semestre-item button {
+    font-size: 12px;
+    padding: 10px;
+  }
 }
 </style>
