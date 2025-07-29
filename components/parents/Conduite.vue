@@ -66,6 +66,14 @@ export default {
       type: Number,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true,
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true,
+    },
   },
   data() {
     return {
@@ -88,7 +96,8 @@ export default {
             Authorization: `Bearer ${token}`,
           },
           params: {
-            eleveId: idEleve,
+            eleveId: this.childId,
+            anneeScolaireId: this.anneeScolaireId,
           },
         });
 

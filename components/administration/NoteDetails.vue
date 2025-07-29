@@ -1,38 +1,51 @@
 <template>
   <div class="container">
-    <h1>Cahier de Notes</h1>
-    <!-- Vérification si les matières sont disponibles -->
+    <h1 class="title">
+      <v-icon class="icon-left" small>mdi-book-open-page-variant</v-icon>
+      Cahier de Notes
+    </h1>
+
     <div v-if="matieres.length === 0">
       <p class="no-data">
+        <v-icon color="error" class="mr-2">mdi-alert-circle</v-icon>
         Aucune donnée n'est encore disponible pour cette classe ou le cahier de notes n'est pas encore disponible pour cette classe.
       </p>
     </div>
 
-    <!-- Affichage des matières -->
     <div v-else>
-      <div v-for="matiere in matieres" :key="matiere.id" class="matiere">
+      <div
+        v-for="matiere in matieres"
+        :key="matiere.id"
+        class="matiere"
+      >
         <div class="matiere-header" @click="toggleMatiere(matiere.id)">
-          {{ matiere.nom }}
-          <span class="icon">{{ activeMatiere === matiere.id ? '-' : '+' }}</span>
+          <div class="matiere-title">
+            <v-icon left class="mr-2">mdi-book</v-icon>
+            {{ matiere.nom }}
+          </div>
+          <v-icon>{{ activeMatiere === matiere.id ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
         </div>
 
-        <!-- Affichage des détails de la matière lorsque celle-ci est active -->
         <div v-if="activeMatiere === matiere.id" class="matiere-details">
-          <!-- Sélection des semestres -->
           <div class="semestres">
-            <button
+            <v-btn
               v-for="semestre in semestres"
               :key="semestre.id"
               @click="selectSemestre(semestre.id)"
-              :class="{ active: selectedSemestre === semestre.id }"
+              :color="selectedSemestre === semestre.id ? 'primary' : 'blue lighten-2'"
               class="semestre-btn"
+              small
+              elevation="1"
             >
               {{ semestre.nom }}
-            </button>
+            </v-btn>
           </div>
 
-          <!-- Tableau des notes pour chaque matière -->
-          <table v-if="getUniqueElevesForMatiere(matiere.id).length" class="notes-table">
+          <v-table
+            v-if="getUniqueElevesForMatiere(matiere.id).length"
+            class="notes-table"
+            dense
+          >
             <thead>
               <tr>
                 <th>Nom/Prenom</th>
@@ -48,7 +61,10 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="eleve in getUniqueElevesForMatiere(matiere.id)" :key="eleve.eleveId">
+              <tr
+                v-for="eleve in getUniqueElevesForMatiere(matiere.id)"
+                :key="eleve.eleveId"
+              >
                 <td>{{ eleve.nom }} {{ eleve.prenom }}</td>
                 <td>{{ eleve.inter1 || '' }}</td>
                 <td>{{ eleve.inter2 || '' }}</td>
@@ -61,10 +77,10 @@
                 <td>{{ eleve.moycoef || '' }}</td>
               </tr>
             </tbody>
-          </table>
+          </v-table>
 
-          <!-- Message si aucune note n'est disponible -->
           <p v-else class="no-data">
+            <v-icon color="warning" class="mr-2">mdi-information</v-icon>
             Aucune note disponible pour cette matière dans le semestre sélectionné.
           </p>
         </div>
@@ -75,22 +91,18 @@
 
 <script>
 import axios from 'axios';
+import { VIcon, VBtn, VTable } from 'vuetify/components';
 
 export default {
   props: {
-    classId: {
-      type: Number,
-      required: true,
-    },
-
-    anneeScolaire: {
-      type: String,
-      required: true
-    },
-    anneeScolaireId: {
-      type: Number,
-      required: true
-    }
+    classId: Number,
+    anneeScolaire: String,
+    anneeScolaireId: Number
+  },
+  components: {
+    VIcon,
+    VBtn,
+    VTable
   },
   data() {
     return {
@@ -109,7 +121,6 @@ export default {
           params: {
             classeId: this.classId,
             anneeScolaireId: this.anneeScolaireId,
-
           },
         });
 
@@ -125,138 +136,131 @@ export default {
         console.error('Erreur lors de la récupération des données :', error);
       }
     },
-    toggleMatiere(matiereId) {
-      this.activeMatiere = this.activeMatiere === matiereId ? null : matiereId;
+    toggleMatiere(id) {
+      this.activeMatiere = this.activeMatiere === id ? null : id;
     },
-    selectSemestre(semestreId) {
-      this.selectedSemestre = semestreId;
+    selectSemestre(id) {
+      this.selectedSemestre = id;
       this.filterNotes();
     },
     filterNotes() {
-      if (!this.selectedSemestre) return;
       this.filteredNotes = this.allNotes[this.selectedSemestre] || [];
     },
     getUniqueElevesForMatiere(matiereId) {
-      const notes = this.filteredNotes.filter(note => note.matiereId === matiereId);
-      const elevesMap = new Map();
-      notes.forEach(note => {
-        if (elevesMap.has(note.eleveId)) {
-          const existingNote = elevesMap.get(note.eleveId);
-          existingNote.inter1 = note.inter1 || existingNote.inter1;
-          existingNote.inter2 = note.inter2 || existingNote.inter2;
-          existingNote.inter3 = note.inter3 || existingNote.inter3;
-          existingNote.inter4 = note.inter4 || existingNote.inter4;
-          existingNote.moyInter = note.moyInter || existingNote.moyInter;
-          existingNote.dev1 = note.dev1 || existingNote.dev1;
-          existingNote.dev2 = note.dev2 || existingNote.dev2;
-          existingNote.moy = note.moy || existingNote.moy;
-          existingNote.moycoef = note.moycoef || existingNote.moycoef;
+      const notes = this.filteredNotes.filter(n => n.matiereId === matiereId);
+      const map = new Map();
+      notes.forEach(n => {
+        if (map.has(n.eleveId)) {
+          const ex = map.get(n.eleveId);
+          Object.assign(ex, { ...ex, ...n });
         } else {
-          elevesMap.set(note.eleveId, note);
+          map.set(n.eleveId, n);
         }
       });
-      return Array.from(elevesMap.values());
+      return Array.from(map.values());
     },
   },
   mounted() {
     this.fetchData();
-  },
+  }
 };
 </script>
 
 <style scoped>
 .container {
-  font-family: 'Arial', sans-serif;
   padding: 20px;
-  max-width: 1000px; /* Augmentation de la largeur de la conteneur */
+  max-width: 1000px;
   margin: auto;
+  font-family: 'Roboto', sans-serif;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  color: #1976D2;
+  text-align: center;
 }
 
 .matiere {
-  border: 1px solid #007BFF; /* Couleur de la bordure en bleu */
-  margin-bottom: 20px;
+  border: 1px solid #90CAF9;
   border-radius: 10px;
-  background-color: #E3F2FD; /* Fond bleu clair pour chaque matière */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Ajout d'une ombre pour un effet de profondeur */
+  background: #E3F2FD;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
 .matiere-header {
-  background-color: #007BFF; /* Fond bleu */
-  color: white;
-  padding: 15px; /* Augmentation de l'espace de padding */
-  font-size: 20px; /* Augmentation de la taille de la police */
-  cursor: pointer;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-radius: 10px 10px 0 0; /* Bordure arrondie en haut */
+  background-color: #2196F3;
+  color: white;
+  padding: 12px 20px;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 1.1rem;
 }
 
-.matiere-header:hover {
-  background-color: #0056b3; /* Bleu plus foncé au survol */
-}
-
-.icon {
-  font-size: 22px; /* Légère augmentation de la taille de l'icône */
+.matiere-title {
+  display: flex;
+  align-items: center;
 }
 
 .matiere-details {
-  padding: 20px; /* Plus d'espace pour les détails */
+  padding: 15px;
   background-color: white;
-  border-radius: 0 0 10px 10px; /* Bordure arrondie en bas */
 }
 
 .semestres {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 15px;
 }
 
-.semestre-btn {
-  background-color: #2196F3;
-  color: white;
-  border: none;
-  padding: 10px 20px; /* Augmentation de la taille des boutons */
-  cursor: pointer;
-  border-radius: 5px;
-  font-size: 15px; /* Légère augmentation de la taille de la police */
-  transition: background-color 0.3s;
-}
-
-.semestre-btn.active {
-  background-color: #0d8bf2;
-}
-
-.semestre-btn:hover {
-  background-color: #1e88e5;
-}
-
 .notes-table {
   width: 100%;
-  border-collapse: collapse;
-  margin-top: 15px;
-}
-
-.notes-table th, .notes-table td {
-  border: 1px solid #ddd;
-  padding: 12px;
-  text-align: left;
-}
-
-.notes-table th {
-  background-color: #f2f2f2;
-  font-weight: bold;
-}
-
-.notes-table tr:nth-child(even) {
-  background-color: #f9f9f9;
+  font-size: 0.9rem;
 }
 
 .no-data {
-  color: #ff0000;
-  font-weight: bold;
-  font-size: 15px;
-  margin-top: 20px;
+  color: #e53935;
+  font-size: 0.95rem;
   text-align: center;
+  margin: 15px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+  }
+
+  .title {
+    font-size: 1.2rem;
+  }
+
+  .matiere-header {
+    font-size: 1rem;
+    padding: 10px;
+  }
+
+  .semestres {
+    flex-direction: column;
+  }
+
+  .notes-table {
+    font-size: 0.75rem;
+  }
+
+  .no-data {
+    font-size: 0.85rem;
+  }
 }
 </style>

@@ -10,7 +10,11 @@ const moment = require('moment');
 const fs = require('fs');  // Ajout de fs
 const path = require('path');  // Ajout de path
 const axios = require('axios'); // Importation d'Axios
+const nodemailer = require('nodemailer');
 
+const dayjs = require('dayjs');
+const customParseFormat = require('dayjs/plugin/customParseFormat');
+dayjs.extend(customParseFormat);
 
 
 const app = express();
@@ -104,6 +108,15 @@ app.post('/api/annees-scolaires', async (req, res) => {
     res.status(500).json({ message: "Une erreur est survenue lors de l'ajout de l'année scolaire." });
   }
 });
+app.get('/api/etablissements', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT id, nom FROM Etablissement ORDER BY nom ASC');
+    res.json(rows);
+  } catch (error) {
+    console.error("Erreur lors de la récupération des établissements :", error);
+    res.status(500).json({ message: "Erreur serveur lors de la récupération des établissements." });
+  }
+});
 
 app.get('/api/annees-scolaires/:etablissementId', async (req, res) => {
   const { etablissementId } = req.params;
@@ -143,20 +156,85 @@ app.get('/api/annees-scolaires/:etablissementId', async (req, res) => {
     res.status(500).json({ message: "Erreur interne du serveur." });
   }
 });
-// API pour clôturer une année scolaire
-// API pour clôturer une année scolaire
+
+app.get('/api/enseignements', async (req, res) => {
+  const { etablissementId, classeId } = req.query;
+
+  console.log('📥 Reçu dans API :', req.query);
+
+  if (!etablissementId || !classeId) {
+    console.warn('⚠️ Paramètres manquants :', { etablissementId, classeId });
+    return res.status(400).json({ error: 'ID établissement ou classe manquant' });
+  }
+
+  try {
+    const etabId = Number(etablissementId);
+    const classId = Number(classeId);
+
+    console.log('🔎 Requête SQL avec :', { etabId, classId });
+
+    const [rows] = await db.query(`
+      SELECT 
+        ens.nom AS nom,
+        ens.prenom AS prenom,
+        mat.nom AS matiere,
+        coef.valeur AS coefficient
+      FROM Enseigner AS e
+      JOIN Enseignants AS ens ON ens.id = e.Enseignants_id
+      JOIN Matieres AS mat ON mat.id = e.matiere_id
+      JOIN Coefficient AS coef ON coef.id = e.coefficient_id
+      WHERE e.etablissement_id = ? AND e.Classes_id = ?
+    `, [etabId, classId]);
+
+    console.log('📤 Résultat SQL :', rows);
+
+    res.json(rows);
+  } catch (err) {
+    console.error('❌ Erreur SQL :', err);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+app.post('/api/enseignements/delete', (req, res) => {
+  const { Enseignants_id, Classes_id, matiere_id } = req.body;
+
+  console.log('Requête reçue pour suppression :', req.body);
+
+  if (!Enseignants_id || !Classes_id || !matiere_id) {
+    console.log('Champs manquants');
+    return res.status(400).json({ error: 'Champs manquants' });
+  }
+
+  const sql = `
+    DELETE FROM Enseigner
+    WHERE Enseignants_id = ? AND Classes_id = ? AND matiere_id = ?
+  `;
+
+  db.query(sql, [Enseignants_id, Classes_id, matiere_id], (err, result) => {
+    if (err) {
+      console.error('Erreur suppression enseignement :', err);
+      return res.status(500).json({ error: 'Erreur serveur' });
+    }
+
+    console.log('Suppression réussie :', result);
+    return res.json({ success: true, message: 'Enseignement supprimé' });
+  });
+});
+
+
+""// ✅ API : Clôture d'année scolaire avec regroupement intelligent des classes
 app.post('/api/cloture-annee-scolaire', async (req, res) => {
   const { etablissementId, anneeScolaireId } = req.body;
 
   if (!etablissementId || !anneeScolaireId) {
-    return res.status(400).json({ message: 'Les IDs de l’établissement et de l’année scolaire sont requis.' });
+    return res.status(400).json({ message: "Les IDs de l’établissement et de l’année scolaire sont requis." });
   }
 
   try {
     const connection = await db.getConnection();
-    console.log(`Étape 1 : Connexion à la base de données réussie.`);
+    const ordreClasses = ['6eme', '5eme', '4eme', '3eme', '2nd', '1ere', 'Tle'];
+    const regexClasse = /^([0-9]{1,2}(?:eme|nd|ere|Tle))\s*([A-Z]*)\s*([0-9]*)$/;
 
-    console.log("Récupération des bulletins, élèves et classes...");
     const [bulletins] = await connection.execute(
       `SELECT b.moyAn, b.decision, e.id AS eleveId, e.nom AS eleveNom, e.prenom AS elevePrenom, 
               c.id AS classeId, c.nom AS classeNom
@@ -167,123 +245,231 @@ app.post('/api/cloture-annee-scolaire', async (req, res) => {
       [etablissementId, anneeScolaireId]
     );
 
-    console.log(`Étape 2 : Bulletins récupérés, nombre d'élèves : ${bulletins.length}.`);
-
     const [classes] = await connection.execute(
       `SELECT id, nom FROM Classes WHERE etablissement_id = ?`,
       [etablissementId]
     );
 
-    console.log(`Étape 3 : Classes récupérées, nombre de classes : ${classes.length}.`);
-    console.log("Classes récupérées:", classes);
-
-    const ordreClasses = ['6eme', '5eme', '4eme', '3eme', '2nd', '1ere', 'Tle'];
-    console.log("Étape 4 : Classement des classes par ordre...");
- 
-    const regexClasse = /^(\d*\D+?)\s*(\d*)$/;
-
     const classesTriees = classes.sort((a, b) => {
       const matchA = a.nom.match(regexClasse);
       const matchB = b.nom.match(regexClasse);
+      if (!matchA || !matchB) return 0;
 
-      if (!matchA || !matchB) {
-        console.log(`Nom de classe incorrect pour tri: ${a.nom}, ${b.nom}`);
-        return 0;
-      }
+      const [_, radA, prefixA, sufA] = matchA;
+      const [__, radB, prefixB, sufB] = matchB;
 
-      const [_, radicaleA, prefixeA] = matchA;
-      const [__, radicaleB, prefixeB] = matchB;
+      const indexA = ordreClasses.indexOf(radA);
+      const indexB = ordreClasses.indexOf(radB);
+      if (indexA !== indexB) return indexA - indexB;
 
-      return ordreClasses.indexOf(radicaleA) - ordreClasses.indexOf(radicaleB) ||
-             (prefixeA || '0').localeCompare(prefixeB || '0');
+      if ((prefixA || '') !== (prefixB || '')) return (prefixA || '').localeCompare(prefixB || '');
+      return (sufA || '0').localeCompare(sufB || '0');
     });
 
-    console.log("Étape 5 : Classes triées.");
-    console.log("Classes triées:", classesTriees);
+    const elevesParNiveau = {};
 
-    const classesMap = {};
-    classesTriees.forEach(classe => {
-      const match = classe.nom.match(regexClasse);
-      if (match) {
-        const [_, radicale, prefixe] = match;
-        if (!classesMap[radicale]) classesMap[radicale] = {};
-        classesMap[radicale][prefixe || ''] = classe;
-      }
-    });
-
-    console.log("Étape 6 : Mapping des classes par radical et préfixe.");
-    console.log("Mapping des classes par radicale et préfixe:", classesMap);
-
-    console.log("Début de la réorganisation des élèves...");
     for (const bulletin of bulletins) {
-      const decision = bulletin.decision;
-      const matchClasse = bulletin.classeNom.match(regexClasse);
+      const { decision, classeNom, eleveId } = bulletin;
+
+      const matchClasse = classeNom.match(regexClasse);
       if (!matchClasse) continue;
 
-      const [_, radicaleActuelle, prefixeActuel] = matchClasse;
-      const indexClasse = ordreClasses.indexOf(radicaleActuelle);
+      const [_, rad, prefix] = matchClasse;
+      const index = ordreClasses.indexOf(rad);
+      if (index === -1 || rad === 'Tle' || index >= ordreClasses.length - 1) continue;
 
-      if (decision === 'Admis' && indexClasse < ordreClasses.length - 1) {
-        const nouvelleRadicale = ordreClasses[indexClasse + 1];
-        const nouvelleClasse = classesMap[nouvelleRadicale]?.[prefixeActuel || ''];
-
-        if (nouvelleClasse) {
-          console.log(`Élève ${bulletin.eleveNom} ${bulletin.elevePrenom} passe de ${bulletin.classeNom} à ${nouvelleClasse.nom}.`);
-          await connection.execute(
-            `UPDATE Eleve SET classe_id = ? WHERE id = ?`,
-            [nouvelleClasse.id, bulletin.eleveId]
-          );
-        } else {
-          console.log(`Aucune classe supérieure trouvée pour l'élève ${bulletin.eleveNom} ${bulletin.elevePrenom}, classe actuelle: ${bulletin.classeNom}.`);
-        }
-      } else {
-        console.log(`Élève ${bulletin.eleveNom} ${bulletin.elevePrenom} reste dans sa classe actuelle.`);
+      if (decision === 'Admis') {
+        const nextRad = ordreClasses[index + 1];
+        const cle = `${nextRad}-${prefix}`;
+        if (!elevesParNiveau[cle]) elevesParNiveau[cle] = [];
+        elevesParNiveau[cle].push(eleveId);
       }
     }
 
-    console.log("Étape 8 : Clôture de l'année scolaire...");
-    await connection.execute(
-      `UPDATE Annee_scolaire SET statut = 'Clôturée' WHERE id = ?`,
-      [anneeScolaireId]
-    );
+    for (const key in elevesParNiveau) {
+      const [nextRad, prefix] = key.split('-');
+      const eleves = elevesParNiveau[key];
+      const count = eleves.length;
 
-    console.log("Étape 9 : Suppression des données de la table Enseigner...");
-    await connection.execute(
-      `DELETE FROM Enseigner WHERE etablissement_id = ?`,
-      [etablissementId]
-    );
-    console.log("Suppression effectuée avec succès.");
+      const classesSuperieures = classes.filter(c => {
+        const match = c.nom.match(regexClasse);
+        return match && match[1] === nextRad && (match[2] || '') === (prefix || '');
+      });
+
+      if (classesSuperieures.length === 0) continue;
+
+      const minimum = 20;
+
+      if (count < minimum) {
+        // Cas 1 : Moins de 20 élèves → tous dans la première classe
+        for (const eleveId of eleves) {
+          await connection.execute(`UPDATE Eleve SET classe_id = ? WHERE id = ?`, [classesSuperieures[0].id, eleveId]);
+        }
+      } else if (classesSuperieures.length === 1) {
+        if (count >= 60) {
+          // Cas 4 : Une seule classe et ≥60 élèves → on crée une nouvelle classe
+          const half = Math.floor(count / 2);
+          const elevesClasse1 = eleves.slice(0, half);
+          const elevesClasse2 = eleves.slice(half);
+
+          const nouveauNom = `${nextRad} ${prefix} ${classesSuperieures.length + 1}`;
+          const [result] = await connection.execute(
+            `INSERT INTO Classes (nom, etablissement_id) VALUES (?, ?)`,
+            [nouveauNom, etablissementId]
+          );
+          const newClasseId = result.insertId;
+
+          for (const eleveId of elevesClasse1) {
+            await connection.execute(`UPDATE Eleve SET classe_id = ? WHERE id = ?`, [classesSuperieures[0].id, eleveId]);
+          }
+          for (const eleveId of elevesClasse2) {
+            await connection.execute(`UPDATE Eleve SET classe_id = ? WHERE id = ?`, [newClasseId, eleveId]);
+          }
+        } else {
+          // Cas 2 : Une seule classe et moins de 60 élèves
+          for (const eleveId of eleves) {
+            await connection.execute(`UPDATE Eleve SET classe_id = ? WHERE id = ?`, [classesSuperieures[0].id, eleveId]);
+          }
+        }
+      } else {
+        // Cas 3 : Répartition dans plusieurs classes existantes par tranche de 20
+        const nombreClasses = Math.floor(count / minimum);
+        const classesAUtiliser = classesSuperieures.slice(0, nombreClasses);
+        for (let i = 0; i < eleves.length; i++) {
+          const classe = classesAUtiliser[i % classesAUtiliser.length];
+          await connection.execute(`UPDATE Eleve SET classe_id = ? WHERE id = ?`, [classe.id, eleves[i]]);
+        }
+      }
+    }
+
+    await connection.execute(`UPDATE Annee_scolaire SET statut = 'Clôturée' WHERE id = ?`, [anneeScolaireId]);
+    await connection.execute(`DELETE FROM Enseigner WHERE etablissement_id = ?`, [etablissementId]);
 
     connection.release();
-    console.log("Étape 10 : Année scolaire clôturée avec succès.");
     res.status(200).json({ message: "Année scolaire clôturée avec succès." });
   } catch (error) {
-    console.error("Erreur lors de la clôture de l'année scolaire :", error);
-    res.status(500).json({ message: "Une erreur s'est produite lors de la clôture de l'année scolaire." });
+    console.error("Erreur de clôture :", error);
+    res.status(500).json({ message: "Une erreur est survenue." });
   }
 });
 
 
 
-// Route pour ajouter une nouvelle classe
-app.post('/api/Classes', async (req, res) => {
-  const { nom, promotion_id, etablissement_id } = req.body; // Récupérer le nom de la classe, l'ID de la promotion et de l'établissement
-  if (nom && promotion_id && etablissement_id) {
-    try {
-      const [result] = await req.db.query(
-        'INSERT INTO Classes (nom, Promotion_id, etablissement_id) VALUES (?, ?, ?)', // Insertion avec l'ID de la promotion et de l'établissement
-        [nom, promotion_id, etablissement_id]
-      );
-      const newClass = { id: result.insertId, nom };
-      res.status(201).json(newClass);
-    } catch (error) {
-      console.error('Erreur lors de l\'ajout de la classe', error);
-      res.status(500).json({ error: 'Une erreur est survenue lors de l\'ajout de la classe.' });
+app.post('/api/eleves', async (req, res) => {
+  const { etablissement_id, annee_scolaire_id } = req.body;
+
+  if (!etablissement_id || !annee_scolaire_id) {
+    return res.status(400).json({ error: "Champs manquants." });
+  }
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT 
+         e.id, e.nom, e.prenom, e.classe_id, c.nom AS classe_nom
+       FROM 
+         Eleve e
+       JOIN 
+         Classes c ON e.classe_id = c.id
+       WHERE 
+         e.etablissement_id = ? AND e.Annee_scolaire_id = ?`,
+      [etablissement_id, annee_scolaire_id]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Erreur lors de la récupération des élèves :", error);
+    res.status(500).json({ error: "Erreur serveur." });
+  }
+});
+
+/*API pour récupérer le nom de la classe
+app.get("/api/classse/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [rows] = await db.query("SELECT nom FROM Classe WHERE id = ?", [id]);
+    if (rows.length > 0) {
+      res.json(rows[0]);
+    } else {
+      res.status(404).json({ error: "Classe non trouvée" });
     }
-  } else {
-    res.status(400).json({ error: 'Le nom de la classe, l\'ID de la promotion et l\'ID de l\'établissement sont requis.' });
+  } catch (error) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});*/
+
+app.post('/api/Classes/multiple', async (req, res) => {
+  const { promotion_id, etablissement_id, cycle, nombre } = req.body;
+
+  if (!promotion_id || !etablissement_id || !cycle || !nombre || isNaN(nombre)) {
+    return res.status(400).json({ error: 'Champs requis manquants ou invalides.' });
+  }
+
+  const connection = req.db;
+
+  try {
+    // 1. Récupère le nom de la promotion
+    const [promoRows] = await connection.query(
+      'SELECT nom FROM Promotion WHERE id = ?',
+      [promotion_id]
+    );
+
+    if (promoRows.length === 0) {
+      return res.status(404).json({ error: 'Promotion non trouvée.' });
+    }
+
+    const nomPromotion = promoRows[0].nom;
+
+    // 2. Récupère les classes existantes pour cette promotion et établissement
+    const [existingClasses] = await connection.query(
+      'SELECT nom FROM Classes WHERE promotion_id = ? AND etablissement_id = ?',
+      [promotion_id, etablissement_id]
+    );
+
+    // 3. Trouve le plus grand index
+    let maxIndex = 0;
+    for (const cls of existingClasses) {
+      const regex = new RegExp(`^${nomPromotion}\\s?(\\d+)?$`, 'i');
+      const match = cls.nom.match(regex);
+      if (match) {
+        const index = parseInt(match[1]) || 0;
+        if (index > maxIndex) maxIndex = index;
+      }
+    }
+
+    const createdClasses = [];
+
+    // 4. Crée les nouvelles classes avec nom auto-généré
+    for (let i = 1; i <= nombre; i++) {
+      const index = maxIndex + i;
+      const nomClasse = index === 0 ? nomPromotion : `${nomPromotion} ${index}`;
+      
+      const [existing] = await connection.query(
+        'SELECT id FROM Classes WHERE nom = ? AND etablissement_id = ?',
+        [nomClasse, etablissement_id]
+      );
+
+      if (existing.length === 0) {
+        const [result] = await connection.query(
+          'INSERT INTO Classes (nom, Promotion_id, etablissement_id, cycle) VALUES (?, ?, ?, ?)',
+          [nomClasse, promotion_id, etablissement_id, cycle]
+        );
+        createdClasses.push({ id: result.insertId, nom: nomClasse });
+      } else {
+        console.log(`Classe "${nomClasse}" déjà existante. Ignorée.`);
+      }
+    }
+
+    res.status(201).json({
+      message: `${createdClasses.length} classe(s) créée(s) avec succès.`,
+      classes: createdClasses
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la création des classes :', error);
+    res.status(500).json({ error: 'Erreur serveur lors de la création des classes.' });
   }
 });
+
+
 
 app.get('/api/Promotions', async (req, res) => {
   try {
@@ -402,6 +588,23 @@ app.put('/api/Classes/:id', async (req, res) => {
   }
 });
 
+app.post('/api/eleves/reinscription', async (req, res) => {
+  const { eleveIds, anneeScolaireId } = req.body;
+
+  if (!Array.isArray(eleveIds) || !anneeScolaireId) {
+    return res.status(400).json({ message: 'Données manquantes' });
+  }
+
+  try {
+    for (const id of eleveIds) {
+      await db.query('UPDATE Eleve SET Annee_scolaire_id = ? WHERE id = ?', [anneeScolaireId, id]);
+    }
+    res.json({ message: 'Réinscription réussie' });
+  } catch (error) {
+    console.error('Erreur API réinscription:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
 
 // Route pour supprimer une classe par id
 // Route pour obtenir le nombre d'élèves dans une classe par ID et la supprimer si elle est vide
@@ -479,27 +682,52 @@ app.post('/api/conduite', async (req, res) => {
 });
 
 // pour administration
-app.get('/api/permissions/:etablissementId/:anneeScolaireId?', async (req, res) => {
+app.get('/api/permissions/:etablissementId/:anneeScolaireId', async (req, res) => {
   const { etablissementId, anneeScolaireId } = req.params;
 
-  // Si anneeScolaireId n'est pas défini, on retourne un tableau vide
-  if (!anneeScolaireId) {
-    return res.json([]);
-  }
-
   try {
-    // Requête SQL pour récupérer les permissions filtrées par établissement et année scolaire
-    const [rows] = await req.db.query(
-      'SELECT * FROM Permission WHERE etablissement_id = ? AND annee_scolaire_id = ?',
+    // Étape 1 : Récupérer toutes les permissions
+    const [permissions] = await req.db.query(
+      `SELECT * FROM Permission 
+       WHERE etablissement_id = ? AND Annee_scolaire_id = ?`,
       [etablissementId, anneeScolaireId]
     );
 
-    res.json(rows);
+    // Étape 2 : Récupérer les permissions déjà vues
+    const permissionIds = permissions.map(p => p.id);
+    let vuesIds = [];
+
+    if (permissionIds.length > 0) {
+      const [vues] = await req.db.query(
+        `SELECT permission_id FROM permissions_vues 
+         WHERE permission_id IN (${permissionIds.map(() => '?').join(',')})`,
+        permissionIds
+      );
+      vuesIds = vues.map(v => v.permission_id);
+    }
+
+    // Étape 3 : Ajouter is_read = true / false (sans modifier la base)
+    const permissionsAvecStatut = permissions.map(p => ({
+      ...p,
+      is_read: vuesIds.includes(p.id),
+    }));
+
+    // ❌ Supprimer cette partie — plus d’enregistrement automatique
+    // if (nouvellesVues.length > 0) {
+    //   await req.db.query(
+    //     `INSERT IGNORE INTO permissions_vues (permission_id) VALUES ?`,
+    //     [nouvellesVues]
+    //   );
+    // }
+
+    // Étape 4 : Retourner les permissions
+    res.json(permissionsAvecStatut);
   } catch (error) {
     console.error('Erreur lors de la récupération des permissions:', error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
+
 
 app.post('/api/Parents', async (req, res) => {
   const { name, firstName, contact, email, username, password,etablissementId } = req.body;
@@ -580,7 +808,7 @@ app.put('/api/Parents/:id', async (req, res) => {
 
 
 // Route pour supprimer un parent
-app.delete('/api/Parents/:id', async (req, res) => {
+app.delete('/api/Parentss/:id', async (req, res) => {
   const { id } = req.params;
   try {
     // Vérifier si des élèves sont associés à ce parent
@@ -590,7 +818,7 @@ app.delete('/api/Parents/:id', async (req, res) => {
       // Si des élèves sont associés, renvoyer un message d'erreur avec les noms des élèves
       const eleveNames = eleves.map(eleve => `${eleve.prenom} ${eleve.nom}`).join(', ');
       return res.status(400).json({
-        error: `Impossible de supprimer ce parent car il a au moins un élève associé : ${eleveNames}. Veuillez modifier cet élève avant de supprimer ce parent.`
+        error: `Impossible de supprimer ce parent car il a au moins un élève associé : ${eleveNames}. Veuillez supprimer cet élève avant de supprimer ce parent.`
       });
     }
 
@@ -637,21 +865,157 @@ app.post('/api/inscription', async (req, res) => {
     console.error('Erreur lors de l\'inscription de l\'élève:', error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
-});
+}); 
 
+// Route pour le traitement du fichier Excel d'inscription multiple
+
+// Fonction pour normaliser les dates au format YYYY-MM-DD
+function normalizeDate(input) {
+  if (!input) return null;
+
+  // Si c’est déjà un objet Date
+  if (input instanceof Date) {
+    return dayjs(input).format('YYYY-MM-DD');
+  }
+
+  const formats = ['DD-MM-YYYY', 'D-M-YYYY', 'DD/MM/YYYY', 'D/M/YYYY', 'YYYY-MM-DD'];
+
+  for (const fmt of formats) {
+    const parsed = dayjs(input, fmt, true);
+    if (parsed.isValid()) {
+      return parsed.format('YYYY-MM-DD');
+    }
+  }
+
+  // Dernier recours
+  const fallback = dayjs(new Date(input));
+  return fallback.isValid() ? fallback.format('YYYY-MM-DD') : null;
+}
+
+app.post('/api/import-eleves', upload.single('file'), async (req, res) => {
+  const file = req.file;
+  const classeId = parseInt(req.body.classeId);
+  const etablissementId = parseInt(req.body.etablissementId);
+  const anneeScolaireId = req.body.anneeScolaireId ? parseInt(req.body.anneeScolaireId) : null;
+
+  if (!file || !classeId || !etablissementId) {
+    return res.status(400).json({ message: 'Données manquantes (fichier, classe ou établissement).' });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const erreurs = [];
+
+  try {
+    const workbook = XLSX.readFile(file.path);
+    const sheetName = workbook.SheetNames[0];
+    const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+    const connection = await db.getConnection();
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+
+      const eleveNom = row['Nom Élève'] ? String(row['Nom Élève']).trim() : '';
+      const elevePrenom = row['Prénom Élève'] ? String(row['Prénom Élève']).trim() : '';
+      const sexe = row['Sexe'] ? String(row['Sexe']).trim() : '';
+
+      const parentNom = row['Nom Parent'] ? String(row['Nom Parent']).trim() : '';
+      const parentPrenom = row['Prénom Parent'] ? String(row['Prénom Parent']).trim() : '';
+      const parentEmail = row['Email Parent'] ? String(row['Email Parent']).trim() : '';
+      const parentTel = row['Téléphone'] ? String(row['Téléphone']).trim() : '';
+
+      let dateNaissance = normalizeDate(row['Date de naissance']);
+
+      if (!eleveNom || !elevePrenom || !dateNaissance || !sexe || !parentNom || !parentPrenom || !parentEmail) {
+        erreurs.push({ ligne: i + 2, message: 'Champs obligatoires manquants ou invalides.' });
+        continue;
+      }
+
+      if (!emailRegex.test(parentEmail)) {
+        erreurs.push({ ligne: i + 2, message: 'Adresse email invalide.' });
+        continue;
+      }
+
+      try {
+        const [existingParent] = await connection.query(
+          'SELECT id FROM Parents WHERE email = ? AND etablissement_id = ?',
+          [parentEmail, etablissementId]
+        );
+
+        let parentId;
+        if (existingParent.length > 0) {
+          parentId = existingParent[0].id;
+        } else {
+          const motDePasseTemp = 'parent123';
+          const motDePasseHash = await bcrypt.hash(motDePasseTemp, 10);
+          const nomUtilisateur = `${parentPrenom}.${parentNom}`.toLowerCase().replace(/\s+/g, '');
+
+          const [parentInsert] = await connection.query(
+            `INSERT INTO Parents (nom, prenom, contact, email, mot_de_passe, nom_utilisateur, etablissement_id, Annee_scolaire_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [parentNom, parentPrenom, parentTel, parentEmail, motDePasseHash, nomUtilisateur, etablissementId, anneeScolaireId]
+          );
+
+          parentId = parentInsert.insertId;
+        }
+
+        const matricule = `E-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        await connection.query(
+          `INSERT INTO Eleve (matricule, nom, prenom, date_naissance, classe_id, Parents_id, sexe, etablissement_id, Annee_scolaire_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [matricule, eleveNom, elevePrenom, dateNaissance, classeId, parentId, sexe, etablissementId, anneeScolaireId]
+        );
+
+      } catch (insertErr) {
+        console.error(`Erreur à la ligne ${i + 2}`, insertErr.message);
+        erreurs.push({ ligne: i + 2, message: `Erreur interne : ${insertErr.message}` });
+        continue;
+      }
+    }
+
+    fs.unlinkSync(file.path); // Supprimer le fichier temporaire
+
+    res.status(200).json({
+      message: 'Importation terminée.',
+      erreurs: erreurs.length > 0 ? erreurs : null,
+    });
+
+  } catch (error) {
+    console.error('Erreur importation fichier Excel :', error);
+    res.status(500).json({ message: 'Erreur lors du traitement du fichier.' });
+  }
+});
 
 // Route pour l'inscription d'un enseignant
 app.post('/api/Enseignants', async (req, res) => {
   const { name, firstName, email, phone, username, password, etablissementId } = req.body;
 
   try {
-    // Insérer les données dans la base de données
+    // Vérifie s'il existe déjà un enseignant avec le même email dans le même établissement
+    const [existingEmail] = await req.db.query(
+      'SELECT id FROM Enseignants WHERE email = ? AND etablissement_id = ?',
+      [email, etablissementId]
+    );
+    if (existingEmail.length > 0) {
+      return res.status(409).json({ error: 'Un enseignant avec cet e-mail existe déjà dans cet établissement.' });
+    }
+
+    // Vérifie s'il existe déjà un enseignant avec le même nom d'utilisateur dans le même établissement
+    const [existingUsername] = await req.db.query(
+      'SELECT id FROM Enseignants WHERE nom_utilisateur = ? AND etablissement_id = ?',
+      [username, etablissementId]
+    );
+    if (existingUsername.length > 0) {
+      return res.status(409).json({ error: 'Ce nom d’utilisateur est déjà utilisé dans cet établissement.' });
+    }
+
+    // Insérer les données
     const [result] = await req.db.query(
       'INSERT INTO Enseignants (nom, prenom, email, telephone, mot_de_passe, nom_utilisateur, etablissement_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [name, firstName, email, phone, password, username, etablissementId]
     );
 
-    // Répondre avec les informations de l'enseignant (sans le mot de passe)
     res.status(201).json({
       id: result.insertId,
       name,
@@ -661,31 +1025,98 @@ app.post('/api/Enseignants', async (req, res) => {
       username
     });
   } catch (error) {
-    console.error('Error creating teacher:', error);
-    res.status(500).json({ error: 'Erreur interne lors de la création de l\'enseignant' });
+    console.error('Erreur lors de la création de l’enseignant :', error);
+    res.status(500).json({ error: 'Erreur serveur lors de la création de l’enseignant.' });
   }
 });
 
-// Route pour ajouter un enseignant avec une seule classe et une seule matière
-app.post('/api/Enseignants/add', async (req, res) => {
-  const { teacherId, class: classId, subject: subjectId, coefficient:coefficientId, etablissement:etablissementId, anneeScolaireId} = req.body;
 
-  // Vérifier que classId et subjectId ne sont pas null et sont des nombres
-  if (!classId || !subjectId || !coefficientId || isNaN(classId) || isNaN(subjectId) || isNaN(coefficientId) || isNaN(etablissementId) || isNaN(anneeScolaireId)) {
-    return res.status(400).json({ error: 'Class and subject and coefficient must be selected and valid' });
+app.post('/api/Enseignants/add', async (req, res) => {
+  const {
+    teacherId,
+    class: classId,
+    subject: subjectId,
+    coefficient: coefficientId,
+    etablissement: etablissementId,
+    anneeScolaireId,
+    force, // pour ajouter plusieurs matières à un enseignant dans une même classe
+    forceReplace // pour remplacer un enseignant déjà assigné à une matière
+  } = req.body;
+
+  // Validation des entrées
+  if (
+    !teacherId || !classId || !subjectId || !coefficientId || !etablissementId || !anneeScolaireId ||
+    isNaN(teacherId) || isNaN(classId) || isNaN(subjectId) ||
+    isNaN(coefficientId) || isNaN(etablissementId) || isNaN(anneeScolaireId)
+  ) {
+    return res.status(400).json({ message: 'Tous les champs sont obligatoires et doivent être valides.' });
   }
 
   try {
-    // Ajouter la relation dans la table Enseigner
+    // Vérifier si le même enseignant est déjà affecté à cette matière dans cette classe et année scolaire
+    const [existingSameSubject] = await req.db.query(
+      `SELECT * FROM Enseigner 
+       WHERE Enseignants_id = ? AND Classes_id = ? AND matiere_id = ? AND Annee_scolaire_id = ?`,
+      [teacherId, classId, subjectId, anneeScolaireId]
+    );
+
+    if (existingSameSubject.length > 0) {
+      return res.status(400).json({
+        message: "Cet enseignant est déjà affecté à cette matière dans cette classe pour l'année scolaire sélectionnée."
+      });
+    }
+
+    // Vérifier si le même enseignant enseigne déjà une autre matière dans cette classe
+    const [existingOtherSubject] = await req.db.query(
+      `SELECT * FROM Enseigner 
+       WHERE Enseignants_id = ? AND Classes_id = ? AND matiere_id != ? AND Annee_scolaire_id = ?`,
+      [teacherId, classId, subjectId, anneeScolaireId]
+    );
+
+    if (existingOtherSubject.length > 0 && !force) {
+      return res.status(409).json({
+        message: "Attention : cet enseignant a déjà une matière assignée dans cette classe pour cette année scolaire. Voulez-vous vraiment lui assigner une nouvelle matière dans cette classe ?"
+      });
+    }
+
+    // Vérifier si un autre enseignant est déjà affecté à cette matière dans cette classe
+    const [otherTeacherSameSubject] = await req.db.query(
+      `SELECT * FROM Enseigner 
+       WHERE Classes_id = ? AND matiere_id = ? AND Annee_scolaire_id = ? AND Enseignants_id != ?`,
+      [classId, subjectId, anneeScolaireId, teacherId]
+    );
+
+    if (otherTeacherSameSubject.length > 0 && !forceReplace) {
+      return res.status(409).json({
+        message: "Cette matière est déjà enseignée dans cette classe pendant l'année scolaire. Voulez-vous remplacer l'ancien enseignant par le nouveau ?"
+      });
+    }
+
+    if (otherTeacherSameSubject.length > 0 && forceReplace) {
+      // Mettre à jour l'affectation avec le nouveau professeur
+      const oldAssignmentId = otherTeacherSameSubject[0].id;
+
+      await req.db.query(
+        `UPDATE Enseigner 
+         SET Enseignants_id = ?, coefficient_id = ?, etablissement_id = ? 
+         WHERE id = ?`,
+        [teacherId, coefficientId, etablissementId, oldAssignmentId]
+      );
+
+      return res.status(200).json({ message: "L'ancien enseignant a été remplacé avec succès." });
+    }
+
+    // Ajouter une nouvelle affectation si aucun conflit
     await req.db.query(
-      'INSERT INTO Enseigner (Enseignants_id, Classes_id, matiere_id, coefficient_id, etablissement_id, Annee_scolaire_id) VALUES (?, ?, ?, ?, ?, ?)',
+      `INSERT INTO Enseigner (Enseignants_id, Classes_id, matiere_id, coefficient_id, etablissement_id, Annee_scolaire_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [teacherId, classId, subjectId, coefficientId, etablissementId, anneeScolaireId]
     );
-    
-    res.status(200).json({ message: 'Teacher added successfully with class and subject' });
+
+    res.status(200).json({ message: 'Enseignant ajouté avec succès.' });
   } catch (error) {
-    console.error('Error adding teacher:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Erreur lors de l'ajout de l'enseignant :", error);
+    res.status(500).json({ message: "Erreur interne du serveur. Veuillez réessayer plus tard." });
   }
 });
 
@@ -753,11 +1184,16 @@ app.get('/api/Matieres/:etablissementId', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-app.get('/api/Enseignant', async (req, res) => {
+app.get('/api/EnseignantAdmin/:etablissementId', async (req, res) => {
   try {
-    console.log("Début de la récupération des enseignants...");
+    const etablissementId = req.params.etablissementId;
+    console.log("Début de la récupération des enseignants pour l'établissement ID:", etablissementId);
 
-    const [enseignants] = await req.db.query('SELECT * FROM Enseignants');
+    // Récupérer uniquement les enseignants de l'établissement concerné
+    const [enseignants] = await req.db.query(
+      'SELECT * FROM Enseignants WHERE etablissement_id = ?',
+      [etablissementId]
+    );
     console.log("Enseignants récupérés :", enseignants);
 
     // Récupérer les classes et matières enseignées par chaque enseignant
@@ -847,8 +1283,7 @@ app.put('/api/Enseignants/:id', async (req, res) => {
 });
 
 app.post('/api/loginEns', async (req, res) => {
-  const { username, password, etablissement } = req.body;
-  console.log('Données reçues:', { username, password, etablissement });
+  const { username, password, etablissement } = req.body; // 'username' peut être nom_utilisateur OU email
 
   try {
     const [rows] = await db.query(
@@ -870,22 +1305,27 @@ app.post('/api/loginEns', async (req, res) => {
         Etablissement.mail AS etablissement_mail
       FROM Enseignants 
       INNER JOIN Etablissement ON Enseignants.etablissement_id = Etablissement.id 
-      WHERE Enseignants.nom_utilisateur = ? AND Etablissement.nom = ?`, 
-      [username, etablissement]
+      WHERE (Enseignants.nom_utilisateur = ? OR Enseignants.email = ?) AND Etablissement.id = ?`, 
+      [username, username, etablissement]
     );
-    console.log('Résultat de la requête SQL:', rows);
 
     if (rows.length === 0) {
-      return res.status(401).json({ message: 'Nom d’utilisateur ou établissement incorrect' });
+      return res.status(401).json({ message: 'Identifiants ou établissement incorrect' });
     }
 
     const enseignant = rows[0];
+    const storedPassword = enseignant.enseignant_mot_de_passe;
 
-    if (password.trim() !== enseignant.enseignant_mot_de_passe.trim()) {
+    if (password.trim() === storedPassword.trim()) {
+      // Connexion réussie en clair
+    } 
+    else if (await bcrypt.compare(password.trim(), storedPassword)) {
+      // Connexion réussie avec mot de passe chiffré
+    } 
+    else {
       return res.status(401).json({ message: 'Mot de passe incorrect' });
     }
 
-    // Génération du token JWT avec les informations supplémentaires
     const token = jwt.sign(
       { 
         id: enseignant.enseignant_id, 
@@ -900,11 +1340,14 @@ app.post('/api/loginEns', async (req, res) => {
     );
 
     res.json({ message: 'Connexion réussie', token });
+
   } catch (error) {
     console.error('Erreur lors de la connexion:', error);
     res.status(500).json({ message: 'Erreur interne du serveur' });
   }
 });
+
+
 // Middleware pour authentifier les requêtes
 const authenticateJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -923,6 +1366,124 @@ const authenticateJWT = (req, res, next) => {
     next();
   });
 };
+
+
+
+// Génère un code à 6 chiffres
+function generateResetCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function generateResetCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Route pour envoyer le code par email
+app.post('/api/send-reset-code', async (req, res) => {
+  const { email, etablissement } = req.body;
+
+  try {
+    const [rows] = await db.query(
+      'SELECT * FROM Enseignants WHERE email = ? AND etablissement_id = ?',
+      [email, etablissement]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Aucun compte trouvé avec cet e-mail et établissement.' });
+    }
+
+    const resetCode = generateResetCode();
+
+    // Supprime les anciens codes
+    await db.query('DELETE FROM reset_codes WHERE email = ? ', [email]);
+
+    // Insère le nouveau code
+    await db.query('INSERT INTO reset_codes (email, code) VALUES (?, ?)', [email, resetCode]);
+
+    // Envoie le mail
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Code de réinitialisation de mot de passe',
+      text: `Votre code de réinitialisation est : ${resetCode} (valable 10 minutes)`
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ message: 'Code envoyé avec succès.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de l\'envoi du code.' });
+  }
+});
+
+
+// Vérifier le code avec expiration de 10 minutes
+app.post('/api/verify-reset-code', async (req, res) => {
+  const { email, code, etablissement } = req.body;
+
+  try {
+    const [rows] = await db.query(
+      `SELECT * FROM reset_codes 
+       WHERE email = ? AND code = ? 
+       AND created_at >= NOW() - INTERVAL 10 MINUTE`,
+      [email, code]
+    );
+
+    if (rows.length === 0) {
+      return res.status(400).json({ message: 'Code invalide ou expiré.' });
+    }
+
+    const [enseignant] = await db.query(
+      'SELECT id FROM Enseignants WHERE email = ? AND etablissement_id = ?',
+      [email, etablissement]
+    );
+
+    if (enseignant.length === 0) {
+      return res.status(404).json({ message: 'Compte enseignant introuvable.' });
+    }
+
+    res.status(200).json({ message: 'Code valide.', enseignantId: enseignant[0].id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de la vérification du code.' });
+  }
+});
+
+// Mise à jour du mot de passe
+app.post('/api/update-password', async (req, res) => {
+  const { enseignantId, newPassword } = req.body;
+
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await db.query(
+      'UPDATE Enseignants SET mot_de_passe = ? WHERE id = ?',
+      [hashedPassword, enseignantId]
+    );
+
+    // Supprime les codes associés à l'email de cet enseignant
+    await db.query(`
+      DELETE FROM reset_codes 
+      WHERE email = (SELECT email FROM Enseignants WHERE id = ?)
+    `,
+      [enseignantId]
+    );
+
+    res.status(200).json({ message: 'Mot de passe mis à jour avec succès.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur lors de la mise à jour du mot de passe.' });
+  }
+});
 
 // API pour récupérer les matières et les classes
 app.get('/api/enseignant/matieres-classes/:id', authenticateJWT, async (req, res) => {
@@ -950,9 +1511,9 @@ app.get('/api/enseignant/matieres-classes/:id', authenticateJWT, async (req, res
     res.status(500).json({ message: 'Erreur du serveur' });
   }
 });
-app.get('/api/classes/:classId/eleves', async (req, res) => {
+app.get('/api/classes/:classeId/eleves', async (req, res) => {
   try {
-    const classId = req.params.classId;
+    const classId = req.params.classeId;
 
     // Requête SQL pour récupérer les id, noms et prénoms des élèves
     const [rows] = await req.db.execute(
@@ -1059,60 +1620,101 @@ app.post('/api/upload/excel', upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     if (!file) {
-      return res.status(400).send('Aucun fichier uploadé.');
+      return res.status(400).send({ message: 'Aucun fichier uploadé.' });
     }
 
     const { typeNote, semestreId, matiereId, classeId, etablissementId, anneeScolaireId } = req.body;
     const updateField = mapTypeNoteToField(typeNote);
     if (!updateField) {
-      return res.status(400).send('Type de note non valide.');
+      return res.status(400).send({ message: 'Type de note non valide.' });
     }
 
     const workbook = XLSX.readFile(file.path);
     const sheetNameList = workbook.SheetNames;
     if (sheetNameList.length === 0) {
-      return res.status(400).send('Le fichier Excel ne contient aucune feuille.');
+      return res.status(400).send({ message: 'Le fichier Excel ne contient aucune feuille.' });
     }
 
     const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetNameList[0]]);
-    
-    console.log('Nom du fichier:', file.path);
-    console.log('Données Excel:', data);
+    const elevesNonTrouves = [];
+    const elevesDejaNote = [];
+    const elevesAjoutes = [];
 
     for (const row of data) {
-      const { Nom, Prénom } = row;
-      const Note = row.Note !== undefined ? row.Note : null; // Gérer les notes absentes
+      const Nom = row.Nom?.trim();
+      const Prenom = row['Prénom']?.trim();
+      const Note = row.Note !== undefined ? row.Note : null;
 
-      if (!Nom || !Prénom) {
+      if (!Nom || !Prenom) {
         console.warn(`⚠️ Élève ignoré (Nom ou Prénom manquant):`, row);
-        continue; // Ignorer cette ligne et passer à la suivante
+        continue;
       }
 
-      // Vérifier si l'élève existe en base de données
-      const [eleve] = await db.query('SELECT id FROM Eleve WHERE nom = ? AND prenom = ?', [Nom, Prénom]);
-      if (eleve.length > 0) {
-        const eleveId = eleve[0].id;
-        const noteValue = isNaN(Note) || Note === "" ? null : Note;
+      const [eleves] = await db.query(
+        'SELECT id FROM Eleve WHERE nom = ? AND prenom = ? AND classe_id = ? AND etablissement_id = ?',
+        [Nom, Prenom, classeId, etablissementId]
+      );
 
-        console.log(`✅ Traitement de ${Nom} ${Prénom}, Note: ${noteValue !== null ? noteValue : 'ABS'}`);
-
-        await db.query(
-          `INSERT INTO Note (${updateField}, Eleves_id, Semestre_id, matieres_id, classe_id, etablissement_id, Annee_scolaire_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE ${updateField} = VALUES(${updateField})`,
-          [noteValue, eleveId, semestreId, matiereId, classeId, etablissementId, anneeScolaireId]
-        );
-      } else {
-        console.warn(`⚠️ Élève non trouvé en base: ${Nom} ${Prénom}`);
+      if (eleves.length === 0) {
+        elevesNonTrouves.push(`${Nom} ${Prenom}`);
+        continue;
       }
+
+      const eleveId = eleves[0].id;
+
+      // Vérifie si l'élève a déjà une note pour ce typeNote
+      const [notesExistantes] = await db.query(
+        `SELECT id FROM Note 
+         WHERE Eleves_id = ? AND ${updateField} IS NOT NULL
+         AND Semestre_id = ? AND matieres_id = ? 
+         AND classe_id = ? AND etablissement_id = ? 
+         AND Annee_scolaire_id = ?`,
+        [eleveId, semestreId, matiereId, classeId, etablissementId, anneeScolaireId]
+      );
+
+      if (notesExistantes.length > 0) {
+        elevesDejaNote.push(`${Nom} ${Prenom}`);
+        continue;
+      }
+
+      const noteValue = isNaN(Note) || Note === "" ? null : parseFloat(Note);
+
+      await db.query(
+        `INSERT INTO Note (${updateField}, Eleves_id, Semestre_id, matieres_id, classe_id, etablissement_id, Annee_scolaire_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE ${updateField} = VALUES(${updateField})`,
+        [noteValue, eleveId, semestreId, matiereId, classeId, etablissementId, anneeScolaireId]
+      );
+
+      elevesAjoutes.push(`${Nom} ${Prenom}`);
     }
 
     fs.unlinkSync(file.path);
-    res.send('Données importées avec succès');
+
+    const messageParts = [`✅ Import terminé.`];
+
+    if (elevesAjoutes.length > 0) {
+      messageParts.push(`Notes ajoutées pour : ${elevesAjoutes.join(', ')}.`);
+    }
+    if (elevesDejaNote.length > 0) {
+      messageParts.push(`Ignorés (déjà notés) : ${elevesDejaNote.join(', ')}.`);
+    }
+    if (elevesNonTrouves.length > 0) {
+      messageParts.push(`Non trouvés : ${elevesNonTrouves.join(', ')}.`);
+    }
+
+    return res.send({
+      message: messageParts.join(' '),
+      details: {
+        ajoutes: elevesAjoutes,
+        dejaNote: elevesDejaNote,
+        nonTrouves: elevesNonTrouves
+      }
+    });
 
   } catch (error) {
     console.error('❌ Erreur lors de l\'importation des données Excel', error);
-    res.status(500).send('Erreur lors de l\'importation');
+    res.status(500).send({ message: 'Erreur lors de l\'importation' });
   }
 });
 
@@ -1427,17 +2029,12 @@ app.post('/api/presence', async (req, res) => {
   let connection;
 
   try {
-    // Obtenir une connexion du pool
     connection = await req.db.getConnection();
-
-    // Ouvrir une transaction pour garantir l'intégrité des données
     await connection.beginTransaction();
 
-    // Rechercher l'ID du semestre pour chaque enregistrement
     for (let presence of presences) {
-      const { date, time, status, eleveId, subjectId, classeId, semesterName, etablissementId, anneeScolaireId } = presence;
+      const { date, status, eleveId, subjectId, classeId, semesterName, etablissementId, anneeScolaireId } = presence;
 
-      // Rechercher l'ID du semestre en fonction du nom
       const [semesterResult] = await connection.query(
         `SELECT id FROM Semestre WHERE nom = ? AND etablissement_id = ?`,
         [semesterName, etablissementId]
@@ -1449,31 +2046,21 @@ app.post('/api/presence', async (req, res) => {
 
       const semesterId = semesterResult[0].id;
 
-      // Insérer les données dans la table `Presence`
       await connection.query(
-        `INSERT INTO Presence (date, heures, statut, eleve_id, matieres_id, classe_id, semestre_id, etablissement_id, Annee_scolaire_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [date, time, status, eleveId, subjectId, classeId, semesterId, etablissementId, anneeScolaireId]
+        `INSERT INTO Presence (date, statut, eleve_id, matieres_id, classe_id, semestre_id, etablissement_id, Annee_scolaire_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [date, status, eleveId, subjectId, classeId, semesterId, etablissementId, anneeScolaireId]
       );
     }
 
-    // Commit de la transaction
     await connection.commit();
-
     res.status(201).json({ message: 'Présences enregistrées avec succès.' });
   } catch (error) {
     console.error('Erreur lors de l\'enregistrement des présences :', error);
-
-    // Rollback en cas d'erreur
-    if (connection) {
-      await connection.rollback();
-    }
+    if (connection) await connection.rollback();
     res.status(500).json({ error: 'Une erreur est survenue lors de l\'enregistrement des présences.' });
   } finally {
-    // Toujours libérer la connexion
-    if (connection) {
-      connection.release();
-    }
+    if (connection) connection.release();
   }
 });
 
@@ -1561,12 +2148,16 @@ app.get('/api/punitions/somme-heures/:studentId/:anneeScolaireId', async (req, r
     res.status(500).send('Erreur serveur');
   }
 });
-
 app.post('/api/parent/login', async (req, res) => {
-  const { username, password, etablissement } = req.body; // Récupérer le nom de l'établissement
+  let { username, password, etablissement } = req.body;
+
+  // Nettoyage des entrées
+  username = username.trim().toLowerCase();
+  const etabId = parseInt(etablissement, 10);
 
   try {
-    // Effectuer une jointure entre la table Parents et Etablissement
+    console.log("🔐 Tentative de login:", { username, password, etabId });
+
     const [rows] = await db.query(
       `SELECT 
         Parents.id AS parent_id, 
@@ -1583,38 +2174,164 @@ app.post('/api/parent/login', async (req, res) => {
         Etablissement.mail AS etablissement_mail
       FROM Parents 
       INNER JOIN Etablissement ON Parents.etablissement_id = Etablissement.id 
-      WHERE Parents.nom_utilisateur = ? AND Etablissement.nom = ?`, 
-      [username, etablissement]
+      WHERE (LOWER(Parents.nom_utilisateur) = ? OR LOWER(Parents.email) = ?) 
+        AND Etablissement.id = ?`,
+      [username, username, etabId]
     );
 
-    // Vérifier si les informations du parent et de l'établissement existent
+    console.log("📄 Résultat SQL:", rows);
+
     if (rows.length === 0) {
-      return res.status(401).json({ message: "Nom d’utilisateur ou établissement incorrect" });
+      console.warn("❌ Utilisateur ou établissement non trouvé");
+      return res.status(401).json({ message: "Nom d’utilisateur/email ou établissement incorrect" });
     }
 
     const parent = rows[0];
 
-    // Vérifier le mot de passe crypté
     const passwordMatch = await bcrypt.compare(password, parent.parent_mot_de_passe);
+    console.log("🔍 Password match:", passwordMatch);
+
     if (!passwordMatch) {
+      console.warn("❌ Mot de passe incorrect");
       return res.status(401).json({ message: 'Mot de passe incorrect' });
     }
 
-    // Génération du token JWT avec l'ID de l'établissement
     const token = jwt.sign({ 
       id: parent.parent_id, 
       username: parent.parent_nom_utilisateur, 
-      etablissementId: parent.parent_etablissement_id // Inclure l'ID de l'établissement
+      etablissementId: parent.parent_etablissement_id
     }, secretKey, { expiresIn: '1h' });
 
+    console.log("✅ Connexion réussie, token généré");
     res.json({ message: 'Connexion réussie', token });
+
   } catch (error) {
-    console.error('Erreur lors de la connexion:', error);
+    console.error('💥 Erreur lors de la connexion:', error);
     res.status(500).json({ message: 'Erreur interne du serveur' });
   }
 });
 
 
+
+app.post('/api/send', async (req, res) => {
+  const { email, etablissement } = req.body;
+
+  if (!email || !etablissement) {
+    return res.status(400).json({ success: false, message: 'Email et établissement requis.' });
+  }
+
+  try {
+    // Vérifie si le parent existe avec email et établissement (par ID)
+    const [rows] = await db.query(
+      'SELECT id FROM Parents WHERE LOWER(email) = LOWER(?) AND etablissement_id = ?',
+      [email, etablissement]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Aucun parent trouvé avec cet email et établissement.' });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000); // Code à 6 chiffres
+
+    // Enregistre le code
+    await db.query(
+      'INSERT INTO reset_codes (email, code, created_at) VALUES (?, ?, NOW())',
+      [email, code]
+    );
+
+    // Envoie l'email
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Code de réinitialisation EchoEducation',
+      text: `Votre code de réinitialisation est : ${code}`
+    });
+
+    res.json({ success: true, message: 'Code envoyé avec succès.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Erreur serveur lors de l’envoi du code.' });
+  }
+});
+app.post('/api/parent-verify-reset-code', async (req, res) => {
+  const { email, code, etablissement } = req.body;
+
+  if (!email || !code || !etablissement) {
+    return res.status(400).json({ success: false, message: 'Email, code et établissement requis.' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `SELECT P.id FROM reset_codes R
+       JOIN Parents P ON LOWER(P.email) = LOWER(R.email)
+       JOIN Etablissement E ON P.etablissement_id = E.id
+       WHERE LOWER(R.email) = LOWER(?)
+       AND R.code = ?
+       AND E.id = ?
+       AND R.created_at >= (NOW() - INTERVAL 10 MINUTE)
+       ORDER BY R.created_at DESC
+       LIMIT 1`,
+      [email, code, etablissement]  // etablissement est bien un ID ici
+    );
+
+    if (rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'Code invalide ou expiré.' });
+    }
+
+    const parentId = rows[0].id;
+    res.json({ success: true, message: 'Code valide.', parentId });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Erreur serveur.' });
+  }
+});
+app.post('/api/parent-update-password', async (req, res) => {
+  const { parentId, newPassword, etablissement } = req.body;
+  console.log("🔧 Reçu dans /api/update-password :", { parentId, newPassword, etablissement });
+  if (!parentId || !newPassword || !etablissement) {
+    return res.status(400).json({ success: false, message: 'Champs manquants.' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    console.log("🔐 Mot de passe hashé :", hashedPassword);
+
+    const [result] = await db.query(
+      'UPDATE Parents SET mot_de_passe = ? WHERE id = ? AND etablissement_id = ?',
+      [hashedPassword, parentId, etablissement]
+    );
+  
+    console.log("📊 Résultat de la requête UPDATE :", result);
+
+    if (result.affectedRows === 0) {
+       console.log("⚠️ Aucun mot de passe mis à jour. Mauvais ID ou établissement.");
+      return res.status(400).json({
+        success: false,
+        message: 'Échec de la mise à jour du mot de passe. ID parent ou établissement invalide.'
+      });
+    }
+   console.log("✅ Mot de passe mis à jour !");
+    return res.status(200).json({
+      success: true,
+      message: 'Mot de passe mis à jour avec succès.'
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur serveur.'
+    });
+  }
+});
 
 app.get('/api/parent/children', authenticateJWT, async (req, res) => {
   try {
@@ -1640,21 +2357,21 @@ app.get('/api/parent/children', authenticateJWT, async (req, res) => {
 });
 
 
-// Route pour obtenir les données de présence en fonction de l'élève et du semestre
+// Route pour obtenir les données de présence en fonction de l'élève et de l'année scolaire
 app.get('/api/presence', async (req, res) => {
   try {
-    const { childId } = req.query;
+    const { childId, anneeScolaireId } = req.query;
 
-    // Requête SQL pour récupérer les présences en fonction de l'ID de l'élève et du semestre
     const query = `
-      SELECT p.id, p.date, p.heures AS heure, p.statut AS presence, m.nom AS matiere,s.nom AS semestreNom
+      SELECT p.id, p.date, p.heures AS heure, p.statut AS presence, 
+             m.nom AS matiere, s.nom AS semestreNom
       FROM Presence p
       JOIN Matieres m ON p.matieres_id = m.id
       JOIN Semestre s ON p.semestre_id = s.id
-      WHERE p.eleve_id = ? 
+      WHERE p.eleve_id = ? AND p.Annee_scolaire_id = ?
     `;
 
-    const [results] = await db.query(query, [childId]);
+    const [results] = await db.query(query, [childId, anneeScolaireId]);
     res.json(results);
 
   } catch (error) {
@@ -1662,6 +2379,7 @@ app.get('/api/presence', async (req, res) => {
     res.status(500).send('Erreur serveur');
   }
 });
+
 
 // Route pour mettre à jour le motif dans la table Presence
 app.post('/api/presence/:id/motif', async (req, res) => {
@@ -1722,16 +2440,16 @@ app.get('/api/incidents', async (req, res) => {
 
 // Route pour ajouter une nouvelle permission
 app.post('/api/permissions/:childId', async (req, res) => {
-  const { date, motif, duree, contact, childId, etablissementId } = req.body;
+  const { date, motif, duree, contact, childId, etablissementId, anneeScolaireId } = req.body;
 
-  if (!date || !motif || !duree || !contact || !etablissementId) {
+  if (!date || !motif || !duree || !contact || !etablissementId || !anneeScolaireId) {
     return res.status(400).json({ message: 'Tous les champs sont obligatoires' });
   }
 
   try {
     const [result] = await req.db.query(
-      'INSERT INTO Permission (date, motif, duree, contact, eleve_id, etablissement_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [date, motif, duree, contact, childId, etablissementId]
+      'INSERT INTO Permission (date, motif, duree, contact, eleve_id, etablissement_id, Annee_scolaire_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [date, motif, duree, contact, childId, etablissementId, anneeScolaireId]
     );
     res.status(201).json({ message: 'Permission ajoutée avec succès', id: result.insertId });
   } catch (error) {
@@ -1741,14 +2459,14 @@ app.post('/api/permissions/:childId', async (req, res) => {
 });
 
 /// Route pour récupérer les permissions par enfant et établissement
-app.get('/api/permissions/:childId/:etablissementId', async (req, res) => {
-  const { childId, etablissementId } = req.params; // Récupération des IDs de l'enfant et de l'établissement depuis les paramètres d'URL
+app.get('/api/permissions/:childId/:etablissementId/:anneeScolaireId', async (req, res) => {
+  const { childId, etablissementId, anneeScolaireId } = req.params; // Récupération des IDs de l'enfant et de l'établissement depuis les paramètres d'URL
 
   try {
     // Requête SQL pour récupérer les permissions d'un enfant spécifique dans un établissement donné
     const [rows] = await req.db.query(
-      'SELECT * FROM Permission WHERE eleve_id = ? AND etablissement_id = ?',
-      [childId, etablissementId]
+      'SELECT * FROM Permission WHERE eleve_id = ? AND etablissement_id = ? AND  Annee_scolaire_id = ?',
+      [childId, etablissementId, anneeScolaireId ]
     );
 
     res.json(rows);
@@ -1757,7 +2475,61 @@ app.get('/api/permissions/:childId/:etablissementId', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
+app.post('/api/parents/check-email', async (req, res) => {
+  const { email, etablissementId } = req.body;
 
+  console.log("Données reçues :", { email, etablissementId });
+
+  try {
+    const [rows] = await db.query(
+      `SELECT p.id
+       FROM Parents p
+       WHERE p.email = ? AND p.etablissement_id = ?`,
+      [email, etablissementId]
+    );
+
+    console.log("Résultat de la requête :", rows);
+
+    if (rows.length > 0) {
+      res.json({ exists: true });
+    } else {
+      res.json({ exists: false });
+    }
+  } catch (error) {
+    console.error("Erreur lors de la vérification de l'email :", error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+
+
+app.post('/api/parents/set-password', async (req, res) => {
+  const { email, password, etablissementId } = req.body;
+
+  if (!email || !password || !etablissementId) {
+    return res.status(400).json({ success: false, message: 'Champs requis manquants.' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const [result] = await db.query(
+      `UPDATE Parents
+       SET mot_de_passe = ?
+       WHERE email = ? AND etablissement_id = ?`,
+      [hashedPassword, email, etablissementId]
+    );
+
+    if (result.affectedRows > 0) {
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ success: false, message: 'Email ou établissement introuvable' });
+    }
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du mot de passe :', error);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
 
 
 // Route pour supprimer une permission
@@ -1829,24 +2601,36 @@ app.get('/api/students/:eleveId', async (req, res) => {
 });
 
 //pour presence,punition dans gestion eleve page administration
-app.get('/api/eleves/:classId', async (req, res) => {
-  const classId = req.params.classId; // Récupère le classId directement
+app.get('/api/eleves/:classId/:anneeScolaireId', async (req, res) => {
+  const { classId, anneeScolaireId } = req.params;
 
-  // Assurez-vous que classId est bien une chaîne de caractères ou un nombre
-  if (!classId) {
-    return res.status(400).send('Class ID is required');
+  // Log des paramètres reçus
+  console.log('Requête API /api/eleves/:classId/:anneeScolaireId');
+  console.log('Param classId :', classId);
+  console.log('Param anneeScolaireId :', anneeScolaireId);
+
+  // Vérifie la présence des deux paramètres
+  if (!classId || !anneeScolaireId) {
+    console.warn('Paramètre manquant dans la requête');
+    return res.status(400).send('Class ID and School Year ID are required');
   }
 
-  const sql = 'SELECT id, nom, prenom FROM Eleve WHERE classe_id = ?';
+  const sql = `
+    SELECT id, nom, prenom 
+    FROM Eleve 
+    WHERE classe_id = ? AND Annee_scolaire_id = ?
+  `;
 
   try {
-    const [results] = await req.db.query(sql, [classId]);
+    const [results] = await req.db.query(sql, [classId, anneeScolaireId]);
+    console.log(`Résultats pour classe_id=${classId}, annee_scolaire_id=${anneeScolaireId} :`, results);
     res.json(results);
   } catch (err) {
-    console.error('Database query error:', err);
+    console.error('Erreur lors de l’exécution de la requête SQL :', err);
     res.status(500).send('Internal Server Error');
   }
 });
+
 
 app.get('/api/classes/:classId/eleves', async (req, res) => {
   const classId = req.params.classId; // Récupère le classId directement
@@ -2018,7 +2802,7 @@ app.post('/api/incidents', async (req, res) => {
   }
 });
 // Endpoint pour les données de présence
-app.get('/api/presenceid/:etablissementId/:anneeScolaireId?', async (req, res) => {
+app.get('/api/presenceidd/:etablissementId/:anneeScolaireId?', async (req, res) => {
   const { etablissementId, anneeScolaireId } = req.params; // Récupérer les paramètres de la requête
   
   try {
@@ -2034,7 +2818,7 @@ app.get('/api/presenceid/:etablissementId/:anneeScolaireId?', async (req, res) =
     
     // Exécuter la requête SQL pour récupérer les présences filtrées
     const [results] = await req.db.query(
-      'SELECT * FROM Presence WHERE etablissement_id = ? AND annee_scolaire_id = ?', 
+      'SELECT * FROM Presence WHERE etablissement_id = ? AND Annee_scolaire_id = ?', 
       [etablissementId, anneeScolaireId]
     );
     
@@ -2152,7 +2936,7 @@ app.get('/api/matiere/:classId', async (req, res) => {
 app.post('/api/programme', async (req, res) => {
   const { classId, jour, horaire, matiereId, etablissementId, anneeScolaireId } = req.body;
 
-  if (!classId || !jour || !horaire || !matiereId || !etablissementId ||   anneeScolaireId) {
+  if (!classId || !jour || !horaire || !matiereId || !etablissementId ||   !anneeScolaireId) {
     return res.status(400).json({ error: 'Tous les champs sont requis.' });
   }
 
@@ -2263,54 +3047,117 @@ app.post('/api/addActivity', async (req, res) => {
 });
 
 
-// Route pour récupérer les notifications d'un établissement et d'un enseignant spécifiques
-app.get('/api/notifications/:etablissementId/:anneeScolaireId', async (req, res) => {
+// Route pour récupérer les notifications d'un établissement et d'un parent spécifiques
+
+app.get('/api/notificationed/:parentId/:etablissementId/:anneeScolaireId', async (req, res) => {
+  const { parentId, etablissementId, anneeScolaireId } = req.params;
+
+  console.log('[1] ➡ Requête reçue pour récupérer les notifications');
+  console.log('[1] 🔹 Parent ID :', parentId);
+  console.log('[1] 🔹 Établissement ID :', etablissementId);
+  console.log('[1] 🔹 Année scolaire ID :', anneeScolaireId);
+
+  if (!parentId || !etablissementId || !anneeScolaireId) {
+    return res.status(400).json({ message: 'Paramètres requis manquants.' });
+  }
+
   try {
-    const etablissementId = req.params.etablissementId;
-    const anneeScolaireId = req.params.anneeScolaireId;
-    const enseignantId = req.query.enseignantId;
-
-    if (!enseignantId) {
-      return res.status(400).json({ error: 'enseignantId est requis' });
-    }
-
-    const [classes] = await req.db.query(
-      `SELECT Classes_id 
-       FROM Enseigner 
-       WHERE Enseignants_id = ? AND etablissement_id = ? AND Annee_scolaire_id = ?`,
-      [enseignantId, etablissementId, anneeScolaireId]
+    // Étape 1 : Récupérer les élèves
+    const [students] = await req.db.execute(
+      `SELECT id, nom, prenom 
+       FROM Eleve 
+       WHERE Parents_id = ? AND etablissement_id = ?`,
+      [parentId, etablissementId]
     );
-
-    if (classes.length === 0) {
-      return res.status(404).json({ message: 'Aucune classe trouvée pour cet enseignant dans cet établissement.' });
+    if (students.length === 0) {
+      return res.status(404).json({ message: 'Aucun élève trouvé pour ce parent.' });
     }
 
-    const classeIds = classes.map(classe => classe.Classes_id);
+    let notifications = [];
 
-    const [permissions] = await req.db.query(
-      `SELECT 
-         Eleve.nom AS nom,
-         Eleve.prenom AS prenom,
-         Classes.nom AS classeNom,
-         Permission.date,
-         Permission.duree
-       FROM Permission
-       JOIN Eleve ON Eleve.id = Permission.eleve_id
-       JOIN Classes ON Classes.id = Eleve.classe_id
-       WHERE 
-         Eleve.classe_id IN (?)
-         AND Permission.statut IN ('autoriser', 'sous reserve de justification')`,
-      [classeIds]
-    );
-
-    if (permissions.length === 0) {
-      return res.status(404).json({ message: 'Aucune permission trouvée.' });
+    // Étape 2 : Récupérer les présences pour chaque élève
+    for (let student of students) {
+      const [rows] = await req.db.execute(
+        `SELECT p.id AS presence_id, p.date, p.heures, p.statut, p.motif,
+                e.nom AS studentName, e.prenom AS studentPrenom
+         FROM Presence p
+         JOIN Eleve e ON p.eleve_id = e.id
+         WHERE p.eleve_id = ?
+           AND p.etablissement_id = ?
+           AND p.Annee_scolaire_id = ?
+         ORDER BY p.date DESC, p.heures DESC`,
+        [student.id, etablissementId, anneeScolaireId]
+      );
+      notifications = notifications.concat(rows);
     }
 
-    return res.json(permissions);
+    // Étape 3 : Ne garder que les présences du mois en cours
+    const currentMonth = moment().month();
+    const currentYear = moment().year();
+
+    notifications = notifications.filter(n => {
+      const notifDate = moment(n.date);
+      return notifDate.month() === currentMonth && notifDate.year() === currentYear;
+    });
+
+    // Étape 4 : Obtenir les présences déjà vues
+    const presenceIds = notifications.map(n => n.presence_id);
+    let vuesIds = [];
+
+    if (presenceIds.length > 0) {
+      const [vues] = await req.db.execute(
+        `SELECT presence_id FROM AbsenceVueParents WHERE parent_id = ? AND presence_id IN (${presenceIds.map(() => '?').join(',')})`,
+        [parentId, ...presenceIds]
+      );
+      vuesIds = vues.map(v => v.presence_id);
+    }
+
+    // Étape 5 : Ajouter is_read aux notifications
+    notifications = notifications.map(n => ({
+      ...n,
+      is_read: vuesIds.includes(n.presence_id),
+    }));
+
+    // Étape 6 : Enregistrer les nouvelles présences vues
+    const vuesNonEnregistrees = notifications
+      .filter(n => !n.is_read && n.statut.toLowerCase() === 'absent')
+      .map(n => [parentId, n.presence_id]);
+
+    if (vuesNonEnregistrees.length > 0) {
+      await req.db.query(
+        `INSERT IGNORE INTO AbsenceVueParents (parent_id, presence_id) VALUES ?`,
+        [vuesNonEnregistrees]
+      );
+    }
+
+    // Étape 7 : Générer les messages
+    const today = moment().format('YYYY-MM-DD');
+    const yesterday = moment().subtract(1, 'days').format('YYYY-MM-DD');
+    const dayBeforeYesterday = moment().subtract(2, 'days').format('YYYY-MM-DD');
+
+    const alertMessages = notifications
+      .filter(n => n.statut.toLowerCase() === 'absent')
+      .map(n => {
+        const date = moment(n.date).format('YYYY-MM-DD');
+        const prefix = !n.is_read ? '[NOUVELLE] ' : '';
+
+        if (date === today) {
+          return `${prefix}Votre enfant ${n.studentName} ${n.studentPrenom} est absent aujourd'hui à ${n.heures}.`;
+        } else if (date === yesterday) {
+          return `${prefix}Votre enfant ${n.studentName} ${n.studentPrenom} était absent hier à ${n.heures}.`;
+        } else if (date === dayBeforeYesterday) {
+          return `${prefix}Votre enfant ${n.studentName} ${n.studentPrenom} était absent avant-hier à ${n.heures}.`;
+        } else {
+          return `${prefix}Votre enfant ${n.studentName} ${n.studentPrenom} était absent le ${n.date} à ${n.heures}.`;
+        }
+      });
+
+    // Réponse finale
+    res.json({ notifications, alertMessages });
+
   } catch (error) {
-    console.error('Erreur lors de la récupération des notifications:', error);
-    return res.status(500).json({ error: 'Erreur interne du serveur' });
+    console.error('❌ Erreur lors de la récupération des notifications :', error);
+    res.status(500).json({ message: 'Erreur serveur lors de la récupération des données.' });
   }
 });
 
@@ -2390,53 +3237,51 @@ app.get('/api/programme/:childId', async (req, res) => {
 });
 
 
-app.get('/api/notificationed/:parentId', async (req, res) => {
-  const parentId = req.params.parentId; // Récupération du parentId
+app.get('/api/notificationed/:parentId/:etablissementId/:anneeScolaireId', async (req, res) => {
+  const { parentId, etablissementId, anneeScolaireId } = req.params;
 
-  if (!parentId) {
-    return res.status(400).json({ message: 'ID du parent manquant.' });
+  if (!parentId || !etablissementId || !anneeScolaireId) {
+    return res.status(400).json({ message: 'Paramètres requis manquants.' });
   }
 
   try {
-    // Requête pour récupérer les élèves associés au parent
+    // Récupérer les élèves du parent dans cet établissement et cette année scolaire
     const [students] = await req.db.execute(
-      `SELECT id, nom, prenom FROM Eleve WHERE Parents_id = ?`,
-      [parentId]
+      `SELECT id, nom, prenom 
+       FROM Eleve 
+       WHERE Parents_id = ? AND etablissement_id = ? `,
+      [parentId, etablissementId]
     );
-    
+
     if (students.length === 0) {
-      return res.status(404).json({ message: 'Aucun élève trouvé pour ce parent.' });
+      return res.status(404).json({ message: 'Aucun élève trouvé pour ce parent dans cet établissement et cette année scolaire.' });
     }
 
-    // Liste pour stocker les notifications de présence des élèves
     let notifications = [];
 
-    // Pour chaque élève, récupérer toutes ses présences
     for (let student of students) {
       const [rows] = await req.db.execute(
-        `SELECT p.date, p.heures, p.statut, e.nom AS studentName, e.prenom AS studentPrenom
+        `SELECT p.date, p.heures, p.statut, p.motif, e.nom AS studentName, e.prenom AS studentPrenom
          FROM Presence p
          JOIN Eleve e ON p.eleve_id = e.id
-         WHERE p.eleve_id = ?
-         ORDER BY p.date DESC, p.heures DESC`, // Suppression de LIMIT 1
-        [student.id]
+         WHERE p.eleve_id = ? 
+           AND p.etablissement_id = ?
+           AND p.Annee_scolaire_id = ?
+         ORDER BY p.date DESC, p.heures DESC`,
+        [student.id, etablissementId, anneeScolaireId]
       );
 
-      // Ajouter les résultats à la liste des notifications
       if (rows.length > 0) {
         notifications = notifications.concat(rows);
       }
     }
 
-    // Format des dates pour comparaison
     const today = moment().format('YYYY-MM-DD');
     const yesterday = moment().subtract(1, 'days').format('YYYY-MM-DD');
     const dayBeforeYesterday = moment().subtract(2, 'days').format('YYYY-MM-DD');
 
-    // Liste pour stocker les messages d'alerte séparés
     let alertMessages = [];
 
-    // Filtrer les absences d'aujourd'hui, hier, avant-hier et les autres dates
     notifications.forEach(n => {
       if (n.statut === 'absent') {
         const notificationDate = moment(n.date).format('YYYY-MM-DD');
@@ -2453,7 +3298,6 @@ app.get('/api/notificationed/:parentId', async (req, res) => {
       }
     });
 
-    // Retourner les notifications et les alertes individuelles
     res.json({ notifications, alertMessages });
 
   } catch (error) {
@@ -2693,31 +3537,24 @@ app.get('/api/classes/:classId/:anneeScolaireId/details', async (req, res) => {
       res.status(500).json({ message: "Erreur serveur lors de la suppression de la note." });
     }
   });
-  
   app.get('/api/bulletin', async (req, res) => {
-    const { classeId, etablissementId, anneeScolaireId} = req.query;
+    const { classeId, etablissementId, anneeScolaireId } = req.query;
+    console.log("Requête reçue avec params:", { classeId, etablissementId, anneeScolaireId });
 
     try {
-        // Première requête : récupération des notes, des matières, des semestres et du nom de la classe
         const [results] = await req.db.query(
-            `SELECT e.id AS eleve_id,
-                    e.nom AS eleve_nom,
-                    e.prenom AS eleve_prenom,
-                    c.nom AS classe_nom,
-                    m.id AS matiere_id,
-                    m.nom AS matiere_nom, 
-                    s.id AS semestre_id, 
-                    s.nom AS semestre_nom,
-                    n.moy, n.moycoef,
-                    MAX(p.total_hours) AS total_hours
-            FROM Eleve e 
-            JOIN Note n ON e.id = n.Eleves_id 
-            JOIN Matieres m ON m.id = n.matieres_id 
-            JOIN Semestre s ON s.id = n.semestre_id 
-            JOIN Classes c ON c.id = n.classe_id 
-            LEFT JOIN Punitions p ON e.id = p.eleve_id AND s.id = p.semestre_id
-            WHERE n.classe_id = ? AND n.Annee_scolaire_id = ?
-            GROUP BY e.id, m.id, s.id`,
+            `SELECT e.id AS eleve_id, e.nom AS eleve_nom, e.prenom AS eleve_prenom,
+                    c.nom AS classe_nom, m.id AS matiere_id, m.nom AS matiere_nom,
+                    s.id AS semestre_id, s.nom AS semestre_nom, n.moy, n.moycoef,
+                    COALESCE(MAX(p.total_hours), 0) AS total_hours
+             FROM Eleve e 
+             JOIN Note n ON e.id = n.Eleves_id 
+             JOIN Matieres m ON m.id = n.matieres_id 
+             JOIN Semestre s ON s.id = n.semestre_id 
+             JOIN Classes c ON c.id = n.classe_id 
+             LEFT JOIN Punitions p ON e.id = p.eleve_id AND s.id = p.semestre_id
+             WHERE n.classe_id = ? AND n.Annee_scolaire_id = ?
+             GROUP BY e.id, m.id, s.id`,
             [classeId, anneeScolaireId]
         );
 
@@ -2725,40 +3562,53 @@ app.get('/api/classes/:classId/:anneeScolaireId/details', async (req, res) => {
             return res.json({ semestres: [], matieres: [], notes: {}, classeNom: null, message: "Aucune note trouvée pour cette classe." });
         }
 
-        // Structuration des données
-        const semestres = [];
+        const [semestresList] = await req.db.query(
+            `SELECT id, nom FROM Semestre WHERE etablissement_id = ? ORDER BY id ASC`,
+            [etablissementId]
+        );
+
+        const [conduiteClasse] = await req.db.query(
+            `SELECT note_conduite FROM Conduite WHERE classe_id = ? AND Annee_scolaire_id = ?`,
+            [classeId, anneeScolaireId]
+        );
+        const noteConduite = conduiteClasse.length > 0 ? Number(conduiteClasse[0].note_conduite) : 0;
+
+        const dernierSemestreId = semestresList.length > 0 ? semestresList.at(-1).id : null;
+        const semestres = semestresList.map(s => ({ id: s.id, nom: s.nom }));
         const matieres = [];
         let notes = {};
         const classeNom = results[0]?.classe_nom || null;
 
         results.forEach(row => {
-            if (!semestres.find(sem => sem.id === row.semestre_id)) {
-                semestres.push({ id: row.semestre_id, nom: row.semestre_nom });
-            }
-
-            if (!matieres.find(mat => mat.id === row.matiere_id)) {
+            if (!matieres.some(mat => mat.id === row.matiere_id)) {
                 matieres.push({ id: row.matiere_id, nom: row.matiere_nom });
             }
-
-            if (!notes[row.semestre_id]) {
-                notes[row.semestre_id] = [];
+            if (!notes[row.semestre_id]) notes[row.semestre_id] = {};
+            if (!notes[row.semestre_id][row.eleve_id]) {
+                notes[row.semestre_id][row.eleve_id] = {
+                    eleveId: row.eleve_id,
+                    nom: row.eleve_nom,
+                    prenom: row.eleve_prenom,
+                    moyennes: [],
+                    total_hours: row.total_hours || 0,
+                    conduite: noteConduite - (row.total_hours / 2),
+                    moyenne_semestrielle: null,
+                    moyenne_annuelle: null,
+                    rang: null,
+                    mention: null,
+                    decision: null
+                };
             }
-
-            notes[row.semestre_id].push({
+            notes[row.semestre_id][row.eleve_id].moyennes.push({
                 matiereId: row.matiere_id,
-                eleveId: row.eleve_id,
-                nom: row.eleve_nom,
-                prenom: row.eleve_prenom,
-                moy: row.moy || null,
-                moycoef: row.moycoef || null,
-                total_hours: row.total_hours || 0, // Valeur maximale des heures
+                moy: row.moy ? Number(row.moy) : null,
+                moycoef: row.moycoef ? Number(row.moycoef) : null,
                 coefficient: null
             });
         });
 
-        // Deuxième requête : récupération des coefficients
         const [coefficients] = await req.db.query(
-            `SELECT c.id As coefficient_id, c.valeur AS coefficient, en.matiere_id
+            `SELECT en.matiere_id, c.valeur AS coefficient 
              FROM Coefficient c
              JOIN Enseigner en ON en.coefficient_id = c.id
              WHERE en.Classes_id = ?`,
@@ -2766,38 +3616,111 @@ app.get('/api/classes/:classId/:anneeScolaireId/details', async (req, res) => {
         );
 
         coefficients.forEach(coef => {
-            Object.keys(notes).forEach(semestreId => {
-                notes[semestreId].forEach(note => {
+            Object.values(notes).flatMap(semestre => Object.values(semestre)).forEach(eleve => {
+                eleve.moyennes.forEach(note => {
                     if (note.matiereId === coef.matiere_id) {
-                        note.coefficient = coef.coefficient || null;
-                        note.coefficientId = coef.coefficient_id;
+                        note.coefficient = Number(coef.coefficient);
                     }
                 });
             });
         });
 
-        // Troisième requête : récupération des notes de conduite et des semestres
-        const [conduiteResults] = await req.db.query(
-            `SELECT c.note_conduite AS note_conduite, s.id AS semestre_id, s.nom AS semestre_nom
-             FROM Conduite c
-             JOIN Semestre s ON s.id = c.semestre_id
-             WHERE c.classe_id = ?`,
-            [classeId]
-        );
+        // === Ajouter "matière" Conduite dans la liste des matières ===
+        const matiereConduite = { id: 'conduite', nom: 'Conduite' };
+        matieres.push(matiereConduite);
 
-        conduiteResults.forEach(conduite => {
-            if (!notes[conduite.semestre_id]) {
-                notes[conduite.semestre_id] = [];
-            }
-            notes[conduite.semestre_id].forEach(note => {
-                note.conduite = conduite.note_conduite || null;
+        // === Calcul des moyennes semestrielles + mention ===
+        Object.values(notes).forEach(semestre => {
+            Object.values(semestre).forEach(eleve => {
+                // Ajouter la conduite comme matière avec coefficient 1
+                eleve.moyennes.push({
+                    matiereId: 'conduite',
+                    moy: Number(eleve.conduite),
+                    coefficient: 1,
+                    moycoef: Number(eleve.conduite)* 1,
+                });
+
+                let sommeMoyCoef = 0, sommeCoef = 0;
+                eleve.moyennes.forEach(note => {
+                    if (note.moy !== null && note.coefficient !== null) {
+                        sommeMoyCoef += note.moy * note.coefficient;
+                        sommeCoef += note.coefficient;
+                    }
+                });
+
+                eleve.moyenne_semestrielle = sommeCoef ? (sommeMoyCoef / sommeCoef).toFixed(2) : null;
+
+                const moyenne = Number(eleve.moyenne_semestrielle);
+                if (moyenne >= 16) eleve.mention = "Très Bien";
+                else if (moyenne >= 14) eleve.mention = "Bien";
+                else if (moyenne >= 12) eleve.mention = "Assez Bien";
+                else if (moyenne >= 10) eleve.mention = "Passable";
+                else eleve.mention = "Insuffisant";
             });
         });
 
+        // === Calcul des rangs ===
+        Object.entries(notes).forEach(([semestreId, elevesMap]) => {
+            const elevesArray = Object.values(elevesMap).filter(e => e.moyenne_semestrielle !== null);
+            elevesArray.sort((a, b) => b.moyenne_semestrielle - a.moyenne_semestrielle);
+            elevesArray.forEach((eleve, index) => {
+                eleve.rang = index + 1;
+            });
+        });
+
+        // === Calcul des moyennes annuelles (uniquement dernier semestre) ===
+        const elevesAnnuel = {};
+        semestres.forEach(sem => {
+            const semId = sem.id;
+            const eleves = notes[semId];
+            if (!eleves) return;
+            Object.values(eleves).forEach(eleve => {
+                if (!elevesAnnuel[eleve.eleveId]) {
+                    elevesAnnuel[eleve.eleveId] = {
+                        total: 0,
+                        compte: 0,
+                        moyenneDernier: null
+                    };
+                }
+                const moyenneSem = parseFloat(eleve.moyenne_semestrielle);
+                if (!isNaN(moyenneSem)) {
+                    if (Number(semId) === Number(dernierSemestreId)) {
+                        elevesAnnuel[eleve.eleveId].moyenneDernier = moyenneSem;
+                    } else {
+                        elevesAnnuel[eleve.eleveId].total += moyenneSem;
+                        elevesAnnuel[eleve.eleveId].compte++;
+                    }
+                }
+            });
+        });
+
+        const elevesDernierSemestre = notes[dernierSemestreId] || {};
+        Object.values(elevesDernierSemestre).forEach(eleve => {
+            const stats = elevesAnnuel[eleve.eleveId];
+            if (stats && stats.moyenneDernier !== null) {
+                const total = stats.total + (stats.moyenneDernier * 2);
+                const diviseur = stats.compte + 2;
+                const moyenneAnnuelle = total / diviseur;
+                eleve.moyenne_annuelle = moyenneAnnuelle.toFixed(2);
+                eleve.decision = moyenneAnnuelle >= 10 ? "Admis" : "Refusé";
+            }
+        });
+
+        // === Valeurs nulles pour moyenne_annuelle et decision dans les autres semestres ===
+        Object.entries(notes).forEach(([semestreId, elevesMap]) => {
+            if (Number(semestreId) !== Number(dernierSemestreId)) {
+                Object.values(elevesMap).forEach(eleve => {
+                    eleve.moyenne_annuelle = null;
+                    eleve.decision = null;
+                });
+            }
+        });
+
         res.json({ semestres, matieres, notes, classeNom });
+
     } catch (error) {
-        console.error("Erreur lors de la récupération des détails de la classe et des coefficients :", error);
-        res.status(500).json({ message: "Erreur serveur lors de la récupération des détails de la classe et des coefficients" });
+        console.error("Erreur serveur:", error);
+        res.status(500).json({ message: "Erreur serveur lors du traitement des bulletins." });
     }
 });
 
@@ -2823,128 +3746,129 @@ app.get('/api/etablissementStatut', async (req, res) => {
     res.status(500).json({ message: "Erreur lors de la récupération du statut de l'établissement" });
   }
 });
+app.post('/api/sauvegarde-bulletin', async (req, res) => {
+  const {
+    eleveId,
+    classeId,
+    etablissementId,
+    anneeScolaireId,
+    semestreId,
+    notes,
+    moyenneSemestrielle,
+    moyenneAnnuelle,
+    rang,
+    mention,
+    decision,
+    conduite
+  } = req.body;
 
-// API : Sauvegarder les bulletins
-app.post('/api/save-bulletin', async (req, res) => {
-  const { bulletin } = req.body;
-
-  // Log des données reçues
-  console.log('Données reçues :', req.body);
-
-  // Validation des données d'entrée
-  if (!bulletin || !Array.isArray(bulletin) || bulletin.length === 0) {
-    console.error('Données manquantes ou invalides:', { bulletin });
-    return res.status(400).json({ message: 'Données manquantes ou invalides.' });
-  }
-
-  let connection; // Déclaration de la connexion en dehors du bloc try
+  const connection = await db.getConnection();
 
   try {
-    connection = await db.getConnection(); // Initialisation de la connexion
-    await connection.beginTransaction(); // Démarrer une transaction
+    console.log('🔍 Début de la vérification des matières avec moyenne...');
 
-    for (const bulletinData of bulletin) {
-      const {
-        eleve_id,
-        semestre_id,
-        matiere_id,
-        coef_id,
-        moy,
-        moycoef,
-        total,
-        moySem,
-        rang,
-        mention,
-        conduite,
-        moyAn,
-        decision,
-        etablissement_id,
-        Annee_scolaire_id,
-      } = bulletinData;
+    // Étape 1 : Récupération des matières enseignées
+    const [enseignements] = await connection.query(
+      `SELECT DISTINCT matiere_id FROM Enseigner 
+       WHERE Classes_id = ? AND etablissement_id = ?`,
+      [classeId, etablissementId]
+    );
 
-      // Validation des champs obligatoires
-      if (!eleve_id || !semestre_id || !matiere_id || !Annee_scolaire_id) {
-        console.error('Données manquantes dans un bulletin:', bulletinData);
-        throw new Error('Données manquantes dans un bulletin.');
-      }
+    console.log('✅ Matières enseignées récupérées :', enseignements);
 
-      // Vérification de l'existence du bulletin
-      const [existingBulletin] = await connection.query(
-        `SELECT bulletin_id FROM Bulletin WHERE eleve_id = ? AND semestre_id = ? AND Annee_scolaire_id = ?`,
-        [eleve_id, semestre_id, Annee_scolaire_id]
+    const matieresRequises = enseignements.map(e => e.matiere_id);
+    console.log('📚 Matières requises pour la classe :', matieresRequises);
+
+    const matieresAvecNote = notes.map(n => n.matiereId).filter(id => id && id !== 'conduite');
+    console.log('📝 Matières avec note fournie :', matieresAvecNote);
+
+    const matieresManquantes = matieresRequises.filter(
+      id => !matieresAvecNote.includes(id)
+    );
+    console.log('❗ Matières manquantes (sans moyenne) :', matieresManquantes);
+
+    // 🚨 Si matières manquantes, récupérer leurs noms depuis la table Matieres
+    if (matieresManquantes.length > 0) {
+      const [matieresInfos] = await connection.query(
+        `SELECT id, nom FROM Matieres WHERE id IN (?)`,
+        [matieresManquantes]
       );
 
-      if (existingBulletin.length > 0) {
-        const [eleve] = await connection.query(
-          `SELECT nom, prenom FROM Eleve WHERE id = ?`,
-          [eleve_id]
-        );
-        const [semestre] = await connection.query(
-          `SELECT nom FROM Semestre WHERE id = ?`,
-          [semestre_id]
-        );
-        const [Annee_scolaire] = await connection.query(
-          `SELECT nom_annee FROM Annee_scolaire WHERE id = ?`,
-          [Annee_scolaire_id]
-        );
+      console.log('📛 Noms des matières manquantes :', matieresInfos);
 
-        if (eleve.length > 0 && semestre.length > 0 && Annee_scolaire.length > 0) {
-          const { nom: eleveNom, prenom: elevePrenom } = eleve[0];
-          const { nom: semestreNom } = semestre[0];
-          const { nom_annee: AnneeNom } = Annee_scolaire[0];
+      return res.status(400).json({
+        error: "Impossible de sauvegarder le bulletin : certaines matières de la classe n'ont pas encore de moyenne calculée.",
+        matieresManquantes: matieresInfos // tableau [{id, nom}]
+      });
+    }
 
-          console.warn(
-            `Bulletin existant : ${eleveNom} ${elevePrenom}, ${semestreNom}, ${AnneeNom}`
-          );
-          continue; // Passez au bulletin suivant au lieu d'interrompre la boucle
-        }
-      }
+    // Vérification de la conduite
+    if (conduite === null || conduite === undefined) {
+      console.log('❌ Note de conduite manquante. Bulletin non sauvegardé.');
+      return res.status(400).json({
+        error: "Impossible de sauvegarder le bulletin : la note de conduite n'a pas encore été attribuée pour ce semestre à cette classe."
+      });
+    }
 
-      // Insérer le nouveau bulletin
+    console.log('✅ Toutes les vérifications sont passées. Début de la transaction...');
+
+    await connection.beginTransaction();
+
+    // Suppression des anciennes données du bulletin
+    console.log('🧹 Suppression des anciennes données du bulletin...');
+    await connection.query(
+      `DELETE FROM Bulletin 
+       WHERE eleve_id = ? AND semestre_id = ? AND etablissement_id = ? AND Annee_scolaire_id = ?`,
+      [eleveId, semestreId, etablissementId, anneeScolaireId]
+    );
+    console.log('🗑️ Anciennes données supprimées.');
+
+    // Insertion des nouvelles données
+    console.log('📥 Insertion des nouvelles notes dans le bulletin...');
+    for (const note of notes) {
+      const { matiereId, coefficient, moy, moycoef } = note;
+
+      if (!matiereId || matiereId === 'conduite') continue;
+
+      console.log(`➡️ Insertion de la note pour la matière ${matiereId} : moy = ${moy}, coef = ${coefficient}`);
+
       await connection.query(
-        `
-        INSERT INTO Bulletin (
-          eleve_id, semestre_id, matiere_id, coef_id, moy, moycoef,
-          total, moySem, rang, mention, conduite, moyAn, decision,
-          etablissement_id, Annee_scolaire_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+        `INSERT INTO Bulletin (
+            eleve_id, semestre_id, matiere_id, coef_id, moy, moycoef, 
+            moySem, rang, mention, etablissement_id, moyAn, decision, Annee_scolaire_id, conduite
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          eleve_id,
-          semestre_id,
-          matiere_id,
-          coef_id,
+          eleveId,
+          semestreId,
+          matiereId,
+          coefficient,
           moy,
           moycoef,
-          total,
-          moySem,
+          moyenneSemestrielle,
           rang,
           mention,
-          conduite,
-          moyAn,
+          etablissementId,
+          moyenneAnnuelle,
           decision,
-          etablissement_id,
-          Annee_scolaire_id,
+          anneeScolaireId,
+          conduite
         ]
       );
     }
 
-    await connection.commit(); // Valider la transaction
-    res.status(200).json({ message: 'Tous les bulletins ont été sauvegardés avec succès.' });
+    await connection.commit();
+    console.log('✅ Bulletin sauvegardé avec succès !');
+    res.status(200).json({ message: 'Bulletin sauvegardé avec succès.' });
+
   } catch (error) {
-    console.error('Erreur lors de la sauvegarde des bulletins :', error.message);
-
-    if (connection) await connection.rollback(); // Annuler la transaction en cas d'erreur
-
-    res.status(500).json({
-      message: 'Erreur lors de la sauvegarde des bulletins.',
-      error: error.message,
-    });
+    await connection.rollback();
+    console.error('🔥 Erreur lors de la sauvegarde du bulletin :', error);
+    res.status(500).json({ error: 'Erreur lors de la sauvegarde du bulletin.' });
   } finally {
-    if (connection) connection.release(); // Libérer la connexion si elle est définie
+    connection.release();
+    console.log('🔚 Connexion à la base de données libérée.');
   }
 });
-
 
 // Endpoint pour récupérer les semestres et les notes d'un élève en une seule requête
 app.get('/api/eleve-notes', async (req, res) => {
@@ -3059,7 +3983,6 @@ app.get('/api/bulletined/:childId/:anneeScolaireId', async (req, res) => {
         coef.valeur AS coef,
         b.moy,
         b.moycoef,
-        b.total,
         b.moySem,
         b.moyAn,
         b.rang,
@@ -3086,7 +4009,7 @@ app.get('/api/bulletined/:childId/:anneeScolaireId', async (req, res) => {
 
     // Regrouper les données par semestre
     results.forEach(row => {
-      const { semestre_id, semestreNom, matiereNom, coef, moy, moycoef, total, moySem, moyAn, rang, mention, conduite, decision } = row;
+      const { semestre_id, semestreNom, matiereNom, coef, moy, moycoef, moySem, moyAn, rang, mention, conduite, decision } = row;
 
       if (!semestres[semestre_id]) {
         semestres[semestre_id] = {
@@ -3094,7 +4017,6 @@ app.get('/api/bulletined/:childId/:anneeScolaireId', async (req, res) => {
           nom: semestreNom,
           bulletins: [],
           moySem,
-          total,
           moyAn,
           rang,
           mention,
@@ -3132,24 +4054,46 @@ app.get('/api/bulletined/:childId/:anneeScolaireId', async (req, res) => {
 
 
 
-app.get('/api/departements', async (req, res) => {
-  try {
-    const [departements] = await db.query('SELECT departement_id, nom FROM Departement');
-    res.json(departements);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des départements.' });
-  }
-});
 app.get('/api/communes', async (req, res) => {
   try {
-    const [communes] = await db.query('SELECT commune_id, nom FROM Commune');
-    res.json(communes);
+    const [rows] = await db.query(`
+      SELECT 
+        d.departement_id, 
+        d.nom AS departement_nom, 
+        c.commune_id, 
+        c.nom AS commune_nom
+      FROM Commune c
+      JOIN Departement d ON c.departement_id = d.departement_id
+      ORDER BY d.departement_id, c.nom
+    `);
+
+    // Regrouper les communes par département
+    const result = [];
+    const map = new Map();
+
+    for (const row of rows) {
+      if (!map.has(row.departement_id)) {
+        const deptGroup = {
+          departement_id: row.departement_id,
+          departement_nom: row.departement_nom,
+          communes: [],
+        };
+        map.set(row.departement_id, deptGroup);
+        result.push(deptGroup);
+      }
+      map.get(row.departement_id).communes.push({
+        commune_id: row.commune_id,
+        nom: row.commune_nom,
+      });
+    }
+
+    res.json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des communes.' });
+    res.status(500).json({ error: 'Une erreur est survenue lors de la récupération des communes par département.' });
   }
 });
+
 
 
 app.post('/api/etablissements', async (req, res) => {

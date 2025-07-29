@@ -4,6 +4,7 @@
       <InfoDetails 
         :child="selectedChild" 
         :etablissementId="etablissementId" 
+        :anneeScolaireId="anneeScolaireId"
         @back="resetView" 
         @navigate="navigateTo" 
       />
@@ -13,6 +14,7 @@
         :child="selectedChild" 
         :childId="selectedChild.id" 
         :etablissementId="etablissementId" 
+        :anneeScolaireId="anneeScolaireId"
         @back="goToDetails" 
       />
     </template>
@@ -21,6 +23,7 @@
         :child="selectedChild" 
         :childId="selectedChild.id" 
         :etablissementId="etablissementId" 
+        :anneeScolaireId="anneeScolaireId"
         @back="goToDetails" 
       />
     </template>
@@ -28,7 +31,8 @@
       <Conduite 
         :child="selectedChild" 
         :childId="selectedChild.id" 
-        :etablissementId="etablissementId" 
+        :etablissementId="etablissementId"
+        :anneeScolaireId="anneeScolaireId" 
         @back="goToDetails" 
       />
     </template>
@@ -38,6 +42,7 @@
         :childId="selectedChild.id" 
         :classId="selectedChild.class" 
         :etablissementId="etablissementId" 
+        :anneeScolaireId="anneeScolaireId"
         @back="goToDetails" 
       />
     </template>
@@ -46,6 +51,7 @@
         :child="selectedChild" 
         :childId="selectedChild.id" 
         :etablissementId="etablissementId" 
+         :anneeScolaireId="anneeScolaireId"
         @back="goToDetails" 
       />
     </template>
@@ -54,6 +60,7 @@
         :child="selectedChild" 
         :childId="selectedChild.id" 
         :etablissementId="etablissementId" 
+        :anneeScolaireId="anneeScolaireId"
         @back="goToDetails" 
       />
     </template>
@@ -62,6 +69,7 @@
         :child="selectedChild" 
         :childId="selectedChild.id" 
         :etablissementId="etablissementId" 
+        :anneeScolaireId="anneeScolaireId"
         @back="goToDetails" 
       />
     </template>
@@ -72,6 +80,7 @@
         :etablissementId="etablissementId" 
         :childName="selectedChild.prenom + ' ' + selectedChild.nom"
         :childClass="selectedChild.class"
+        :anneeScolaireId="anneeScolaireId"
         @back="goToDetails" 
       />
     </template>
@@ -80,6 +89,7 @@
         :child="selectedChild" 
         :childId="selectedChild.id" 
         :etablissementId="etablissementId" 
+        :anneeScolaireId="anneeScolaireId"
         @back="goToDetails" 
       />
     </template>
@@ -142,6 +152,15 @@ export default {
       type: Number,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
+    }
+  
   },
   data() {
     return {
@@ -153,6 +172,7 @@ export default {
   },
   created() {
     this.fetchChildren();
+    console.log(this.anneeScolaireId);
   },
   methods: {
     async fetchChildren() {

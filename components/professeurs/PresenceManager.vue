@@ -1,14 +1,17 @@
 <template>
   <v-app>
-    <v-container>
-      <h1>Veuillez Informez que les absences</h1>
+    <v-container class="px-2 sm:px-4">
+      <h1 class="text-xl sm:text-2xl font-bold mb-4 text-center">
+        Veuillez Informez que les absences
+      </h1>
 
       <!-- Semester Buttons -->
-      <v-row>
+      <v-row class="flex flex-wrap justify-center gap-2 mb-4">
         <v-col
           v-for="semester in semesters"
           :key="semester.id"
           cols="auto"
+          class="p-1"
         >
           <v-btn
             :color="getButtonColor(semester.nom)"
@@ -20,59 +23,59 @@
         </v-col>
       </v-row>
 
-      <!-- Spacer for margin -->
-      <v-spacer class="my-4"></v-spacer>
+      <!-- Responsive Data Table Wrapper -->
+      <div class="overflow-x-auto">
+        <div class="inline-block min-w-full align-middle transition-transform duration-300 
+                    scale-100 sm:scale-95 md:scale-90 lg:scale-90 xl:scale-90 2xl:scale-100">
 
-      <!-- Data Table -->
-      <v-data-table
-        :headers="headers"
-        :items="students"
-        item-key="id"
-        class="elevation-1"
-      >
-        <template v-slot:top>
-          <v-toolbar flat>
-            <v-toolbar-title>Gérer Présence</v-toolbar-title>
-            <v-spacer></v-spacer>
-            <v-btn color="primary" @click="save">Sauvegarder</v-btn>
-          </v-toolbar>
-        </template>
+          <v-data-table
+            :headers="headers"
+            :items="students"
+            item-key="id"
+            class="elevation-1 rounded-lg shadow-md border border-gray-200"
+            hide-default-footer
+          >
+            <template v-slot:top>
+              <v-toolbar flat class="flex flex-wrap justify-between items-center px-2 sm:px-4">
+                <v-toolbar-title class="text-base sm:text-lg">Gérer Présence</v-toolbar-title>
+                <v-btn color="primary" @click="save">Sauvegarder</v-btn>
+              </v-toolbar>
+            </template>
 
-        <!-- Data Table Slots -->
-        <template v-slot:item.name="{ item }">
-          <span>{{ item.name }}</span>
-        </template>
-        <template v-slot:item.date="{ item }">
-          <v-text-field
-            v-model="item.date"
-            label="Date"
-            type="date"
-          ></v-text-field>
-        </template>
-        <template v-slot:item.time="{ item }">
-          <v-text-field
-            v-model="item.time"
-            label="Heure"
-            placeholder="17h00-18h00"
-          ></v-text-field>
-        </template>
-        <template v-slot:item.status="{ item }">
-          <v-select
-            v-model="item.status"
-            :items="statuses"
-            label="Statut"
-          ></v-select>
-        </template>
+            <!-- Table Columns -->
+            <template v-slot:item.name="{ item }">
+              <div class="text-sm sm:text-base">{{ item.name }}</div>
+            </template>
+            <template v-slot:item.date="{ item }">
+              <v-text-field
+                v-model="item.date"
+                label="Date"
+                type="date"
+                dense
+                class="w-full"
+              ></v-text-field>
+            </template>
+            <template v-slot:item.status="{ item }">
+              <v-select
+                v-model="item.status"
+                :items="statuses"
+                label="Statut"
+                dense
+                class="w-full"
+              ></v-select>
+            </template>
 
-        <!-- Bottom Button -->
-        <template v-slot:bottom>
-          <v-row class="mt-4">
-            <v-col class="text-center">
-              <v-btn color="primary" @click="$emit('back')">Retour</v-btn>
-            </v-col>
-          </v-row>
-        </template>
-      </v-data-table>
+            <!-- Bottom Slot -->
+            <template v-slot:bottom>
+              <v-row class="mt-4">
+                <v-col class="text-center">
+                  <v-btn color="primary" @click="$emit('back')">Retour</v-btn>
+                </v-col>
+              </v-row>
+            </template>
+          </v-data-table>
+        </div>
+      </div>
 
       <!-- Success Dialog -->
       <v-dialog v-model="successDialog" max-width="500">
@@ -106,26 +109,11 @@ import axios from 'axios';
 
 export default {
   props: {
-    classeId: {
-      type: Number,
-      required: true,
-    },
-    subjectId: {
-      type: Number,
-      required: true,
-    },
-    etablissementId: {
-      type: Number,
-      required: true,
-    },
-    anneeScolaire: {
-      type: String,
-      required: true,
-    },
-    anneeScolaireId: {
-      type: Number,
-      required: true,
-    },
+    classeId: Number,
+    subjectId: Number,
+    etablissementId: Number,
+    anneeScolaire: String,
+    anneeScolaireId: Number,
   },
   data() {
     return {
@@ -134,10 +122,9 @@ export default {
       headers: [
         { title: 'Nom/Prenom', value: 'name' },
         { title: 'Date', value: 'date' },
-        { title: 'Heure', value: 'time' },
         { title: 'Statut', value: 'status' },
       ],
-      statuses: ['Présent', 'Absent', 'Permissionaire'],
+      statuses: ['Absent', 'Permissionaire'],
       students: [],
       successDialog: false,
       errorDialog: false,
@@ -159,7 +146,6 @@ export default {
           ...student,
           name: `${student.nom} ${student.prenom}`,
           date: '',
-          time: '17h00-18h00',
           status: '',
         }));
       } catch (error) {
@@ -180,11 +166,10 @@ export default {
     async save() {
       try {
         const dataToSave = this.students
-          .filter(student => student.date && student.time && student.status)
+          .filter(student => student.date && student.status)
           .map(student => ({
             eleveId: student.id,
             date: student.date,
-            time: student.time,
             status: student.status,
             subjectId: this.subjectId,
             classeId: this.classeId,
@@ -199,11 +184,9 @@ export default {
         }
 
         await axios.post('http://localhost:8080/api/presence', dataToSave);
-        console.log('Données sauvegardées:', dataToSave);
         this.students = this.students.map(student => ({
           ...student,
           date: '',
-          time: '',
           status: '',
         }));
         this.successDialog = true;

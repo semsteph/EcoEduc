@@ -28,6 +28,7 @@
               item-key="id"
               class="elevation-1 presence-table"
               dense
+              mobile-breakpoint="0"
             >
               <template v-slot:item.date="{ item }">
                 <td>{{ formaterDate(item.date) }}</td>
@@ -49,7 +50,7 @@
                     rows="2"
                     auto-grow
                     @input="handleMotifChange(item.id, item.motif)"
-                    class="elevation-0"
+                    class="elevation-0 motif-textarea"
                     outlined
                     dense
                   ></v-textarea>
@@ -63,10 +64,10 @@
 
     <!-- Boutons d'action -->
     <div class="action-buttons">
-      <v-btn color="primary" @click="submitMotifs" large outlined>
+      <v-btn color="primary" @click="submitMotifs" class="action-btn">
         Envoyer
       </v-btn>
-      <v-btn color="secondary" @click="$emit('back')" large outlined>
+      <v-btn color="secondary" @click="$emit('back')" class="action-btn">
         Retour
       </v-btn>
     </div>
@@ -90,11 +91,11 @@ export default {
     },
     anneeScolaire: {
       type: String,
-      required: true
+      required: true,
     },
     anneeScolaireId: {
       type: Number,
-      required: true
+      required: true,
     },
   },
   data() {
@@ -119,30 +120,26 @@ export default {
   },
   methods: {
     async fetchIncidentsData() {
-  try {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      this.$router.push("/login");
-      return;
-    }
+      try {
+        const response = await axios.get("http://localhost:8080/api/presence", {
+          params: {
+            childId: this.childId,
+            anneeScolaireId: this.anneeScolaireId,
+          },
+        });
 
-    const response = await axios.get("http://localhost:8080/api/incidents", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      params: {
-        eleveId: this.childId,
-        anneeScolaireId: this.anneeScolaireId,
-      },
-    });
+        this.presenceData = response.data;
 
-    this.incidentsData = response.data;
-    this.semestres = [...new Set(this.incidentsData.map((item) => item.semestreNom))];
-  } catch (error) {
-    console.error("Erreur lors de la récupération des incidents :", error);
-  
-  }
-},
+        const uniqueSemestres = [
+          ...new Set(this.presenceData.map((item) => item.semestreNom)),
+        ];
+        this.semestres = uniqueSemestres;
+
+      } catch (error) {
+        console.error("Erreur lors de la récupération des données de présence :", error);
+        this.showSnackbar("Erreur lors du chargement des données de présence", "error");
+      }
+    },
 
     filteredPresence(semestre) {
       return this.presenceData.filter((item) => item.semestreNom === semestre);
@@ -189,7 +186,7 @@ export default {
     },
   },
   mounted() {
-    this.fetchIncidentsData() ;
+    this.fetchIncidentsData();
   },
 };
 </script>
@@ -197,8 +194,13 @@ export default {
 <style scoped>
 .presence-container {
   padding: 16px;
-  max-width: 100%;
   font-family: Arial, sans-serif;
+}
+
+.title {
+  font-size: 22px;
+  margin-bottom: 10px;
+  text-align: center;
 }
 
 .no-data-message {
@@ -210,19 +212,66 @@ export default {
 
 .table-container {
   overflow-x: auto;
-  max-width: 100%;
-}
-
-.v-data-table {
   width: 100%;
-  min-width: 600px;
-  border-radius: 8px;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+.presence-table {
+  min-width: 600px;
+}
+
+.motif-textarea {
+  min-width: 100px;
+}
+
+/* Responsive : mobiles et tablettes */
 @media (max-width: 768px) {
-  .v-data-table {
+  .title {
+    font-size: 18px;
+  }
+
+  .no-data-message {
+    font-size: 16px;
+  }
+
+  .presence-table {
     font-size: 12px;
+    min-width: 100%;
+  }
+
+  .motif-textarea {
+    font-size: 12px;
+  }
+
+  .action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 20px;
+    align-items: center;
+  }
+
+  .action-btn {
+    width: 100%;
+    font-size: 14px;
+  }
+
+  .back-button {
+    margin-bottom: 10px;
+  }
+}
+
+/* Très petits écrans (ex. téléphones) */
+@media (max-width: 480px) {
+  .title {
+    font-size: 16px;
+  }
+
+  .presence-table {
+    font-size: 11px;
+  }
+
+  .motif-textarea {
+    font-size: 11px;
   }
 }
 </style>

@@ -1,11 +1,10 @@
 <template>
   <div class="background">
-    <!-- Couche floue appliquée à l'image de fond -->
     <div class="overlay"></div>
 
     <div class="content">
       <form @submit.prevent="submitForm" class="form-container">
-        <!-- Champ nom d'utilisateur avec label -->
+        <!-- Champ nom d'utilisateur -->
         <label for="nom_utilisateur" class="input-label">Nom d'utilisateur</label>
         <input 
           v-model="nom_utilisateur" 
@@ -16,7 +15,7 @@
           class="input-field"
         />
         
-        <!-- Champ mot de passe avec label -->
+        <!-- Champ mot de passe -->
         <label for="mot_de_passe" class="input-label">Mot de passe</label>
         <input 
           v-model="mot_de_passe" 
@@ -34,7 +33,7 @@
         </v-btn>
       </form>
 
-      <!-- Dialog de succès de connexion -->
+      <!-- Dialog de succès -->
       <v-dialog v-model="dialog" max-width="500">
         <v-card>
           <v-card-title class="headline">Connexion réussie</v-card-title>
@@ -72,14 +71,12 @@ export default {
         const response = await axios.post('http://localhost:8080/api/loginEtablissement', formData);
         const { token, etablissement } = response.data;
 
-        // Stocker le token et les infos de l'établissement
         localStorage.setItem('token', token);
         localStorage.setItem('etablissement_nom', etablissement.nom);
         localStorage.setItem('etablissement_id', etablissement.id);
 
         this.dialog = true;
 
-        // Redirection vers le tableau de bord après une courte pause
         setTimeout(() => {
           this.$router.push({ 
             path: '/administration/dashbord', 
@@ -104,73 +101,77 @@ export default {
 </script>
 
 <style scoped>
-/* Fond avec une image de fond */
 .background {
-  position: relative; /* Nécessaire pour superposer les calques */
-  background-image: url('assets/administration/depositphotos_91369982-stock-photo-notebook-stack-with-apple-and.webp'); /* Remplacez par le chemin de votre image */
+  position: relative;
+  background-image: url('@/assets/administration/depositphotos_91369982-stock-photo-notebook-stack-with-apple-and.webp');
   background-size: cover;
   background-position: center;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 20px;
 }
 
-/* Couche floue */
 .overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  backdrop-filter: blur(15px); /* Applique un flou de 15px */
-  z-index: 1; /* Place la couche derrière le contenu principal */
-  background-color: rgba(255, 255, 255, 0.2); /* Optionnel : ajoute une légère teinte */
+  backdrop-filter: blur(12px);
+  background-color: rgba(255, 255, 255, 0.25);
+  z-index: 1;
 }
 
-/* Contenu principal */
 .content {
-  position: relative; /* Nécessaire pour superposer sur la couche floue */
-  background-color: rgba(255, 255, 255, 0.8); /* Fond légèrement transparent */
-  border-radius: 10px;
-  padding: 30px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
-  max-width: 400px;
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  padding: 40px;
+  max-width: 420px;
   width: 100%;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 2;
   text-align: center;
-  z-index: 2; /* Place le contenu au-dessus de la couche floue */
+  transition: all 0.3s ease;
 }
 
-/* Formulaire */
 .form-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+}
+
+.input-label {
+  text-align: left;
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
 }
 
 .input-field {
   padding: 12px;
-  border: 1px solid blue;
-  border-radius: 5px;
+  border: 1px solid #007BFF;
+  border-radius: 6px;
   font-size: 16px;
-  width: 100%;
+  transition: border-color 0.3s ease;
 }
 
 .input-field:focus {
-  border-color: #007BFF;
+  border-color: #0056b3;
   outline: none;
 }
 
 .submit-button {
   background-color: #007BFF;
-  color: white;
-  border: none;
-  border-radius: 5px;
+  color: #fff;
   padding: 12px;
   font-size: 16px;
+  border: none;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s;
 }
 
 .submit-button:hover {
@@ -180,22 +181,41 @@ export default {
 .back-button {
   background-color: #6c757d;
   color: white;
-  border-radius: 5px;
-  padding: 10px 15px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-size: 14px;
+  padding: 10px;
+  border-radius: 6px;
   margin-top: 10px;
+  transition: background-color 0.3s;
 }
 
 .back-button:hover {
   background-color: #5a6268;
 }
 
-/* Labels des champs */
-.input-label {
-  text-align: left;
-  font-size: 14px;
-  margin-bottom: -12px;
-  color: #333;
+/* Responsive design */
+@media (max-width: 600px) {
+  .content {
+    padding: 20px;
+    max-width: 90%;
+  }
+
+  .input-label {
+    font-size: 13px;
+  }
+
+  .input-field {
+    font-size: 14px;
+    padding: 10px;
+  }
+
+  .submit-button {
+    font-size: 14px;
+    padding: 10px;
+  }
+
+  .back-button {
+    font-size: 13px;
+    padding: 8px;
+  }
 }
 </style>

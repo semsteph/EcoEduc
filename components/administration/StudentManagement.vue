@@ -32,7 +32,8 @@ export default {
         { name: 'Gestion de Punition', route: 'PunishmentManagement', color: 'lime darken-2' },
         { name: 'Consulter Note', route: 'NoteConsultation', color: 'amber darken-2' },
         { name: 'Gestion Bulletin', route: 'BulletinManagement', color: 'teal darken-2' },
-        { name: 'Gestion Scolarité', route: 'ScolariteManagement', color: 'purple darken-2' }
+        { name: 'Reinscription', route: 'Reinscription', color: 'purple darken-2' },
+         { name: 'MesEleves', route: 'MesEleves', color: 'teal darken-2' },
       ]
     };
   },

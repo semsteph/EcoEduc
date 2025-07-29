@@ -1,48 +1,58 @@
 <template>
   <v-app>
-    <!-- Barre de navigation en haut -->
-    <v-app-bar color="primary" dark elevate-on-scroll>
-      <v-toolbar-title>EchoEducation</v-toolbar-title>
+    <!-- Barre de navigation FIXÉE -->
+    <v-app-bar color="primary" dark app dense>
+      <!-- Logo à la place du texte -->
+      <img
+        src="@/assets/administration/logooff.png"
+        alt="Logo EchoEducation"
+        class="app-logo"
+      />
       <v-spacer></v-spacer>
-      <v-btn text @click="navigateTo('/administration/Accueil')">Accueil</v-btn>
-      <v-btn text @click="navigateTo('/administration/connexion')">Se connecter</v-btn>
-      <v-btn text @click="navigateTo('/administration/inscription')">S'inscrire</v-btn>
+      <v-btn text class="nav-btn" @click="navigateTo('/administration/Accueil')">Accueil</v-btn>
+      <v-btn text class="nav-btn" @click="navigateTo('/administration/connexion')">Se connecter</v-btn>
+      <v-btn text class="nav-btn" @click="navigateTo('/administration/inscription')">S'inscrire</v-btn>
     </v-app-bar>
 
-    <!-- Section principale avec fond d'image -->
+    <!-- Section principale -->
     <div class="background">
-      <div class="overlay"></div> <!-- Couche floue appliquée -->
+      <div class="overlay"></div>
       <v-container class="content" fluid>
-        <!-- Informations principales avec des cartes stylisées -->
+        <!-- Titre défilant -->
+        <div class="scroll-wrapper">
+          <marquee behavior="scroll" direction="left" class="scroll-title">
+            Bienvenue sur EchoEducation — Plateforme de gestion scolaire moderne
+          </marquee>
+        </div>
+
+        <!-- Cartes d'information -->
         <v-row justify="center">
           <v-col cols="12" md="8">
-            <v-card class="info-card" elevation="10">
+            <v-card class="info-card" elevation="6">
               <v-card-title class="headline">Pourquoi le suivi scolaire est-il important ?</v-card-title>
               <v-card-text>
-                Le suivi scolaire permet aux établissements de mieux comprendre le parcours de chaque élève, 
-                d'identifier rapidement les difficultés, et d'offrir un accompagnement personnalisé. 
-                Il améliore la communication entre les enseignants, les parents, et l'administration, 
-                pour garantir la réussite de chaque élève.
+                Le suivi scolaire permet aux établissements de mieux comprendre le parcours de chaque élève,
+                d'identifier rapidement les difficultés, et d'offrir un accompagnement personnalisé.
               </v-card-text>
             </v-card>
           </v-col>
+
           <v-col cols="12" md="8">
-            <v-card class="info-card" elevation="10">
+            <v-card class="info-card" elevation="6">
               <v-card-title class="headline">Comment EchoEducation peut vous aider ?</v-card-title>
               <v-card-text>
-                EchoEducation centralise toutes les informations scolaires : suivi des notes, gestion des absences, 
-                planification des cours, et bien plus encore. Avec une interface intuitive, l'application facilite 
-                la gestion quotidienne de votre établissement et le suivi de la progression de chaque élève.
+                EchoEducation centralise les informations scolaires : suivi des notes, gestion des absences,
+                planification des cours, et plus encore. L'interface est intuitive et moderne.
               </v-card-text>
             </v-card>
           </v-col>
+
           <v-col cols="12" md="8">
-            <v-card class="info-card" elevation="10">
+            <v-card class="info-card" elevation="6">
               <v-card-title class="headline">Utilisez EchoEducation pour un suivi efficace</v-card-title>
               <v-card-text>
-                Avec EchoEducation, vous pouvez suivre les performances des élèves, générer des rapports détaillés, 
-                et communiquer facilement avec les parents. C'est l'outil idéal pour améliorer l'expérience éducative 
-                et garantir un suivi optimal.
+                Suivez les performances des élèves, générez des rapports détaillés et communiquez facilement
+                avec les parents. Améliorez l'expérience éducative avec EchoEducation.
               </v-card-text>
             </v-card>
           </v-col>
@@ -63,77 +73,141 @@ export default {
 </script>
 
 <style scoped>
-/* Fond avec une image de fond floue */
+/* Fond avec image */
 .background {
-  position: relative; /* Nécessaire pour la couche floue */
-  background-image: url('assets/administration/Image collée.png'); /* Chemin vers votre image */
+  position: relative;
+  background-image: url('assets/administration/Image collée.png');
   background-size: cover;
   background-position: center;
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 20px;
+  padding: 100px 20px 20px; /* Ajout de padding-top pour tenir compte de la v-app-bar */
 }
 
-/* Couche floue au-dessus de l'image */
+/* Flou de fond */
 .overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  backdrop-filter: blur(10px); /* Applique le flou */
-  z-index: 1; /* Assure que la couche reste derrière le contenu */
+  backdrop-filter: blur(10px);
+  background-color: rgba(0, 0, 0, 0.2);
+  z-index: 1;
 }
 
-/* Conteneur principal avec fond semi-transparent */
+/* Contenu principal */
 .content {
-  position: relative; /* Permet de superposer sur l'effet flou */
-  background-color: rgba(255, 255, 255, 0.9); /* Légèrement transparent pour un effet visuel */
-  border-radius: 12px;
-  padding: 40px;
-  margin-top: 10%;
+  position: relative;
+  z-index: 2;
+  background-color: rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  padding: 40px 30px;
+  max-width: 1000px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  max-width: 900px;
   text-align: center;
-  border-radius: 15px;
-  z-index: 2; /* Place le contenu au-dessus de l'effet flou */
 }
 
-/* Cartes d'informations avec un design moderne */
+/* Marquee wrapper pour éviter le débordement */
+.scroll-wrapper {
+  overflow: hidden;
+  white-space: nowrap;
+  margin-bottom: 30px;
+}
+
+.scroll-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #007BFF;
+}
+
+/* Cartes d'information */
 .info-card {
-  background-color: #fafafa;
-  border-radius: 10px;
-  padding: 25px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-  transition: transform 0.3s ease-in-out;
+  background-color: #fdfdfd;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+  transition: transform 0.3s ease;
 }
 
 .info-card:hover {
-  transform: scale(1.03);
+  transform: translateY(-3px);
 }
 
 .headline {
-  font-size: 22px;
-  color: #333;
+  font-size: 18px;
   font-weight: 600;
-  margin-bottom: 15px;
+  color: #333;
+  margin-bottom: 10px;
+  word-wrap: break-word;
+  white-space: normal;
 }
 
-/* Stylisation des boutons dans la barre de navigation */
+/* Logo */
+.app-logo {
+  height: 36px;
+  width: auto;
+  max-width: 130px;
+  margin-left: 10px;
+}
+
+/* Barre de navigation */
 .v-app-bar {
-  background-color: #007BFF; /* Couleur bleue pour la barre */
+  background-color: #007BFF;
+  padding-left: 10px;
+  padding-right: 10px;
+  z-index: 10;
 }
 
-.v-btn {
-  color: white;
+/* Boutons navigation */
+.nav-btn {
+  color: white !important;
   font-weight: 500;
+  font-size: 0.85rem;
   text-transform: none;
+  padding: 6px 8px;
+  min-width: 0;
 }
 
-.v-btn:hover {
+.nav-btn:hover {
   background-color: #0056b3;
+}
+
+/* Responsive pour petits écrans */
+@media screen and (max-width: 600px) {
+  .content {
+    padding: 20px 15px;
+    margin-top: 20px;
+  }
+
+  .scroll-title {
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .info-card {
+    padding: 14px;
+  }
+
+  .headline {
+    font-size: 15px;
+  }
+
+  .app-logo {
+    height: 28px;
+    max-width: 90px;
+  }
+
+  .nav-btn {
+    font-size: 0.65rem !important;
+    padding: 4px 5px !important;
+  }
+
+  .v-app-bar {
+    height: 48px;
+  }
 }
 </style>

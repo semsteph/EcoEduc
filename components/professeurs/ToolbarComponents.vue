@@ -1,21 +1,26 @@
 <template>
   <v-app-bar color="blue darken-3" dark app elevation="4">
+    <!-- Bouton du menu (drawer) -->
     <v-btn icon @click="$emit('toggleDrawer')" class="white--text">
       <v-icon>mdi-menu</v-icon>
     </v-btn>
-    <v-toolbar-title class="white--text font-weight-bold text-h5 ml-2">
-      EchoEducation
-    </v-toolbar-title>
+
+    <!-- Logo agrandi à la place du titre -->
+    <v-img
+      src="/assets/administration/logooff.png"
+      contain
+      height="60"
+      class="ml-3"
+      style="max-width: 180px"
+    ></v-img>
+
     <v-spacer></v-spacer>
 
+    <!-- Bouton de notifications -->
     <v-btn icon @click="$emit('showNotifications')" class="white--text">
       <v-badge :content="badgeCount" :value="badgeCount" color="red" overlap>
         <v-icon>mdi-bell</v-icon>
       </v-badge>
-    </v-btn>
-
-    <v-btn icon @click="showLogoutDialog" class="white--text">
-      <v-icon>mdi-logout"></v-icon>
     </v-btn>
   </v-app-bar>
 </template>

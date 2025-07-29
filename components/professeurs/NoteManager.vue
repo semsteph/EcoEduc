@@ -3,7 +3,7 @@
     <v-btn block color="primary" @click="$emit('back')">Retour</v-btn>
     <v-container fluid>
       <!-- Sélection des semestres -->
-       <h1>Cahier de notes</h1>
+      <h1>Cahier de notes</h1>
       <v-row>
         <v-col
           v-for="semester in semesters"
@@ -20,27 +20,32 @@
         </v-col>
       </v-row>
 
-      <!-- Bouton de génération et téléchargement des fichiers Excel -->
+      <!-- Boutons actions -->
       <v-row class="my-4" justify="center">
         <v-col cols="12" md="4">
           <v-btn block color="green darken-1" @click="generateExcelFile">
-            Generer  un fichier Excel
+            Générer un fichier Excel
           </v-btn>
         </v-col>
-        <!-- Bouton de génération et téléchargement des fichiers Excel -->
         <v-col cols="12" md="4">
           <v-btn block color="green darken-1" @click="openImportForm2">
-            Renseigner les notes 
+            Renseigner les notes
           </v-btn>
         </v-col>
-
       </v-row>
 
-      
+      <!-- Toolbar et boutons de validation -->
+      <v-toolbar flat class="responsive-toolbar">
+        <v-toolbar-title>Cahier de note</v-toolbar-title>
+        <span class="responsive-text">{{ matiereNom }} - {{ currentSemester }}</span>
+        <v-spacer></v-spacer>
+        <div class="responsive-button-group">
+          <v-btn color="blue darken-1" class="mb-2" @click="openImportForm1">Valider les notes</v-btn>
+          <v-btn color="red darken-1" class="mb-2" @click="saveNotes">Sauvegarder</v-btn>
+        </div>
+      </v-toolbar>
 
-      <v-spacer class="my-4"></v-spacer>
-
-      <!-- Tableau de données des étudiants -->
+      <!-- Tableau des étudiants -->
       <v-data-table
         :headers="headers"
         :items="students"
@@ -49,95 +54,69 @@
         :items-per-page="10"
         dense
       >
-        <template v-slot:top>
-          <v-toolbar flat class="responsive-toolbar">
-            <v-toolbar-title>Cahier de note</v-toolbar-title>
-            <span class="responsive-text">{{ matiereNom }} - {{ currentSemester }}</span>
-            <v-spacer></v-spacer>
-            <v-btn color="blue darken-1" @click="openImportForm1">Valider les notes</v-btn>
-            <v-btn color="red darken-1" @click="saveNotes">Sauvegarder</v-btn>
-          </v-toolbar>
-        </template>
-
-        <!-- Affichage des noms des étudiants -->
         <template v-slot:item.studentName="{ item }">
           <span>{{ item.nom }} {{ item.prenom }}</span>
         </template>
 
-        <!-- Affichage des notes récupérées -->
         <template v-slot:item.inter1="{ item }">
           <div class="note-container">
-            <span>{{ item.inter1 ? item.inter1 : '' }}</span>
+            <span>{{ item.inter1 || '' }}</span>
             <v-icon v-if="item.inter1" class="delete-icon" @click="confirmDelete(item, 'Inter1')">mdi-delete</v-icon>
           </div>
         </template>
         <template v-slot:item.inter2="{ item }">
-        <div class="note-container">
-           <span>{{ item.inter2 ? item.inter2 : '' }}</span>
-           <v-icon v-if="item.inter2" class="delete-icon" @click="confirmDelete(item, 'Inter2')">mdi-delete</v-icon>
+          <div class="note-container">
+            <span>{{ item.inter2 || '' }}</span>
+            <v-icon v-if="item.inter2" class="delete-icon" @click="confirmDelete(item, 'Inter2')">mdi-delete</v-icon>
           </div>
         </template>
         <template v-slot:item.inter3="{ item }">
-          <span>{{ item.inter3 ? item.inter3 : '' }}</span>
+          <span>{{ item.inter3 || '' }}</span>
           <v-icon v-if="item.inter3" class="delete-icon" @click="confirmDelete(item, 'Inter3')">mdi-delete</v-icon>
         </template>
         <template v-slot:item.inter4="{ item }">
-          <span>{{ item.inter4 ? item.inter4 : '' }}</span>
+          <span>{{ item.inter4 || '' }}</span>
           <v-icon v-if="item.inter4" class="delete-icon" @click="confirmDelete(item, 'Inter4')">mdi-delete</v-icon>
         </template>
         <template v-slot:item.MoyI="{ item }">
-          <span>{{ item.MoyI ? item.MoyI : '' }}</span>
+          <span>{{ item.MoyI || '' }}</span>
         </template>
         <template v-slot:item.Dev1="{ item }">
-          <span>{{ item.Dev1 ? item.Dev1 : '' }}</span>
+          <span>{{ item.Dev1 || '' }}</span>
           <v-icon v-if="item.Dev1" class="delete-icon" @click="confirmDelete(item, 'Devoir1')">mdi-delete</v-icon>
         </template>
         <template v-slot:item.Dev2="{ item }">
-          <span>{{ item.Dev2 ? item.Dev2 : '' }}</span>
+          <span>{{ item.Dev2 || '' }}</span>
           <v-icon v-if="item.Dev2" class="delete-icon" @click="confirmDelete(item, 'Devoir2')">mdi-delete</v-icon>
         </template>
         <template v-slot:item.Moy="{ item }">
-          <span>{{ item.Moy ? item.Moy : '' }}</span>
+          <span>{{ item.Moy || '' }}</span>
         </template>
         <template v-slot:item.Moycoef="{ item }">
-          <span>{{ item.Moycoef ? item.Moycoef : '' }}</span>
+          <span>{{ item.Moycoef || '' }}</span>
         </template>
       </v-data-table>
 
-      <!-- Message de succès -->
+      <!-- Snackbars et dialogues -->
       <v-snackbar v-model="snackbar" color="green" timeout="3000">
         {{ snackbarMessage }}
         <v-btn text @click="snackbar = false">Fermer</v-btn>
       </v-snackbar>
 
-      <!-- Bouton retour -->
       <v-row class="mt-4" justify="center">
         <v-col cols="12" md="6" class="text-center">
           <v-btn block color="primary" @click="$emit('back')">Retour</v-btn>
         </v-col>
       </v-row>
-   <!-- Formulaire modal pour l'importation des notes -->
-       <!-- Première modale -->
-       <v-dialog v-model="dialog1" max-width="500px">
+
+      <!-- Dialogues d'importation et de confirmation -->
+      <v-dialog v-model="dialog1" max-width="500px">
         <v-card>
-          <v-card-title>
-            <span class="headline">Importer des notes</span>
-          </v-card-title>
+          <v-card-title><span class="headline">Importer des notes</span></v-card-title>
           <v-card-text>
             <v-form ref="form1" v-model="valid1">
-              <v-select
-                v-model="selectedNoteType"
-                :items="noteTypes"
-                label="Type de note"
-                required
-              ></v-select>
-              <v-file-input
-                v-model="selectedFile"
-                label="Fichier Excel"
-                accept=".xlsx, .xls"
-                prepend-icon="mdi-upload"
-                required
-              ></v-file-input>
+              <v-select v-model="selectedNoteType" :items="noteTypes" label="Type de note" required></v-select>
+              <v-file-input v-model="selectedFile" label="Fichier Excel" accept=".xlsx, .xls" prepend-icon="mdi-upload" required></v-file-input>
             </v-form>
           </v-card-text>
           <v-card-actions>
@@ -158,16 +137,37 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
-      <v-dialog v-model="showDeleteDialog" max-width="400">
-  <v-card>
-    <v-card-title>Suppression réussie</v-card-title>
-    <v-card-text>{{ deleteMessage }}</v-card-text>
-    <v-card-actions>
-      <v-btn color="primary" text @click="showDeleteDialog = false">OK</v-btn>
-    </v-card-actions>
-  </v-card>
-</v-dialog>
 
+      <v-dialog v-model="showDeleteDialog" max-width="400">
+        <v-card>
+          <v-card-title>Suppression réussie</v-card-title>
+          <v-card-text>{{ deleteMessage }}</v-card-text>
+          <v-card-actions>
+            <v-btn color="primary" text @click="showDeleteDialog = false">OK</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-dialog v-model="dialogElevesNonTrouves" max-width="500">
+        <v-card>
+          <v-card-title class="headline">Élèves introuvables</v-card-title>
+          <v-card-text>
+            <div>Les élèves suivants n’ont pas été trouvés dans la classe sélectionnée :</div>
+            <v-list dense>
+              <v-list-item v-for="(eleve, index) in nonFoundStudents" :key="index">
+                <v-list-item-content>
+                  <v-list-item-title>{{ eleve }}</v-list-item-title>
+                </v-list-item-content>
+              </v-list-item>
+            </v-list>
+            <div class="gog">Veuillez vérifier si vous importez le bon fichier</div>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="primary" text @click="dialogElevesNonTrouves = false">Fermer</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-container>
   </v-app>
 </template>
@@ -200,6 +200,7 @@ export default {
   data: () => ({
     dialog1: false, // Contrôle de la première modale
     dialog2: false, // Contrôle de la deuxième modale
+    dialogElevesNonTrouves: false,
     snackbar: false,
     dialog: false,
     deleteMessage: "", // Stocke le message de confirmation
@@ -243,24 +244,24 @@ export default {
       this.fetchNotesData();
     },
 
-    // Récupération des étudiants et tri par ordre alphabétique
-    async getStudents() {
-      try {
-        const response = await axios.get(`http://localhost:8080/api/classes/${this.classeId}/eleves`);
-        this.students = response.data;
+   // Récupération des étudiants et tri par ordre alphabétique
+async getStudents() {
+  try {
+    const response = await axios.get(`http://localhost:8080/api/classes/${this.classeId}/eleves`);
+    this.students = response.data;
+    console.log(this.students)    // Trier les étudiants par ordre alphabétique
+    this.students.sort((a, b) => {
+      const nomA = a.nom.toUpperCase();
+      const nomB = b.nom.toUpperCase();
+      return nomA < nomB ? -1 : nomA > nomB ? 1 : 0;
+    });
 
-        // Trier les étudiants par ordre alphabétique
-        this.students.sort((a, b) => {
-          const nomA = a.nom.toUpperCase();
-          const nomB = b.nom.toUpperCase();
-          return nomA < nomB ? -1 : nomA > nomB ? 1 : 0;
-        });
+    console.log("✅ Étudiants chargés :", this.students);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des élèves', error);
+  }
+},
 
-        await this.fetchNotesData(); // Récupérer les notes après avoir récupéré et trié les étudiants
-      } catch (error) {
-        console.error('Erreur lors de la récupération des élèves', error);
-      }
-    },
 
     async fetchSemesters() {
       console.log(this.etablissementId);
@@ -384,37 +385,84 @@ async deleteNote() {
     closeImportForm2() {
       this.dialog2 = false;
     },
+async handleFileUpload() {
+  if (!this.selectedNoteType || !this.selectedFile) {
+    this.snackbarMessage = 'Veuillez remplir tous les champs requis.';
+    this.snackbar = true;
+    return;
+  }
 
-    async handleFileUpload() {
-      if (!this.selectedNoteType || !this.selectedFile) {
-        return; // Valide les champs avant d'envoyer
+  const formData = new FormData();
+  formData.append('typeNote', this.selectedNoteType);
+  formData.append('file', this.selectedFile);
+  formData.append('semestreId', this.getSemesterId(this.currentSemester));
+  formData.append('matiereId', this.subjectId);
+  formData.append('classeId', this.classeId);
+  formData.append('etablissementId', this.etablissementId);
+  formData.append('anneeScolaireId', this.anneeScolaireId);
+
+  try {
+    const response = await axios.post(`http://localhost:8080/api/upload/excel`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    // ✅ Succès
+    this.snackbarMessage = response.data.message || 'Importation réussie !';
+    this.snackbar = true;
+    this.dialog1 = false;
+
+    this.fetchNotesData(); // Recharge les données après importation
+
+    setTimeout(() => {
+      this.selectedNoteType = '';
+      this.selectedFile = null;
+    }, 100);
+
+    if (this.$refs.form1) {
+      this.$refs.form1.resetValidation();
+    }
+
+  } catch (error) {
+    let message = 'Erreur lors de l\'importation.';
+    let details = [];
+
+    if (error.response) {
+      const status = error.response.status;
+      const data = error.response.data;
+
+      switch (status) {
+        case 400:
+          message = data.message || 'Requête invalide. Vérifiez les données envoyées.';
+          break;
+        case 409:
+          message = data.message || 'Certaines notes existent déjà.';
+          if (Array.isArray(data.details) && data.details.length > 0) {
+            details = data.details;
+          }
+          break;
+        case 500:
+          message = 'Erreur interne du serveur. Veuillez réessayer plus tard.';
+          break;
+        default:
+          message = data.message || 'Une erreur inconnue est survenue.';
+          break;
       }
+    }
 
-      const formData = new FormData();
-      formData.append('typeNote', this.selectedNoteType);
-      formData.append('file', this.selectedFile);
-      formData.append('semestreId', this.getSemesterId(this.currentSemester));
-      formData.append('matiereId', this.subjectId);
-      formData.append('classeId', this.classeId);
-      formData.append('etablissementId', this.etablissementId);
-      formData.append('anneeScolaireId', this.anneeScolaireId);
+    this.snackbarMessage = message;
+    this.snackbar = true;
 
-      try {
-        await axios.post(`http://localhost:8080/api/upload/excel`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        
-        this.snackbarMessage = 'Importation réussie!';
-        this.snackbar = true;
-        this.dialog = false;
-        this.fetchNotesData();
-        this.$refs.form.reset();
-      } catch (error) {
-        console.error('Erreur lors de l\'importation du fichier Excel', error);
-      }
-    },
+    // 🆕 Affiche la liste d'élèves introuvables dans un `v-dialog`
+    if (details.length > 0) {
+      this.nonFoundStudents = details;
+      this.dialogElevesNonTrouves = true;
+    }
+  }
+},
+
+
    
 
     getSemesterId(semesterName) {
@@ -424,32 +472,50 @@ async deleteNote() {
 
     // Récupération des notes selon le semestre
     async fetchNotesData() {
-      try {
-        const semesterId = this.getSemesterId(this.currentSemester);
-        const response = await axios.get(`http://localhost:8080/api/notes/${this.classeId}/${this.subjectId}/${semesterId}/${this.anneeScolaireId}`);
-        const notesData = response.data;
-        console.log(notesData)
+  try {
+    const semesterId = this.getSemesterId(this.currentSemester);
 
-        // Associer les notes aux étudiants
-        this.students.forEach(student => {
-          const studentNotes = notesData.find(note => note.nom === student.nom && note.prenom === student.prenom);
-          if (studentNotes) {
-            student.notesId = studentNotes.notesId;
-            student.inter1 = studentNotes.inter1 !== null ? Number(studentNotes.inter1) : null;
-            student.inter2 = studentNotes.inter2 !== null ? Number(studentNotes.inter2) : null;
-            student.inter3 = studentNotes.inter3 !== null ? Number(studentNotes.inter3) : null;
-            student.inter4 = studentNotes.inter4 !== null ? Number(studentNotes.inter4) : null;
-            student.MoyI = studentNotes.moyInter !== null ? Number(studentNotes.moyInter) : null;
-            student.Dev1 = studentNotes.Dev1 !== null ? Number(studentNotes.Dev1) : null;
-            student.Dev2 = studentNotes.Dev2 !== null ? Number(studentNotes.Dev2) : null;
-            student.Moy = studentNotes.moy !== null ? Number(studentNotes.moy) : null;
-            student.Moycoef = studentNotes.coeff !== null ? Number(studentNotes.coeff) : null;
-          }
-        });
-      } catch (error) {
-        console.error('Erreur lors de la récupération des notes', error);
+    // Requête API pour récupérer les notes de la classe, matière, semestre et année scolaire
+    const response = await axios.get(`http://localhost:8080/api/notes/${this.classeId}/${this.subjectId}/${semesterId}/${this.anneeScolaireId}`);
+    const notesData = response.data;
+
+    //console.log("✅ Données des notes récupérées :", notesData);
+    //console.log("📚 Liste des élèves :", this.students);
+
+    // Associer les notes à chaque élève par leur ID unique
+    this.students.forEach(student => {
+      const studentNotes = notesData.find(note => note.eleveId === student.id);
+
+      if (studentNotes) {
+        student.notesId = studentNotes.notesId || null;
+        student.inter1 = studentNotes.inter1 !== null ? Number(studentNotes.inter1) : null;
+        student.inter2 = studentNotes.inter2 !== null ? Number(studentNotes.inter2) : null;
+        student.inter3 = studentNotes.inter3 !== null ? Number(studentNotes.inter3) : null;
+        student.inter4 = studentNotes.inter4 !== null ? Number(studentNotes.inter4) : null;
+        student.MoyI = studentNotes.moyInter !== null ? Number(studentNotes.moyInter) : null;
+        student.Dev1 = studentNotes.Dev1 !== null ? Number(studentNotes.Dev1) : null;
+        student.Dev2 = studentNotes.Dev2 !== null ? Number(studentNotes.Dev2) : null;
+        student.Moy = studentNotes.moy !== null ? Number(studentNotes.moy) : null;
+        student.Moycoef = studentNotes.coeff !== null ? Number(studentNotes.coeff) : null;
+      } else {
+        // Réinitialiser les champs s’il n’y a pas encore de note
+        student.notesId = null;
+        student.inter1 = null;
+        student.inter2 = null;
+        student.inter3 = null;
+        student.inter4 = null;
+        student.MoyI = null;
+        student.Dev1 = null;
+        student.Dev2 = null;
+        student.Moy = null;
+        student.Moycoef = null;
       }
-    },
+    });
+  } catch (error) {
+    console.error('❌ Erreur lors de la récupération des notes :', error);
+  }
+},
+
 
     async saveNotes() {
       try {
@@ -506,8 +572,11 @@ async deleteNote() {
   },
 
   async mounted() {
-    await this.fetchSemesters();
     await this.getStudents();
+    console.log("✅ Étudiants chargés :", this.students);
+    await this.fetchSemesters();
+    await this.fetchNotesData();
+    await this.fetchNotesData(); // Important : après getStudents
   },
 };
 </script>
@@ -520,26 +589,38 @@ async deleteNote() {
   overflow-x: auto;
   max-width: 100%;
 }
-.responsive-text {
-  font-size: 1rem;
-  white-space: nowrap;
-}
-
 .responsive-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
 }
+.responsive-text {
+  font-size: 1rem;
+  white-space: nowrap;
+}
+.responsive-button-group {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
 @media screen and (max-width: 600px) {
   .responsive-toolbar {
     flex-direction: column;
     text-align: center;
   }
+  .responsive-button-group {
+    flex-direction: column;
+    width: 100%;
+  }
+  .responsive-button-group .v-btn {
+    width: 100%;
+  }
   .responsive-text {
     font-size: 0.9rem;
   }
-
 }
-
+.gog {
+  color: red;
+}
 </style>

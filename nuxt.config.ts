@@ -1,7 +1,13 @@
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 
 export default defineNuxtConfig({
+  
   devtools: { enabled: true },
+css: [
+    '@/assets/css/styles.css' // ➕ Ajout de ton fichier Tailwind CSS
+  ],
+  
+
   build: {
     transpile: ['vuetify'],
   },
@@ -13,7 +19,6 @@ export default defineNuxtConfig({
         config.plugins.push(vuetify({ autoImport: true }))
       })
     },
-    //...
   ],
 
   vite: {
@@ -23,6 +28,13 @@ export default defineNuxtConfig({
       },
     },
   },
+ 
+  postcss: {
+    plugins: {
+      tailwindcss: {},
+      autoprefixer: {},
+    },
+  },
 
   runtimeConfig: {
     openaiApiKey: process.env.OPENAI_API_KEY, // Clé OpenAI (uniquement côté serveur)
@@ -30,5 +42,7 @@ export default defineNuxtConfig({
       baseURL: 'http://localhost:3002', // Base URL exposée côté client
     },
   },
+
   compatibilityDate: '2024-07-08',
+  
 })

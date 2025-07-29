@@ -1,56 +1,165 @@
 <template>
-  <v-container class="button-group">
-    <v-card class="mx-auto" max-width="600">
-      <v-card-title class="text-h5 text-center">
+  <v-container class="pa-2 pa-sm-6">
+    <v-card class="mx-auto card-responsive">
+      <v-card-title class="text-center text-h6 text-md-h5 font-weight-bold">
+        <v-icon class="mr-2" color="primary">mdi-account-group</v-icon>
         Gestion des Parents
       </v-card-title>
-      <v-card-subtitle class="text-center">
-        <v-btn color="primary" @click="openForm">Inscrire un Parent</v-btn>
+
+      <v-card-subtitle class="text-center mb-2">
+        <v-btn color="primary" @click="openForm" class="text-caption text-sm-body-2">
+          <v-icon left>mdi-account-plus</v-icon>
+          Inscrire un Parent
+        </v-btn>
       </v-card-subtitle>
+
       <v-card-text>
-        <v-form v-if="showForm" class="px-3">
-          <v-text-field v-model="newParent.name" label="Nom" required></v-text-field>
-          <v-text-field v-model="newParent.firstName" label="Prénom" required></v-text-field>
-          <v-text-field v-model="newParent.contact" label="Contact" required></v-text-field>
-          <v-text-field v-model="newParent.email" label="Email" required></v-text-field>
-          <v-text-field v-model="newParent.username" label="Nom d'utilisateur" required></v-text-field>
-          
-          <v-text-field 
-            v-model="newParent.password" 
-            :type="showPassword ? 'text' : 'password'" 
-            label="Mot de passe" required>
-            <template v-slot:append-inner>
-              <v-icon @click="showPassword = !showPassword">{{ showPassword ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
-            </template>
-          </v-text-field>
-          
-          <v-text-field 
-            v-model="confirmPassword" 
-            :type="showConfirmPassword ? 'text' : 'password'" 
-            label="Confirmer Mot de passe" required>
-            <template v-slot:append-inner>
-              <v-icon @click="showConfirmPassword = !showConfirmPassword">{{ showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye' }}</v-icon>
-            </template>
-          </v-text-field>
-          
-          <v-btn color="success" class="mr-2" @click="registerParent">Enregistrer</v-btn>
-          <v-btn color="error" @click="showForm = false">Annuler</v-btn>
+        <v-form v-if="showForm" class="px-2 px-md-6">
+          <v-row dense>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="newParent.name"
+                label="Nom"
+                prepend-inner-icon="mdi-account"
+                dense outlined
+                required
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="newParent.firstName"
+                label="Prénom"
+                prepend-inner-icon="mdi-account"
+                dense outlined
+                required
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="newParent.contact"
+                label="Contact"
+                prepend-inner-icon="mdi-phone"
+                dense outlined
+                required
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="newParent.email"
+                label="Email"
+                prepend-inner-icon="mdi-email"
+                dense outlined
+                required
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="newParent.username"
+                label="Nom d'utilisateur"
+                prepend-inner-icon="mdi-account-circle"
+                dense outlined
+                required
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="newParent.password"
+                :type="showPassword ? 'text' : 'password'"
+                label="Mot de passe"
+                prepend-inner-icon="mdi-lock"
+                dense outlined
+                required
+              >
+                <template v-slot:append-inner>
+                  <v-icon @click="showPassword = !showPassword" class="cursor-pointer">
+                    {{ showPassword ? 'mdi-eye-off' : 'mdi-eye' }}
+                  </v-icon>
+                </template>
+              </v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                label="Confirmer Mot de passe"
+                prepend-inner-icon="mdi-lock-check"
+                dense outlined
+                required
+              >
+                <template v-slot:append-inner>
+                  <v-icon @click="showConfirmPassword = !showConfirmPassword" class="cursor-pointer">
+                    {{ showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye' }}
+                  </v-icon>
+                </template>
+              </v-text-field>
+            </v-col>
+          </v-row>
+
+          <v-row justify="center" class="mt-2">
+            <v-btn color="success" class="mr-2" @click="registerParent" small>
+              <v-icon left>mdi-content-save</v-icon> Enregistrer
+            </v-btn>
+            <v-btn color="error" @click="showForm = false" small>
+              <v-icon left>mdi-close-circle</v-icon> Annuler
+            </v-btn>
+          </v-row>
         </v-form>
 
-        <v-data-table v-else :headers="headers" :items="parents" item-key="id" class="elevation-1 mt-4">
+        <v-data-table
+          v-else
+          :headers="headers"
+          :items="parents"
+          :search="search"
+          item-key="id"
+          class="elevation-1 mt-4 data-table-responsive"
+          dense
+        >
           <template v-slot:top>
-            <v-toolbar flat>
-              <v-toolbar-title>Liste des Parents</v-toolbar-title>
+            <v-toolbar flat dense>
+              <v-toolbar-title class="text-subtitle-1 text-md-h6">Liste des Parents</v-toolbar-title>
               <v-spacer></v-spacer>
-              <v-text-field v-model="search" append-icon="mdi-magnify" label="Rechercher" single-line hide-details></v-text-field>
+              <v-text-field
+                v-model="search"
+                append-icon="mdi-magnify"
+                label="Rechercher"
+                single-line
+                dense
+                hide-details
+                class="ma-2"
+              ></v-text-field>
             </v-toolbar>
           </template>
           <template v-slot:item.action="{ item }">
-            <v-icon small class="mr-2" color="blue" @click="editParent(item)">mdi-pencil</v-icon>
-            <v-icon small color="red" @click="promptDeleteParent(item)">mdi-delete</v-icon>
+            <v-icon small class="mr-2 edit-icon" @click="editParent(item)">mdi-pencil</v-icon>
+            <v-icon small class="delete-icon" @click="promptDeleteParent(item)">mdi-delete</v-icon>
           </template>
         </v-data-table>
       </v-card-text>
+
+      <!-- Dialog de confirmation suppression -->
+      <v-dialog v-model="confirmDeleteDialog" max-width="400">
+        <v-card>
+          <v-card-title class="text-h6">Confirmer la suppression</v-card-title>
+          <v-card-text>Êtes-vous sûr de vouloir supprimer ce parent ?</v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="error" text @click="confirmDelete">Oui</v-btn>
+            <v-btn color="primary" text @click="confirmDeleteDialog = false">Non</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Dialog de notification -->
+      <v-dialog v-model="dialog" max-width="400">
+        <v-card>
+          <v-card-title class="text-h6">Notification</v-card-title>
+          <v-card-text class="text-body-2">{{ dialogMessage }}</v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="primary" text @click="dialog = false">Fermer</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-card>
   </v-container>
 </template>
@@ -168,7 +277,7 @@ export default {
     },
     confirmDelete() {
       if (this.parentToDelete) {
-        axios.delete(`http://localhost:8080/api/Parents/${this.parentToDelete.id}`)
+        axios.delete(`http://localhost:8080/api/Parentss/${this.parentToDelete.id}`)
           .then(() => {
             this.parents = this.parents.filter(p => p.id !== this.parentToDelete.id);
             this.showSuccess('Parent supprimé avec succès');
@@ -219,46 +328,59 @@ export default {
 </script>
 
 <style scoped>
-.content-container {
-  display: flex;
-  justify-content: center;
-  padding: 20px;
-}
-
-.main-card {
-  width: 100%;
-  max-width: 900px;
-  padding: 20px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-}
-
-.form-card {
-  padding: 20px;
-  margin-bottom: 20px;
-  border-radius: 10px;
-  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.dialog-content {
-  max-height: 200px;
-  overflow-y: auto;
+.card-responsive {
+  max-width: 100%;
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .edit-icon {
   color: #1976D2;
   cursor: pointer;
-  margin-right: 10px;
 }
 
 .delete-icon {
   color: #D32F2F;
   cursor: pointer;
 }
-.button-group {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 20px;
+
+@media (max-width: 600px) {
+  .v-card-title,
+  .v-card-subtitle,
+  .v-btn,
+  .v-toolbar-title,
+  .v-text-field input,
+  .v-icon,
+  .v-card-text,
+  .v-data-table {
+    font-size: 12px !important;
+  }
+
+  .v-btn {
+    min-height: 30px !important;
+    padding: 4px 10px !important;
+  }
+
+  .v-text-field {
+    margin-bottom: 10px !important;
+  }
+
+  .v-data-table .v-data-table__wrapper {
+    font-size: 12px !important;
+  }
+}
+
+@media (min-width: 601px) {
+  .v-card-title,
+  .v-card-subtitle,
+  .v-btn,
+  .v-toolbar-title,
+  .v-text-field input,
+  .v-icon,
+  .v-card-text,
+  .v-data-table {
+    font-size: 15px;
+  }
 }
 </style>
-

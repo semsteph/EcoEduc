@@ -2,7 +2,6 @@
   <v-card>
     <v-card-title>Cahier de Texte</v-card-title>
     <v-card-text>
-      <!-- Bouton de retour -->
       <v-btn color="primary" @click="$emit('back')" class="mb-4">Retour</v-btn>
 
       <!-- Sélection des semestres -->
@@ -21,11 +20,9 @@
       <v-toolbar flat class="mt-4">
         <v-toolbar-title>Activités</v-toolbar-title>
         <v-spacer></v-spacer>
-        <!-- Bouton ajouter une activité -->
         <v-btn @click="openAddActivityDialog" color="primary">Ajouter une activité</v-btn>
       </v-toolbar>
 
-      <!-- Table d'activités -->
       <v-data-table
         :headers="tableHeaders"
         :items="currentActivities"
@@ -41,9 +38,7 @@
     <!-- Dialog pour ajouter une activité -->
     <v-dialog v-model="dialog" max-width="600px">
       <v-card>
-        <v-card-title>
-          <span>Ajouter une Activité</span>
-        </v-card-title>
+        <v-card-title><span>Ajouter une Activité</span></v-card-title>
         <v-card-text>
           <v-form ref="form">
             <v-text-field v-model="newActivity.classeId" label="Classe" readonly></v-text-field>
@@ -77,7 +72,7 @@
       </v-card>
     </v-dialog>
 
-    <!-- Messages de succès et d'erreur -->
+    <!-- Snackbar messages -->
     <v-snackbar v-model="successMessage" color="green" top right timeout="3000">
       Action réalisée avec succès !
     </v-snackbar>
@@ -93,26 +88,11 @@ import axios from 'axios';
 export default {
   name: 'CahierDeTexteManager',
   props: {
-    classeId: {
-      type: String,
-      required: true,
-    },
-    subjectId: {
-      type: String,
-      required: true,
-    },
-    etablissementId: {
-      type: Number,
-      required: true,
-    },
-    anneeScolaire: {
-      type: String,
-      required: true,
-    },
-    anneeScolaireId: {
-      type: Number,
-      required: true,
-    },
+    classeId: String,
+    subjectId: String,
+    etablissementId: Number,
+    anneeScolaire: String,
+    anneeScolaireId: Number,
   },
   data() {
     return {
@@ -133,11 +113,12 @@ export default {
         activite: '',
       },
       tableHeaders: [
-        { title: 'Date', value: 'date' },
-        { title: 'Horaire', value: 'horaire' },
-        { title: 'Activité', value: 'activite' },
-        { title: 'Actions', value: 'actions', sortable: false },
-      ],
+  { title: 'Date', value: 'dateFormatted' },
+  { title: 'Horaire', value: 'horaire' },
+  { title: 'Activité', value: 'activite' },
+  { title: 'Actions', value: 'actions', sortable: false },
+],
+
     };
   },
   computed: {
@@ -145,17 +126,15 @@ export default {
       return this.$route.query.id;
     },
     currentActivities() {
-      // Retourne les activités visibles pour le semestre courant
-      return (this.activities[this.currentSemester] || []).filter(activity => !activity.hidden);
+      return (this.activities[this.currentSemester] || []).filter(a => !a.hidden);
     },
   },
   methods: {
-    getButtonColor(semester) {
-      return this.currentSemester === semester ? 'primary' : 'secondary';
+    getButtonColor(nom) {
+      return this.currentSemester === nom ? 'primary' : 'secondary';
     },
-
-    changeSemester(semester) {
-      this.currentSemester = semester;
+    changeSemester(nom) {
+      this.currentSemester = nom;
       this.fetchNotesData();
     },
     openAddActivityDialog() {
@@ -163,21 +142,12 @@ export default {
         this.errorMessage = 'Veuillez vérifier que tous les champs sont remplis.';
         return;
       }
-
       this.dialog = true;
       this.newActivity.teacherId = this.teacherId;
     },
     closeDialog() {
       this.dialog = false;
       this.resetForm();
-    },
-    openHideActivityDialog(activity) {
-      this.activityToHide = activity;
-      this.hideDialog = true;
-    },
-    closeHideDialog() {
-      this.hideDialog = false;
-      this.activityToHide = null;
     },
     resetForm() {
       this.newActivity = {
@@ -189,6 +159,14 @@ export default {
         activite: '',
       };
     },
+    openHideActivityDialog(activity) {
+      this.activityToHide = activity;
+      this.hideDialog = true;
+    },
+    closeHideDialog() {
+      this.hideDialog = false;
+      this.activityToHide = null;
+    },
     async fetchSemesters() {
       try {
         const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
@@ -199,9 +177,41 @@ export default {
           this.fetchNotesData();
         }
       } catch (error) {
-        console.error('Erreur lors de la récupération des semestres', error);
+        console.error('Erreur lors de la récupération des semestres :', error);
       }
     },
+ async fetchNotesData() {
+  try {
+    const response = await axios.get(`http://localhost:8080/api/getActivities/${this.classeId}/${this.subjectId}/${this.anneeScolaireId}`);
+    this.activities = {};
+
+    if (response.data) {
+      response.data.forEach(activity => {
+        const semesterName = this.semesters.find(s => s.id === activity.semestre_id)?.nom;
+        if (!this.activities[semesterName]) {
+          this.activities[semesterName] = [];
+        }
+
+        // Garder la vraie date brute pour le tri
+        activity.originalDate = new Date(activity.date);
+
+        // Formater une version affichable sans écraser la vraie date
+        activity.dateFormatted = this.formatDate(activity.date);
+
+        activity.hidden = false;
+        this.activities[semesterName].push(activity);
+      });
+
+      // Trier chaque liste par date décroissante (du plus récent au plus ancien)
+      for (const semester in this.activities) {
+        this.activities[semester].sort((a, b) => new Date(b.originalDate) - new Date(a.originalDate));
+      }
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des activités :', error);
+  }
+},
+
     async addActivity() {
       if (this.$refs.form.validate()) {
         const newActivity = {
@@ -217,66 +227,39 @@ export default {
         };
 
         try {
-          const response = await axios.post('http://localhost:8080/api/addActivity', newActivity);
+          await axios.post('http://localhost:8080/api/addActivity', newActivity);
           this.successMessage = true;
-
-          // Ajouter l'activité localement sans rechargement de page
-          if (!this.activities[this.currentSemester]) {
-            this.activities[this.currentSemester] = [];
-          }
-          this.activities[this.currentSemester].push({
-            ...newActivity,
-            id: response.data.id, // Supposons que l'ID soit renvoyé par l'API
-            hidden: false, // La nouvelle activité est visible par défaut
-          });
           this.closeDialog();
+          await this.fetchNotesData();
         } catch (error) {
           this.errorMessage = true;
-          console.error('Erreur lors de l\'ajout de l\'activité:', error.response.data);
+          console.error('Erreur lors de l\'ajout de l\'activité :', error.response?.data || error);
         }
       }
     },
     hideActivity() {
       if (this.activityToHide) {
-        this.activityToHide.hidden = true; // Cacher l'activité localement
+        this.activityToHide.hidden = true;
         this.successMessage = true;
         this.closeHideDialog();
       }
     },
     formatDate(date) {
       if (!date) return '';
-      const options = { year: 'numeric', month: 'long', day: 'numeric' };
-      return new Date(date).toLocaleDateString('fr-FR', options);
-    },
-    async fetchNotesData() {
-      try {
-        const response = await axios.get(`http://localhost:8080/api/getActivities/${this.classeId}/${this.subjectId}/${this.anneeScolaireId}`);
-
-        this.activities = {};
-
-        if (response.data) {
-          response.data.forEach(activity => {
-            const semesterName = this.semesters.find(semester => semester.id === activity.semestre_id)?.nom;
-
-            if (!this.activities[semesterName]) {
-              this.activities[semesterName] = [];
-            }
-
-            activity.date = this.formatDate(activity.date); // Formater la date avant affichage
-            activity.hidden = false; // Assurez-vous que les activités sont visibles par défaut
-            this.activities[semesterName].push(activity);
-          });
-        }
-      } catch (error) {
-        console.error('Erreur lors du chargement des activités :', error);
-      }
+      return new Date(date).toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
     },
   },
-  async mounted() {
+  mounted() {
     this.fetchSemesters();
-  }
+  },
 };
 </script>
+
+
 
 <style scoped>
 .table-container {

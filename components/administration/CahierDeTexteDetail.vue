@@ -1,50 +1,60 @@
 <template>
   <div class="container">
-    <!-- Vérification si les matières sont disponibles -->
-    <div v-if="matieres.length === 0">
+    <!-- Message si aucune matière -->
+    <div v-if="matieres.length === 0" class="no-data-container">
+      <v-icon color="error" class="mb-2">mdi-alert-circle-outline</v-icon>
       <p class="no-data">
-        Aucune donnée n'est encore disponible pour cette classe ou le cahier de texte n'est pas encore disponible pour cette classe.
+        Aucune donnée disponible pour cette classe ou le cahier de texte est indisponible.
       </p>
     </div>
 
-    <!-- Affichage des matières -->
+    <!-- Liste des matières -->
     <div v-else>
-      <div v-for="matiere in matieres" :key="matiere.id" class="matiere">
+      <div v-for="matiere in matieres" :key="matiere.id" class="matiere-card">
         <div class="matiere-header" @click="toggleMatiere(matiere.id)">
+          <v-icon class="mr-2">mdi-book-open-page-variant</v-icon>
           {{ matiere.nom }}
-          <span class="icon">{{ activeMatiere === matiere.id ? '-' : '+' }}</span>
+          <v-icon class="toggle-icon">
+            {{ activeMatiere === matiere.id ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
+          </v-icon>
         </div>
 
-        <!-- Détails de la matière (semestres et tests) -->
+        <!-- Détails -->
         <div v-if="activeMatiere === matiere.id" class="matiere-details">
-          <p v-if="matiere.tests.length === 0" class="no-data">
-            Aucune donnée n'est encore disponible pour cette matière.
-          </p>
+          <div v-if="matiere.tests.length === 0" class="no-data-container">
+            <v-icon color="warning" class="mb-2">mdi-alert-outline</v-icon>
+            <p class="no-data">Aucune donnée disponible pour cette matière.</p>
+          </div>
 
           <p v-else class="enseignant">
-            Enseignant : <strong>{{ matiere.enseignant.nom }} {{ matiere.enseignant.prenom }}</strong>
+            <v-icon class="mr-1" color="primary">mdi-account</v-icon>
+            Enseignant :
+            <strong>{{ matiere.enseignant.nom }} {{ matiere.enseignant.prenom }}</strong>
           </p>
 
-          <!-- Boutons des semestres -->
-          <div class="semestres" v-if="matiere.tests.length">
-            <button
+          <!-- Semestres -->
+          <div class="semestres">
+            <v-btn
               v-for="semestre in getUniqueSemestres(matiere)"
               :key="semestre.id"
               @click="selectSemestre(semestre.id)"
-              :class="{ active: activeSemestre === semestre.id }"
+              :color="activeSemestre === semestre.id ? 'primary' : 'blue-grey lighten-2'"
               class="semestre-btn"
+              size="small"
+              rounded
             >
+              <v-icon start>mdi-calendar-range</v-icon>
               {{ semestre.nom }}
-            </button>
+            </v-btn>
           </div>
 
-          <!-- Tableau des tests filtrés par semestre -->
-          <table v-if="activeSemestre && filteredTests.length" class="test-table">
+          <!-- Tableau des tests -->
+          <v-table v-if="activeSemestre && filteredTests.length" class="test-table" density="compact">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Horaire</th>
-                <th>Activité</th>
+                <th><v-icon start>mdi-calendar</v-icon> Date</th>
+                <th><v-icon start>mdi-clock-time-four-outline</v-icon> Horaire</th>
+                <th><v-icon start>mdi-clipboard-text-outline</v-icon> Activité</th>
               </tr>
             </thead>
             <tbody>
@@ -54,7 +64,7 @@
                 <td>{{ test.activite }}</td>
               </tr>
             </tbody>
-          </table>
+          </v-table>
         </div>
       </div>
     </div>
@@ -148,103 +158,156 @@ export default {
 </script>
 
 <style scoped>
-/* Stylisation générale */
 .container {
-  font-family: 'Arial', sans-serif;
-  padding: 20px;
-  max-width: 800px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  padding: 24px;
+  max-width: 900px;
   margin: auto;
 }
 
-.matiere {
-  border: 1px solid #ddd;
-  margin-bottom: 15px;
-  border-radius: 8px;
-  background-color: #f9f9f9;
+.matiere-card {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 18px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.3s ease;
+}
+
+.matiere-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 .matiere-header {
-  background-color: #007BFF; /* Bleu pour les matières */
+  background-color: #2196F3;
   color: white;
-  padding: 10px;
-  font-size: 18px;
-  cursor: pointer;
+  padding: 14px 20px;
+  font-size: 1.1rem;
+  font-weight: 600;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-radius: 8px 8px 0 0;
+  border-radius: 12px 12px 0 0;
+  cursor: pointer;
 }
 
-.matiere-header:hover {
-  background-color: #0056b3;
-}
-
-.icon {
-  font-size: 20px;
+.toggle-icon {
+  font-size: 22px;
 }
 
 .matiere-details {
-  padding: 15px;
-  background-color: white;
-  border-top: 1px solid #ddd;
-  border-radius: 0 0 8px 8px;
+  padding: 16px;
+  background-color: #fafafa;
+  border-radius: 0 0 12px 12px;
 }
 
 .enseignant {
-  font-size: 16px;
-  margin-bottom: 10px;
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
 }
 
 .semestres {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 
 .semestre-btn {
-  background-color: #2196F3;
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  cursor: pointer;
-  border-radius: 5px;
-  font-size: 14px;
-  transition: background-color 0.3s;
-}
-
-.semestre-btn.active {
-  background-color: #0d8bf2;
-}
-
-.semestre-btn:hover {
-  background-color: #1e88e5;
+  text-transform: none;
+  font-weight: 500;
+  transition: 0.3s ease;
 }
 
 .test-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.9rem;
 }
 
-.test-table th, .test-table td {
-  border: 1px solid #ddd;
-  padding: 10px;
+.test-table th,
+.test-table td {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
   text-align: left;
 }
 
 .test-table th {
-  background-color: #f2f2f2;
+  background-color: #f5f5f5;
   font-weight: bold;
 }
 
 .test-table tr:nth-child(even) {
-  background-color: #f9f9f9;
+  background-color: #fcfcfc;
+}
+
+.no-data-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 20px 0;
+  text-align: center;
 }
 
 .no-data {
-  color: #ff0000;
-  font-weight: bold;
-  font-size: 14px;
-  margin-top: 20px;
+  color: #f44336;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+  .container {
+    padding: 12px;
+  }
+
+  .matiere-header {
+    font-size: 0.9rem;
+    padding: 12px;
+  }
+
+  .enseignant {
+    font-size: 0.85rem;
+  }
+
+  .semestre-btn {
+    font-size: 0.75rem !important;
+    padding: 4px 8px !important;
+  }
+
+  .test-table th,
+  .test-table td {
+    padding: 8px;
+    font-size: 0.8rem;
+  }
+
+  .no-data {
+    font-size: 0.8rem;
+  }
+}
+
+@media (min-width: 961px) {
+  .matiere-header {
+    font-size: 1.2rem;
+  }
+
+  .enseignant {
+    font-size: 1rem;
+  }
+
+  .semestre-btn {
+    font-size: 0.9rem;
+  }
+
+  .test-table th,
+  .test-table td {
+    font-size: 0.95rem;
+  }
 }
 </style>

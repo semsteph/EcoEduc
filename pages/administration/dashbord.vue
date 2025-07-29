@@ -1,15 +1,55 @@
 <template>
   <v-app>
-    <!-- Barre latérale de navigation -->
-    <v-navigation-drawer app color="indigo darken-4" v-model="drawer" dark>
-      <v-list dense>
+    <!-- Sidebar -->
+    <v-navigation-drawer
+      app
+      color="primary"
+      v-model="drawer"
+      dark
+      permanent
+      class="elevation-2"
+    >
+      <v-toolbar flat color="primary">
+        <v-img
+          src="@/assets/administration/logooff.png"
+          max-width="140"
+          class="mx-auto mt-3"
+        />
+      </v-toolbar>
+
+      <v-divider></v-divider>
+
+      <v-list dense nav class="mt-4">
         <v-list-item>
           <v-list-item-content>
-            <h1 class="etablissement-title"><strong>Etablissement: </strong> {{ etablissementNom }}</h1>
+            <v-list-item-title class="text-caption grey--text text--lighten-3">
+              Etablissement
+            </v-list-item-title>
+            <v-list-item-subtitle class="white--text font-weight-bold">
+              {{ etablissementNom }}
+            </v-list-item-subtitle>
           </v-list-item-content>
         </v-list-item>
-        <v-divider></v-divider>
-        <v-list-item v-for="item in menuItems" :key="item.title" @click="changeComponent(item.component)">
+
+        <v-list-item>
+          <v-list-item-content>
+            <v-list-item-title class="text-caption grey--text text--lighten-3">
+              Année scolaire
+            </v-list-item-title>
+            <v-list-item-subtitle class="white--text font-weight-bold">
+              {{ anneeScolaireNom }}
+            </v-list-item-subtitle>
+          </v-list-item-content>
+        </v-list-item>
+
+        <v-divider class="my-3"></v-divider>
+
+        <v-list-item
+          v-for="item in menuItems"
+          :key="item.title"
+          @click="changeComponent(item.component)"
+          :class="{ 'active-item': currentComponent === item.component }"
+        >
           <v-list-item-icon>
             <v-icon>{{ item.icon }}</v-icon>
           </v-list-item-icon>
@@ -20,50 +60,70 @@
       </v-list>
     </v-navigation-drawer>
 
-    <!-- Barre d'applications -->
-    <v-app-bar app color="indigo darken-4" dark>
-      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
-      <v-toolbar-title class="app-title">EchoEducation</v-toolbar-title>
-      <v-spacer></v-spacer>
+    <!-- Top Bar -->
+    <v-app-bar app color="white" class="elevation-1">
+      <v-app-bar-nav-icon @click="drawer = !drawer" class="text-primary" />
+      <v-toolbar-title class="font-weight-bold text-primary">
+        EchoEducation
+      </v-toolbar-title>
+
+      <v-spacer />
+
       <v-btn icon @click="showMessages">
-        <v-badge color="red" content="5" overlap>
-          <v-icon>mdi-message</v-icon>
+        <v-badge
+          :content="permissionCount"
+          color="deep-orange"
+          v-if="permissionCount > 0"
+          overlap
+        >
+          <v-icon>mdi-email</v-icon>
         </v-badge>
+        <template v-else>
+          <v-icon>mdi-email-outline</v-icon>
+        </template>
       </v-btn>
+
       <v-btn icon @click="showNotifications">
-        <v-badge :color="notificationBadgeColor" :content="notificationCount" overlap>
-          <v-icon>mdi-bell</v-icon>
+        <v-badge
+          :content="notificationCount"
+          :color="notificationBadgeColor"
+          overlap
+        >
+          <v-icon>mdi-bell-outline</v-icon>
         </v-badge>
       </v-btn>
+
       <v-btn icon @click="showLogoutDialog">
-        <v-icon>mdi-logout</v-icon>
+        <v-icon color="red darken-1">mdi-logout</v-icon>
       </v-btn>
     </v-app-bar>
 
-    <!-- Conteneur principal avec l'image de fond -->
-    <div class="background-container">
-      <div class="background-image"></div>
-      <v-main class="foreground">
-        <v-container class="py-5">
-          <component :is="currentComponent"
-                     :etablissement-id="etablissementId"
-                     :annee-scolaire="anneeScolaire"
-                     :annee-scolaire-id="anneeScolaireId"
-                     @component-selected="selectComponent"
-                     @back="currentComponent = previousComponent"
-                     @update-notification-count="updateNotificationCount" />
-        </v-container>
-      </v-main>
-    </div>
+    <!-- Main Content -->
+    <v-main>
+      <v-container
+        fluid
+        class="pa-6 main-content"
+      >
+        <component
+          :is="currentComponent"
+          :etablissement-id="etablissementId"
+          :annee-scolaire="anneeScolaire"
+          :annee-scolaire-id="anneeScolaireId"
+          @component-selected="selectComponent"
+          @back="currentComponent = previousComponent"
+          @update-notification-count="updateNotificationCount"
+        />
+      </v-container>
+    </v-main>
 
-    <!-- Boîte de dialogue de déconnexion -->
-    <logout-dialog ref="logoutDialog" @confirm-logout="logout"></logout-dialog>
+    <!-- Logout Dialog -->
+    <logout-dialog ref="logoutDialog" @confirm-logout="logout" />
   </v-app>
 </template>
 
 <script>
 import axios from 'axios';
-// Importation des composants (inchangée)
+// Composants
 import ParentManagement from '@/components/administration/ParentManagement.vue';
 import MessageComponent from '@/components/administration/MessageComponent.vue';
 import NotificationComponent from '@/components/administration/NotificationComponent.vue';
@@ -76,8 +136,9 @@ import PresenceManagement from '@/components/administration/PresenceManagement.v
 import PunishmentManagement from '@/components/administration/PunishmentManagement.vue';
 import NoteConsultation from '@/components/administration/NoteConsultation.vue';
 import BulletinManagement from '@/components/administration/BulletinManagement.vue';
-import ScolariteManagement from '@/components/administration/ScolariteManagement.vue';
 import Parametre from '~/components/administration/Parametre.vue';
+import Reinscription from '~/components/administration/Reinscription.vue';
+import MesEleves from '~/components/administration/MesEleves.vue';
 
 export default {
   components: {
@@ -93,58 +154,88 @@ export default {
     PunishmentManagement,
     NoteConsultation,
     BulletinManagement,
-    ScolariteManagement,
+    Reinscription,
     Parametre,
+    MesEleves,
   },
   data() {
     return {
-      drawer: false,
+      drawer: true,
       currentComponent: 'ClassManagement',
       previousComponent: null,
       notificationCount: 0,
-      notificationBadgeColor: 'red',
+      notificationBadgeColor: 'deep-orange accent-3',
+      permissionCount: 0,
       etablissementId: null,
       etablissementNom: '',
-      anneeScolaire: '', // Année scolaire en cours
-      anneeScolaireId: null, // ID de l'année scolaire
+      anneeScolaire: '',
+      anneeScolaireId: null,
+      permissionInterval: null,
       menuItems: [
-        { title: 'Gestion Classe', component: 'ClassManagement', icon: 'mdi-school' },
-        { title: 'Gestion Élève', component: 'StudentManagement', icon: 'mdi-account-group' },
-        { title: 'Gestion Enseignant', component: 'TeacherManagement', icon: 'mdi-teach' },
-        { title: 'Gestion Parent', component: 'ParentManagement', icon: 'mdi-account-child' },
-        { title: 'Paramètres', component: 'Parametre',  icon: 'mdi-cog' },
+        { title: 'Classes', component: 'ClassManagement', icon: 'mdi-school-outline' },
+        { title: 'Elèves', component: 'StudentManagement', icon: 'mdi-account-group-outline' },
+        { title: 'Enseignants', component: 'TeacherManagement', icon: 'mdi-teach' },
+        { title: 'Parents', component: 'ParentManagement', icon: 'mdi-account-child-outline' },
+        { title: 'Paramètres', component: 'Parametre', icon: 'mdi-cog-outline' },
       ],
     };
   },
   created() {
     this.etablissementId = parseInt(this.$route.query.etablissement_id, 10);
     this.etablissementNom = this.$route.query.etablissement_nom;
-    this.fetchAnneeScolaire(); // Récupérer l'année scolaire en cours
+    this.fetchAnneeScolaire().then(() => {
+      this.fetchPermissionCount();
+      this.startPermissionPolling();
+    });
+  },
+  beforeDestroy() {
+    clearInterval(this.permissionInterval);
   },
   methods: {
     async fetchAnneeScolaire() {
-    try {
-      const response = await axios.get(`http://localhost:8080/api/annees-scolaires/${this.etablissementId}`);
-      if (response.data) {
-        const { id, nom } = response.data;
-        this.anneeScolaire = nom || 'Année scolaire non spécifiée';
-        this.anneeScolaireId = id || null;
-      } else {
-        this.anneeScolaire = 'Aucune année scolaire trouvée.';
+      try {
+        const res = await axios.get(`http://localhost:8080/api/annees-scolaires/${this.etablissementId}`);
+        if (res.data) {
+          const { id, nom } = res.data;
+          this.anneeScolaireNom = nom || 'Non spécifiée';
+          this.anneeScolaireId = id || null;
+        }
+      } catch (error) {
+        console.error(error);
+        this.anneeScolaireNom = 'Erreur de chargement';
         this.anneeScolaireId = null;
       }
-    } catch (error) {
-      console.error("Erreur lors de la récupération de l'année scolaire :", error);
-      this.anneeScolaire = 'Impossible de charger les données.';
-      this.anneeScolaireId = null;
-    }
-    console.log("Année scolaire :", this.anneeScolaire, "ID :", this.anneeScolaireId);
-  },
+    },
+    async fetchPermissionCount() {
+      if (!this.etablissementId || !this.anneeScolaireId) return;
+      try {
+        const response = await axios.get(`http://localhost:8080/api/permissions/${this.etablissementId}/${this.anneeScolaireId}`);
+        const now = new Date();
+        const filtered = response.data.filter(p => {
+          const date = new Date(p.date);
+          return (
+            date.getMonth() === now.getMonth() &&
+            date.getFullYear() === now.getFullYear() &&
+            !p.is_read
+          );
+        });
+        this.permissionCount = filtered.length;
+      } catch (error) {
+        console.error('Erreur permissions:', error);
+        this.permissionCount = 0;
+      }
+    },
+    startPermissionPolling() {
+      this.permissionInterval = setInterval(() => {
+        this.fetchPermissionCount();
+      }, 30000);
+    },
     changeComponent(component) {
       this.previousComponent = this.currentComponent;
       this.currentComponent = component;
     },
     showMessages() {
+      this.permissionCount = 0;
       this.currentComponent = 'MessageComponent';
     },
     showNotifications() {
@@ -169,61 +260,42 @@ export default {
 </script>
 
 <style scoped>
-/* Arrière-plan avec image floue */
-.background-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+.v-list-item.active-item {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-left: 4px solid #FFC107;
 }
 
-.background-image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: url('assets/administration/Image collée.png');
-  background-size: cover;
-  background-position: center;
-  filter: blur(10px); /* Flou appliqué à l'image */
-  z-index: 1;
+.main-content {
+  background-color: #F4F7FA;
+  height: calc(100vh - 64px); /* Adjust if your app-bar height differs */
+  overflow-y: auto;
 }
 
-.foreground {
-  position: relative;
-  z-index: 2;
-  background-color: rgba(255, 255, 255, 0.1); /* Fond semi-transparent */
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  height: 100%;
-  overflow-y: auto; /* Permet le défilement vertical */
-}
-
-.app-title {
-  font-size: 24px;
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-.etablissement-title {
-  font-size: 20px;
+.v-toolbar-title {
   font-weight: 600;
-  color: white;
-  text-align: center;
-  margin: 16px 0;
+  font-size: 18px;
 }
 
-.v-list-item {
-  color: white;
+.v-list-item-title {
+  font-size: 15px;
   font-weight: 500;
 }
 
-.v-list-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  border-radius: 8px;
+.v-icon {
+  font-size: 22px;
+}
+
+@media (max-width: 768px) {
+  .v-toolbar-title {
+    font-size: 16px;
+  }
+
+  .v-list-item-title {
+    font-size: 13px;
+  }
+
+  .v-icon {
+    font-size: 18px !important;
+  }
 }
 </style>

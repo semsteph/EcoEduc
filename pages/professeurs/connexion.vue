@@ -1,17 +1,35 @@
 <template>
-  <v-container fluid fill-height class="login-container">
-    <v-row justify="center" align="center">
-      <v-col cols="12" md="5" sm="8">
-        <v-card class="pa-6 login-card" elevation="12">
-          <v-card-title class="text-h5 text-center mb-5">Bienvenue !</v-card-title>
-          <v-card-subtitle class="text-center mb-6">
+  <v-container fluid fill-height class="login-container pa-2">
+    <!-- Bouton retour -->
+    <v-btn
+      class="back-button"
+      icon
+      color="white"
+      @click="$router.push('/Accueil/Accueil')"
+    >
+      <v-icon>mdi-arrow-left</v-icon>
+    </v-btn>
+
+    <v-row justify="center" align="center" class="ma-0">
+      <v-col cols="12" sm="10" md="6" lg="4" class="pa-0">
+        <!-- Message de bienvenue -->
+        <div class="text-center mb-4 px-4">
+          <v-card-title class="welcome-title text-xl sm:text-2xl font-bold text-blue-700">
+            Bienvenue !
+          </v-card-title>
+          <v-card-subtitle
+            class="welcome-subtitle text-base sm:text-lg text-gray-600 whitespace-normal break-words leading-snug"
+          >
             Connectez-vous pour accéder à votre espace personnel.
           </v-card-subtitle>
-          <v-form @submit.prevent="login">
-            <!-- Champ utilisateur -->
+        </div>
+
+        <!-- Carte de connexion -->
+        <v-card class="pa-4 login-card" elevation="12">
+          <v-form v-if="!showReset" @submit.prevent="login">
             <v-text-field
-              v-model="username"
-              label="Nom d'utilisateur"
+              v-model="usernameOrEmail"
+              label="Nom d'utilisateur ou Email"
               required
               outlined
               dense
@@ -19,188 +37,308 @@
               prepend-inner-icon="mdi-account"
             ></v-text-field>
 
-            <!-- Champ mot de passe -->
             <v-text-field
               v-model="password"
+              :type="showPassword ? 'text' : 'password'"
               label="Mot de passe"
-              type="password"
               required
               outlined
               dense
               color="primary"
               prepend-inner-icon="mdi-lock"
+              :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+              @click:append-inner="togglePasswordVisibility"
             ></v-text-field>
 
-            <!-- Champ établissement -->
-            <v-text-field
+            <v-select
               v-model="etablissement"
+              :items="etablissements"
+              item-title="nom"
+              item-value="id"
               label="Établissement"
               required
               outlined
               dense
               color="primary"
               prepend-inner-icon="mdi-school"
-            ></v-text-field>
+            ></v-select>
 
-            <!-- Bouton de connexion -->
             <v-btn
               type="submit"
               color="primary"
               block
-              class="mt-5 font-weight-bold login-button"
+              class="mt-4 font-weight-bold login-button"
               elevation="3"
             >
               Se connecter
             </v-btn>
+
+            <v-alert v-if="error" type="error" class="mt-4" dense outlined>
+              {{ error }}
+            </v-alert>
           </v-form>
 
-          <!-- Message d'erreur -->
-          <v-alert v-if="error" type="error" class="mt-4" dense outlined>{{ error }}</v-alert>
+          <!-- Formulaire de réinitialisation -->
+          <v-form v-else @submit.prevent="handleReset">
+            <div v-if="!resetCodeSent">
+              <v-text-field
+                v-model="email"
+                label="Entrez votre mail"
+                required
+                outlined
+                dense
+                color="primary"
+              ></v-text-field>
+
+              <v-select
+                v-model="resetEtablissement"
+                :items="etablissements"
+                item-title="nom"
+                item-value="id"
+                label="Établissement"
+                required
+                outlined
+                dense
+                color="primary"
+                prepend-inner-icon="mdi-school"
+              ></v-select>
+            </div>
+
+            <v-text-field
+              v-if="resetCodeSent && !validCode"
+              v-model="code"
+              label="Code de vérification"
+              required
+              outlined
+              dense
+              color="primary"
+            ></v-text-field>
+
+            <div v-if="validCode">
+              <v-text-field
+                v-model="newPassword"
+                :type="showNewPassword ? 'text' : 'password'"
+                label="Nouveau mot de passe"
+                required
+                outlined
+                dense
+                color="primary"
+                :append-inner-icon="showNewPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                @click:append-inner="toggleNewPasswordVisibility"
+              ></v-text-field>
+
+              <v-text-field
+                v-model="confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                label="Confirmez le mot de passe"
+                required
+                outlined
+                dense
+                color="primary"
+                :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                @click:append-inner="toggleConfirmPasswordVisibility"
+              ></v-text-field>
+            </div>
+
+            <v-btn
+              type="submit"
+              color="primary"
+              block
+              class="mt-4 font-weight-bold"
+              elevation="3"
+            >
+              {{
+                resetCodeSent
+                  ? validCode
+                    ? 'Modifier le mot de passe'
+                    : 'Valider le code'
+                  : 'Envoyer le code'
+              }}
+            </v-btn>
+
+            <v-btn text color="primary" block class="mt-2" @click="cancelReset">
+              Annuler
+            </v-btn>
+
+            <v-alert
+              v-if="resetError"
+              type="error"
+              class="mt-4"
+              dense
+              outlined
+            >
+              {{ resetError }}
+            </v-alert>
+
+            <v-alert
+              v-if="resetSuccess"
+              type="success"
+              class="mt-4"
+              dense
+              outlined
+            >
+              {{ resetSuccess }}
+            </v-alert>
+          </v-form>
         </v-card>
+
+        <!-- Lien mot de passe oublié -->
+        <div class="text-center mt-2">
+          <span class="text-primary text-sm underline cursor-pointer" @click="showReset = true">
+            Mot de passe oublié ?
+          </span>
+        </div>
       </v-col>
     </v-row>
   </v-container>
 </template>
 
+
 <script>
 import axios from 'axios';
+
+import '/assets/css/styles.css';
 
 export default {
   data() {
     return {
-      username: '',
+      // Connexion
+      usernameOrEmail: '',
       password: '',
       etablissement: '',
       error: '',
+      showPassword: false,
+
+      // Réinitialisation
+      showReset: false,
+      email: '',
+      code: '',
+      newPassword: '',
+      confirmPassword: '',
+      resetCodeSent: false,
+      validCode: false,
+      enseignantId: null,
+      resetEtablissement: '',
+      resetError: '',
+      resetSuccess: '',
+      showNewPassword: false,
+      showConfirmPassword: false,
+
+      // Etablissements
+      etablissements: [],
     };
   },
+  mounted() {
+    this.fetchEtablissements();
+  },
   methods: {
-    async login() {
+    togglePasswordVisibility() {
+      this.showPassword = !this.showPassword;
+    },
+    toggleNewPasswordVisibility() {
+      this.showNewPassword = !this.showNewPassword;
+    },
+    toggleConfirmPasswordVisibility() {
+      this.showConfirmPassword = !this.showConfirmPassword;
+    },
+
+    async fetchEtablissements() {
       try {
-        const response = await axios.post('http://localhost:8080/api/loginEns', {
-          username: this.username,
-          password: this.password,
-          etablissement: this.etablissement,
-        });
-
-        const token = response.data.token;
-        localStorage.setItem('token', token);
-
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const enseignantId = payload.id;
-        const etablissementId = payload.etablissement;
-        const enseignantNom = payload.enseignant_nom;
-        const enseignantPrenom = payload.enseignant_prenom;
-        const etablissementNom = payload.etablissement_nom;
-
-        this.$router.push({
-          path: '/professeurs/dashbord',
-          query: {
-            id: enseignantId,
-            etablissement: etablissementId,
-            enseignantNom,
-            enseignantPrenom,
-            etablissementNom,
-          },
-        });
+        const res = await axios.get('http://localhost:8080/api/etablissements');
+        this.etablissements = res.data;
       } catch (error) {
-        this.error = error.response
-          ? error.response.data.message
-          : 'Erreur de connexion au serveur.';
+        console.error('Erreur lors du chargement des établissements.');
+      }
+    },
+
+    async login() {
+  try {
+    const response = await axios.post('http://localhost:8080/api/loginEns', {
+      username: this.usernameOrEmail, // ✅ CORRECTION : 'username' au lieu de 'identifier'
+      password: this.password,
+      etablissement: this.etablissement,
+    });
+
+    const token = response.data.token;
+    localStorage.setItem('token', token);
+
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const {
+      id: enseignantId,
+      etablissement: etablissementId,
+      enseignant_nom,
+      enseignant_prenom,
+      etablissement_nom,
+    } = payload;
+
+    this.$router.push({
+      path: '/professeurs/dashbord',
+      query: {
+        id: enseignantId,
+        etablissement: etablissementId,
+        enseignantNom: enseignant_nom,
+        enseignantPrenom: enseignant_prenom,
+        etablissementNom: etablissement_nom,
+      },
+    });
+  } catch (error) {
+    this.error = error.response?.data?.message || 'Erreur de connexion au serveur.';
+  }
+},
+
+    cancelReset() {
+      this.showReset = false;
+      this.email = '';
+      this.code = '';
+      this.newPassword = '';
+      this.confirmPassword = '';
+      this.resetCodeSent = false;
+      this.validCode = false;
+      this.resetError = '';
+      this.resetSuccess = '';
+      this.resetEtablissement = '';
+    },
+
+    async handleReset() {
+      try {
+        if (!this.resetCodeSent) {
+          await axios.post('http://localhost:8080/api/send-reset-code', {
+            email: this.email,
+            etablissement: this.resetEtablissement,
+          });
+          this.resetCodeSent = true;
+          this.resetError = '';
+        } else if (!this.validCode) {
+          const res = await axios.post('http://localhost:8080/api/verify-reset-code', {
+            email: this.email,
+            code: this.code,
+            etablissement: this.resetEtablissement,
+          });
+          this.enseignantId = res.data.enseignantId;
+          this.validCode = true;
+          this.resetError = '';
+        } else {
+          if (this.newPassword !== this.confirmPassword) {
+            this.resetError = 'Les mots de passe ne correspondent pas.';
+            return;
+          }
+
+          await axios.post('http://localhost:8080/api/update-password', {
+            enseignantId: this.enseignantId,
+            newPassword: this.newPassword,
+          });
+
+          this.resetSuccess = 'Mot de passe modifié avec succès. Vous pouvez maintenant vous connecter.';
+          this.cancelReset();
+        }
+      } catch (error) {
+        if (error.response?.status === 404) {
+          this.resetError = 'Aucun compte n’est associé à cet e-mail et établissement.';
+        } else {
+          this.resetError = error.response?.data?.message || 'Erreur lors du processus.';
+        }
       }
     },
   },
 };
 </script>
-
-<style scoped>
-/* Contexte général */
-.login-container {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.login-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: url('assets/professeurs/istockphoto-1358852926-1024x1024.jpg'); /* Image de fond */
-  background-size: cover;
-  background-position: center;
-  filter: blur(8px); /* Flou appliqué */
-
-}
-
-.login-container::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.4); /* Couche sombre */
-  z-index: -1;
-}
-
-/* Carte de connexion */
-.login-card {
-  z-index: 1;
-  backdrop-filter: blur(15px);
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
-}
-
-.login-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.4);
-}
-
-/* Bouton de connexion */
-.login-button {
-  font-size: 18px;
-  font-family: 'Roboto', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* Champs de saisie */
-.v-text-field {
-  margin-bottom: 20px;
-}
-
-.v-text-field .v-input__control {
-  border-radius: 8px;
-}
-
-.v-text-field .v-input__prepend-inner > .v-icon {
-  color: #1976d2;
-}
-
-/* Message d'erreur */
-.v-alert {
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-/* Titre et sous-titre */
-.v-card-title {
-  font-family: 'Poppins', sans-serif;
-  color: #1565c0;
-  font-weight: bold;
-}
-
-.v-card-subtitle {
-  font-family: 'Roboto', sans-serif;
-  color: #546e7a;
-  font-size: 16px;
-}
-</style>

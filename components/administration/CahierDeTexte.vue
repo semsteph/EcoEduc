@@ -1,32 +1,45 @@
 <template>
-  <div>
-    <v-btn icon @click="$emit('back')">
-      <v-icon>mdi-arrow-left</v-icon>
-    </v-btn>
-    <v-card color="blue lighten-4" v-if="!selectedClassId">
-      <v-card-title>Gestion des Cahiers de Texte</v-card-title>
+  <div class="cahier-container">
+    <!-- Vue de sélection des classes -->
+    <v-card color="blue lighten-5" v-if="!selectedClassId" class="elevation-2 pa-4 main-card">
+      <v-card-title class="title">
+        <v-icon class="mr-2" color="blue darken-2">mdi-book-education</v-icon>
+        Gestion des Cahiers de Texte
+      </v-card-title>
       <v-card-text>
         <v-row>
           <v-col
             v-for="classe in classes"
             :key="classe.id"
             cols="12"
+            sm="6"
             md="4"
           >
             <v-card
-              class="ma-2"
+              class="class-card"
               outlined
+              elevation="1"
               @click="goToClass(classe.id)"
             >
-              <v-card-title>{{ classe.nom }}</v-card-title>
+              <v-card-title class="class-title">
+                <v-icon color="primary" class="mr-2">mdi-google-classroom</v-icon>
+                {{ classe.nom }}
+              </v-card-title>
             </v-card>
           </v-col>
         </v-row>
       </v-card-text>
     </v-card>
-    <!-- Affiche le composant enfant si une classe est sélectionnée -->
-    <CahierDeTexteDetail v-else :class-id="selectedClassId" :annee-scolaire="anneeScolaire"
-    :annee-scolaire-id="anneeScolaireId" :etablissement-id="etablissementId" @back="clearSelection" />
+
+    <!-- Vue détaillée d'une classe -->
+    <CahierDeTexteDetail
+      v-else
+      :class-id="selectedClassId"
+      :annee-scolaire="anneeScolaire"
+      :annee-scolaire-id="anneeScolaireId"
+      :etablissement-id="etablissementId"
+      @back="clearSelection"
+    />
   </div>
 </template>
 
@@ -85,3 +98,72 @@ export default {
   }
 }
 </script>
+<style scoped>
+.cahier-container {
+  padding: 24px;
+}
+
+.main-card {
+  border-radius: 12px;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #0d47a1;
+  display: flex;
+  align-items: center;
+}
+
+.class-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  border-radius: 12px;
+  background-color: white;
+}
+
+.class-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.class-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #1565c0;
+  display: flex;
+  align-items: center;
+  padding: 16px;
+}
+
+/* Responsive pour petits écrans */
+@media (max-width: 600px) {
+  .cahier-container {
+    padding: 12px;
+  }
+
+  .title {
+    font-size: 1.1rem;
+  }
+
+  .class-title {
+    font-size: 0.9rem;
+    padding: 12px;
+  }
+
+  .v-icon {
+    font-size: 20px;
+  }
+}
+
+/* Responsive pour grands écrans */
+@media (min-width: 960px) {
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .class-title {
+    font-size: 1.2rem;
+  }
+}
+</style>

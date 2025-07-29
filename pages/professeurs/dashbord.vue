@@ -4,19 +4,24 @@
     <div class="background-blur"></div>
 
     <!-- Drawer latéral -->
-    <v-navigation-drawer app v-model="drawer" color="blue darken-3" dark>
+    <v-navigation-drawer
+      app
+      v-model="drawer"
+      :width="drawerWidth"
+      color="blue darken-3"
+      dark
+      class="navigate"
+    >
       <v-list dense>
-        <!-- Entête avec nom de l'établissement -->
         <v-card class="pa-3 white--text text-center" flat>
           <v-list-item-content>
-            <h3 class="mb-2"> <strong>Etablissement:</strong> {{ nomEtablissement }}</h3>
-            <p> <strong>Enseignant:</strong> {{ enseignantPrenom }} {{ enseignantNom }}</p>
+            <h3 class="mb-2"><strong>Etablissement:</strong> {{ nomEtablissement }}</h3>
+            <p><strong>Enseignant:</strong> {{ enseignantPrenom }} {{ enseignantNom }}</p>
           </v-list-item-content>
         </v-card>
 
         <v-divider class="my-3"></v-divider>
 
-        <!-- Liste des matières -->
         <v-list-item
           v-for="subject in uniqueSubjects"
           :key="subject.matiere_id"
@@ -31,7 +36,6 @@
 
         <v-divider class="my-3"></v-divider>
 
-        <!-- Bouton de déconnexion -->
         <v-list-item @click="showLogoutDialog" class="red--text">
           <v-list-item-icon>
             <v-icon color="red">mdi-logout</v-icon>
@@ -41,17 +45,17 @@
       </v-list>
     </v-navigation-drawer>
 
-    <!-- Barre supérieure -->
-    <ToolbarComponents @toggleDrawer="toggleDrawer" @showNotifications="showNotifications" />
+    <!-- Toolbar fixée en haut -->
+    <div class="fixed-toolbar">
+      <ToolbarComponents @toggleDrawer="toggleDrawer" @showNotifications="showNotifications" />
+    </div>
 
-    <!-- Contenu principal -->
-    <v-main>
+    <v-main class="pt-16">
       <v-container class="py-5 content-container">
-         <!-- Message d'alerte si l'année scolaire n'est pas définie -->
-         <v-alert v-if="!anneeScolaireId" type="warning" class="mb-4">
+        <v-alert v-if="!anneeScolaireId" type="warning" class="mb-4">
           L'année scolaire n'est pas encore définie.
         </v-alert>
-        <!-- Notifications -->
+
         <v-row v-if="showNotificationsComponent">
           <v-col>
             <NotificationComponent
@@ -63,7 +67,6 @@
           </v-col>
         </v-row>
 
-        <!-- Gestion des matières et des classes -->
         <v-row>
           <v-col>
             <ClassManager
@@ -79,12 +82,12 @@
           </v-col>
         </v-row>
 
-        <!-- Détails de la classe -->
         <v-row>
           <v-col>
             <ClassDetails
               v-if="selectedClassId"
               :class-id="selectedClassId"
+              :class-name="selectedClassName"
               :etablissement-id="etablissementId"
               :annee-scolaire="anneeScolaire"
               :annee-scolaire-id="anneeScolaireId"
@@ -94,7 +97,6 @@
       </v-container>
     </v-main>
 
-    <!-- Dialogue de déconnexion -->
     <v-dialog v-model="logoutDialog" max-width="400">
       <v-card>
         <v-card-title class="text-h5">Confirmer la déconnexion</v-card-title>
@@ -109,138 +111,147 @@
   </v-app>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'nuxt/app';
+import { useDisplay } from 'vuetify';
 import ToolbarComponents from '@/components/professeurs/ToolbarComponents.vue';
 import ClassManager from '@/components/professeurs/ClassManager.vue';
 import NotificationComponent from '@/components/professeurs/NotificationComponent.vue';
 
-export default {
-  components: {
-    ClassManager,
-    ToolbarComponents,
-    NotificationComponent,
-  },
-  data() {
-    return {
-      selectedSubjectId: null,
-      selectedClassId: null,
-      subjects: [],
-      classes: [],
-      etablissementId: null,
-      nomEtablissement: '',
-      enseignantNom: '',
-      enseignantPrenom: '',
-      enseignantId: null,
-      logoutDialog: false,
-      anneeScolaire: '', // Année scolaire en cours
-      anneeScolaireId: null, // ID de l'année scolaire
-      drawer: false,
-      showNotificationsComponent: false,
-    };
-  },
-  computed: {
-    uniqueSubjects() {
-      const unique = [];
-      const map = new Map();
-      for (const item of this.subjects) {
-        if (!map.has(item.matiere_id)) {
-          map.set(item.matiere_id, true);
-          unique.push({
-            matiere_id: item.matiere_id,
-            matiere: item.matiere,
-          });
-        }
-      }
-      return unique;
-    },
-  },
-  async mounted() {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const decodedToken = JSON.parse(atob(token.split('.')[1]));
-        this.enseignantId = decodedToken.id;
-        this.etablissementId = decodedToken.etablissement;
-        this.nomEtablissement = decodedToken.etablissement_nom;
-        this.enseignantNom = decodedToken.enseignant_nom;
-        this.enseignantPrenom = decodedToken.enseignant_prenom;
+// Gestion drawer et affichage responsive
+const drawer = ref(false);
+const { smAndDown } = useDisplay();
+const drawerWidth = computed(() => (smAndDown.value ? 200 : 300));
 
-        await this.fetchAnneeScolaire();
+// États de l'application
+const selectedSubjectId = ref(null);
+const selectedClassId = ref(null);
+const selectedClassName = ref('');
+const subjects = ref([]);
+const classes = ref([]);
+const etablissementId = ref(null);
+const nomEtablissement = ref('');
+const enseignantNom = ref('');
+const enseignantPrenom = ref('');
+const enseignantId = ref(null);
+const logoutDialog = ref(false);
+const anneeScolaire = ref('');
+const anneeScolaireId = ref(null);
+const showNotificationsComponent = ref(false);
 
-        const response = await axios.get(`http://localhost:8080/api/enseignant/matieres-classes/${this.enseignantId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        this.subjects = response.data;
-      } catch (error) {
-        console.error('Erreur lors de la récupération des données', error);
-      }
+// Récupérer les matières uniques
+const uniqueSubjects = computed(() => {
+  const map = new Map();
+  return subjects.value.filter(subject => {
+    if (!map.has(subject.matiere_id)) {
+      map.set(subject.matiere_id, true);
+      return true;
     }
-  },
-  methods: {
-    async fetchAnneeScolaire() {
+    return false;
+  });
+});
+
+// Router
+const router = useRouter();
+
+// Actions
+const fetchAnneeScolaire = async () => {
   try {
-    const response = await axios.get(`http://localhost:8080/api/annees-scolaires/${this.etablissementId}`);
-    
-    if (response.data && response.data.id) {
-      this.anneeScolaire = response.data.nom || 'Année scolaire non spécifiée';
-      this.anneeScolaireId = response.data.id;
+    const response = await axios.get(`http://localhost:8080/api/annees-scolaires/${etablissementId.value}`);
+    if (response.data?.id) {
+      anneeScolaire.value = response.data.nom;
+      anneeScolaireId.value = response.data.id;
     } else {
-      this.anneeScolaire = null;
-      this.anneeScolaireId = null;
-      console.warn("L'année scolaire est clôturée ou non disponible.");
+      anneeScolaire.value = null;
+      anneeScolaireId.value = null;
+      console.warn("Aucune année scolaire active.");
     }
   } catch (error) {
-    console.error("Erreur lors de la récupération de l'année scolaire :", error);
+    console.error("Erreur année scolaire :", error);
   }
-},
-
-    selectSubject(id) {
-      this.selectedSubjectId = id;
-      this.selectedClassId = null;
-      this.classes = this.subjects.filter(subject => subject.matiere_id === id);
-    },
-    showClassDetails(id) {
-      this.selectedClassId = id;
-    },
-    showNotifications() {
-      this.showNotificationsComponent = !this.showNotificationsComponent;
-    },
-    showLogoutDialog() {
-      this.logoutDialog = true;
-    },
-    toggleDrawer() {
-      this.drawer = !this.drawer;
-    },
-    logout() {
-      localStorage.removeItem('token');
-      const router = useRouter();
-      router.push('/professeurs/connexion');
-    },
-  },
 };
+
+const selectSubject = (id) => {
+  selectedSubjectId.value = id;
+  selectedClassId.value = null;
+  classes.value = subjects.value.filter(subject => subject.matiere_id === id);
+};
+
+const showClassDetails = (classId) => {
+  const selectedClass = classes.value.find(cl => cl.class_id === classId);
+  selectedClassId.value = classId;
+  selectedClassName.value = selectedClass ? selectedClass.class_name : '';
+};
+
+const showNotifications = () => {
+  showNotificationsComponent.value = !showNotificationsComponent.value;
+};
+
+const showLogoutDialog = () => {
+  logoutDialog.value = true;
+};
+
+const toggleDrawer = () => {
+  drawer.value = !drawer.value;
+};
+
+const logout = () => {
+  localStorage.removeItem('token');
+  router.push('/professeurs/connexion');
+};
+
+// Initialisation
+onMounted(async () => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    try {
+      const decodedToken = JSON.parse(atob(token.split('.')[1]));
+      enseignantId.value = decodedToken.id;
+      etablissementId.value = decodedToken.etablissement;
+      nomEtablissement.value = decodedToken.etablissement_nom;
+      enseignantNom.value = decodedToken.enseignant_nom;
+      enseignantPrenom.value = decodedToken.enseignant_prenom;
+
+      await fetchAnneeScolaire();
+
+      const response = await axios.get(
+        `http://localhost:8080/api/enseignant/matieres-classes/${enseignantId.value}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      subjects.value = response.data;
+    } catch (error) {
+      console.error('Erreur récupération données enseignant :', error);
+    }
+  }
+});
 </script>
 
 <style scoped>
-/* Styles inchangés */
 .background-blur {
+  @apply fixed top-0 left-0 w-full h-full bg-cover bg-center filter blur-md;
+  background-image: url('/assets/professeurs/istockphoto-1328488607-1024x1024.jpg');
+  z-index: -1;
+}
+
+.fixed-toolbar {
   position: fixed;
   top: 0;
-  left: 0;
   width: 100%;
-  height: 100%;
-  background-image: url('/assets/professeurs/istockphoto-1328488607-1024x1024.jpg');
-  background-size: cover;
-  background-position: center;
-  filter: blur(8px);
+  z-index: 20;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
+
+.v-main {
+  padding-top: 64px; /* hauteur de la toolbar */
+}
+
 .content-container {
-  background-color: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  position: relative;
-  z-index: 1;
+  @apply bg-white bg-opacity-95 rounded-2xl shadow-md relative z-10 px-4 py-6 sm:px-8 sm:py-8;
+}
+.navigate{
+   position: fixed;
 }
 </style>

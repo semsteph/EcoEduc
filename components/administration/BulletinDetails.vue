@@ -1,118 +1,147 @@
 <template>
   <div class="container">
-    <h1>Liste des élèves</h1>
+    <h1 class="title">
+      <v-icon left class="mr-2">mdi-account-group</v-icon>
+      Liste des élèves
+    </h1>
+
+    <!-- Bouton de sauvegarde globale -->
+    <div v-if="eleves.length > 0" class="sauvegarde-global">
+      <button @click="sauvegarderTousLesBulletins" class="save-all-btn">
+        <v-icon left class="mr-1">mdi-content-save</v-icon>
+        Sauvegarder les bulletins
+      </button>
+    </div>
 
     <div v-if="eleves.length === 0">
       <p class="no-data">
-        Aucune donnée n'est encore disponible pour cette classe ou aucun élève n'est encore inscrit.
+        <v-icon left class="mr-1" color="red">mdi-alert-circle-outline</v-icon>
+        Aucune donnée disponible pour cette classe ou aucun élève n'est encore inscrit.
       </p>
     </div>
 
     <div v-else>
-      <div>
-        <h2>Classe : {{ classeNom }}</h2>
+      <div class="classe-title">
+        <h2>
+          <v-icon left class="mr-2">mdi-school</v-icon>
+          Classe : {{ classeNomLocal }}
+        </h2>
       </div>
 
       <div v-for="eleve in eleves" :key="eleve.id" class="eleve-item">
         <div class="eleve-header" @click="toggleEleve(eleve.id)">
-          {{ eleve.nom }} {{ eleve.prenom }}
-          <span class="icon">{{ activeEleve === eleve.id ? '-' : '+' }}</span>
+          <span>
+            <v-icon left class="mr-1">mdi-account</v-icon>
+            {{ eleve.nom }} {{ eleve.prenom }}
+          </span>
+          <v-icon>{{ activeEleve === eleve.id ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
         </div>
 
         <div v-if="activeEleve === eleve.id" class="eleve-details">
           <div class="eleve-info">
-            <button @click="saveBulletin(eleve.id)" class="save-btn">Sauvegarder</button>
+            <button class="save-btn">
+              <v-icon left class="mr-1">mdi-content-save</v-icon>
+              Sauvegarder
+            </button>
             <h3>Détails de l'élève</h3>
             <p><strong>Nom :</strong> {{ eleve.nom }}</p>
             <p><strong>Prénom :</strong> {{ eleve.prenom }}</p>
-            <p><strong>Classe :</strong> {{ classeNom }}</p>
+            <p><strong>Classe :</strong> {{ classeNomLocal }}</p>
           </div>
 
           <div>
-            <label for="semestre">Semestres :</label>
+            <label>Semestres :</label>
             <div class="semestres">
               <button
                 v-for="semestre in semestres"
                 :key="semestre.id"
-                @click="selectSemestre(semestre.id, eleve.id)"
-                :class="{ active: selectedSemestre === semestre.id }"
                 class="semestre-btn"
+                :class="{ active: selectedSemestreParEleve[eleve.id] === semestre.id }"
+                @click="selectSemestre(eleve.id, semestre.id)"
               >
+                <v-icon left small class="mr-1">mdi-calendar-range</v-icon>
                 {{ semestre.nom }}
               </button>
             </div>
           </div>
 
-          <table v-if="filteredNotes[eleve.id] && filteredNotes[eleve.id].length" class="notes-table">
-            <thead>
-              <tr>
-                <th>Matières</th>
-                <th>Coef</th>
-                <th>Moy</th>
-                <th>Moy Coef</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="note in filteredNotes[eleve.id]" :key="note.matiere_id">
-                <td>{{ note.matiere_nom }}</td>
-                <td>{{ note.totalCoefficient }}</td>
-                <td>{{ note.averageMoy }}</td>
-                <td>{{ note.moycoef }}</td>
-              </tr>
-              <tr>
-                <td><strong>Conduite</strong></td>
-                <td>{{ coefConduite }}</td>
-                <td>{{ calculateConduite(eleve.id) }}</td>
-                <td>{{ calculateConduite(eleve.id) }}</td>
-              </tr>
-              <tr class="total-row">
-                <td><strong>Total</strong></td>
-                <td>{{ calculateTotalCoefficient(filteredNotes[eleve.id]) }}</td>
-                <td></td>
-                <td>{{ calculateTotalMoyCoef(filteredNotes[eleve.id], eleve.id) }}</td>
-              </tr>
-              <tr>
-                <td colspan="2">Moyenne Semestrielle:</td>
-                <td colspan="2">{{ calculateMoySem(filteredNotes[eleve.id], eleve.id) }}</td>
-              </tr>
-              <tr>
-                <td colspan="2">Rang:</td>
-                <td colspan="2">{{ calculateRang(eleve.id, selectedSemestre) }}</td>
-              </tr>
-              <tr>
-                <td colspan="2">Mention:</td>
-                <td colspan="2">{{ calculateMention(calculateMoySem(filteredNotes[eleve.id], eleve.id)) }}</td>
-              </tr>
-              <tr v-if="isLastSemestre(selectedSemestre)">
-                <td colspan="2">Moyenne Annuelle:</td>
-                <td colspan="2">{{ moyennesAnnuelles[eleve.id] !== undefined ? moyennesAnnuelles[eleve.id] : 'Non calculée' }}</td>
+          <!-- Bloc v-if / v-else corrigé -->
+          <div class="notes-wrapper">
+            <template
+              v-if="selectedSemestreParEleve[eleve.id] &&
+                     notes[selectedSemestreParEleve[eleve.id]] &&
+                     notes[selectedSemestreParEleve[eleve.id]][eleve.id]"
+            >
+              <table class="notes-table">
+                <thead>
+                  <tr>
+                    <th>Matières</th>
+                    <th>Coef</th>
+                    <th>Moy</th>
+                    <th>Moy Coef</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="note in notes[selectedSemestreParEleve[eleve.id]][eleve.id].moyennes"
+                    :key="note.matiereId"
+                  >
+                    <td>{{ getMatiereNom(note.matiereId) }}</td>
+                    <td>{{ note.coefficient ?? 'N/A' }}</td>
+                    <td>{{ note.moy ?? 'N/A' }}</td>
+                    <td>{{ note.moycoef ?? 'N/A' }}</td>
+                  </tr>
 
-              </tr>
-              <tr v-if="isLastSemestre(selectedSemestre)">
-                <td colspan="2">Décision:</td>
-                <td colspan="2">{{ decision(eleve.id) }}</td>
-              </tr>
-            </tbody>
-          </table>
+                  <tr v-if="notes[selectedSemestreParEleve[eleve.id]][eleve.id].moyenne_semestrielle">
+                    <td colspan="2">Moyenne Semestrielle:</td>
+                    <td colspan="2">
+                      {{ notes[selectedSemestreParEleve[eleve.id]][eleve.id].moyenne_semestrielle }}
+                    </td>
+                  </tr>
 
-          <p v-else class="no-data">
-            Aucune note disponible pour cet élève dans le semestre sélectionné.
-          </p>
+                  <tr v-if="notes[selectedSemestreParEleve[eleve.id]][eleve.id].rang">
+                    <td colspan="2">Rang:</td>
+                    <td colspan="2">{{ notes[selectedSemestreParEleve[eleve.id]][eleve.id].rang }}</td>
+                  </tr>
+
+                  <tr v-if="notes[selectedSemestreParEleve[eleve.id]][eleve.id].mention">
+                    <td colspan="2">Mention:</td>
+                    <td colspan="2">{{ notes[selectedSemestreParEleve[eleve.id]][eleve.id].mention }}</td>
+                  </tr>
+
+                  <tr v-if="notes[selectedSemestreParEleve[eleve.id]][eleve.id].moyenne_annuelle">
+                    <td colspan="2">Moyenne Annuelle:</td>
+                    <td colspan="2">{{ notes[selectedSemestreParEleve[eleve.id]][eleve.id].moyenne_annuelle }}</td>
+                  </tr>
+
+                  <tr v-if="notes[selectedSemestreParEleve[eleve.id]][eleve.id].decision">
+                    <td colspan="2">Décision:</td>
+                    <td colspan="2">{{ notes[selectedSemestreParEleve[eleve.id]][eleve.id].decision }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </template>
+
+            <p v-else class="no-data">
+              <v-icon left color="red" class="mr-1">mdi-close-circle-outline</v-icon>
+              Aucune note disponible pour cet élève dans le semestre sélectionné.
+            </p>
+          </div>
         </div>
       </div>
     </div>
 
-    <v-dialog v-model="dialog" max-width="400" class="custom-dialog">
+    <!-- DIALOG -->
+    <v-dialog v-model="dialog" max-width="400">
       <v-card>
-        <v-card-title>
-          <span class="headline">{{ dialogTitle }}</span>
+        <v-card-title class="headline">
+          <v-icon left class="mr-2">mdi-information-outline</v-icon>
+          {{ dialogTitle }}
         </v-card-title>
-        <v-card-text>
-          <p>{{ message }}</p>
-        </v-card-text>
+        <v-card-text>{{ message }}</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" @click="closeDialog">Fermer</v-btn>
+          <v-btn color="primary" text @click="closeDialog">OK</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -122,30 +151,12 @@
 import axios from 'axios';
 export default {
   props: {
-    classId: {
-      type: Number,
-      required: true,
-    },
-    classeNom: {
-      type: String,
-      required: true,
-    },
-    etablissementId: {
-      type: Number,
-      required: true
-    },
-    etablissementNom: {
-      type: String,
-      required: true
-    },
-    anneeScolaire: {
-      type: String,
-      required: true
-    },
-    anneeScolaireId: {
-      type: Number,
-      required: true
-    }
+    classId: { type: Number, required: true },
+    classeNom: { type: String, required: true },
+    etablissementId: { type: Number, required: true },
+    etablissementNom: { type: String, required: true },
+    anneeScolaire: { type: String, required: true },
+    anneeScolaireId: { type: Number, required: true }
   },
   data() {
     return {
@@ -153,564 +164,278 @@ export default {
       semestres: [],
       matieres: [],
       notes: {},
-      filteredNotes: {}, // Initialisation correcte ici
-      moyennesSemestrielles: {},
-      selectedSemestre: null,
       activeEleve: null,
-      message: '',           // État pour le message de succès ou d'erreur
-      dialog: false,         // État pour contrôler l'affichage du dialog
-      dialogTitle: '',       // Titre du dialog
-      coefConduite: 1,
-      classeNom: '',
-      noteConduiteIn: {},
-      heuresParEleve: {},    // Pour stocker la somme d'heures de chaque élève
-      notesConduite: {},     // Initialisation de notesConduite comme un objet vide
-      moyennesAnnuelles: {},
-      seenEleves: new Set(), // Pour suivre les élèves déjà vus pour le semestre sélectionné     etablissementStatut: '' // Pour stocker le statut de l'établissement
+      classeNomLocal: this.classeNom,
+      message: '',
+      dialog: false,
+      dialogTitle: '',
+      selectedSemestreParEleve: {}
     };
   },
   methods: {
-    async fetchBulletin() {
+    async fetchBulletinData() {
       try {
         const response = await axios.get('http://localhost:8080/api/bulletin', {
-          params: { classeId: this.classId,
+          params: {
+            classeId: this.classId,
+            etablissementId: this.etablissementId,
             anneeScolaireId: this.anneeScolaireId
-          },
+          }
         });
-        const data = response.data;
+        const { semestres, matieres, notes, classeNom } = response.data;
+        this.semestres = semestres || [];
+        this.matieres = matieres || [];
+        this.notes = notes || {};
+        this.classeNomLocal = classeNom || 'Inconnue';
 
-        // Affichage de la structure complète de la réponse pour le débogage
-        console.log('Données brutes récupérées :', JSON.stringify(data, null, 2));
-
-        // Correction : Vérification de l'existence de `notes`
-        if (!data.notes || Object.keys(data.notes).length === 0) {
-          console.error("Erreur : 'notes' est manquant ou vide dans les données reçues.");
-          this.notes = {}; // Sécurisation
-          return;
-        }
-
-        // Correction : Vérification si les tableaux attendus sont valides
-        if (!data.semestres || !Array.isArray(data.semestres)) {
-          console.warn("Attention : 'semestres' est manquant ou n'est pas un tableau.");
-          this.semestres = [];
-        } else {
-          this.semestres = data.semestres;
-        }
-
-        if (!data.matieres || !Array.isArray(data.matieres)) {
-          console.warn("Attention : 'matieres' est manquant ou n'est pas un tableau.");
-          this.matieres = [];
-        } else {
-          this.matieres = data.matieres;
-        }
-
-        this.classeNom = data.classeNom || '';
-        this.eleves = this.extractEleves(data.notes);
-        this.notes = data.notes;
-
-        // Initialisation des objets de calcul
-        this.heuresParEleve = {};
-        this.notesConduite = {};
-        this.moyennesSemestrielles = {};
-        this.moyennesAnnuelles = {};
+        this.eleves = Object.values(notes).flatMap(semestreNotes =>
+          Object.values(semestreNotes)
+        ).reduce((acc, eleve) => {
+          if (!acc.find(item => item.id === eleve.eleveId)) {
+            acc.push({ id: eleve.eleveId, nom: eleve.nom, prenom: eleve.prenom });
+          }
+          return acc;
+        }, []);
 
         if (this.semestres.length > 0) {
-          this.selectedSemestre = this.semestres[0].id;
-          console.log('Semestre par défaut sélectionné :', this.selectedSemestre);
-        } else {
-          console.warn('Aucun semestre trouvé dans les données récupérées.');
-          return;
+          const premierSemestreId = this.semestres[0].id;
+          this.eleves.forEach(eleve => {
+            this.selectedSemestreParEleve[eleve.id] = premierSemestreId;
+          });
         }
 
-        this.eleves.forEach((eleve) => {
-          this.moyennesSemestrielles[eleve.id] = {};
-          this.heuresParEleve[eleve.id] = {};
-          this.notesConduite[eleve.id] = {};
-
-          this.semestres.forEach((semestre) => {
-            // Correction : Vérification sécurisée des données avant calcul
-            if (!this.notes[semestre.id]) {
-              this.notes[semestre.id] = []; // Sécurisation
-            }
-
-            const moyenne = this.calculateMoySem(this.filteredNotes[eleve.id] || [], eleve.id);
-            console.log(
-              `Moyenne calculée pour élève ${eleve.id} semestre ${semestre.id} : ${moyenne}`
-            );
-            this.moyennesSemestrielles[eleve.id][semestre.id] = moyenne || 'Non calculée';
-          });
-        });
-
-        this.eleves.forEach((eleve) => {
-          this.filterNotesBySemestre(eleve.id, this.selectedSemestre);
-        });
-
-        this.eleves.forEach((eleve) => {
-          this.calculateMoyenneAnnuelle(eleve.id);
-        });
+        if (this.eleves.length === 0) {
+          this.message = "Aucun élève trouvé dans cette classe.";
+          this.dialogTitle = 'Information';
+          this.dialog = true;
+        }
       } catch (error) {
-        console.error('Erreur lors de la récupération des données :', error);
+        this.message = "Erreur lors de la récupération des données.";
+        this.dialogTitle = 'Erreur';
+        this.dialog = true;
       }
     },
-
-
 
     toggleEleve(eleveId) {
       this.activeEleve = this.activeEleve === eleveId ? null : eleveId;
-      this.seenEleves.add(eleveId); // Marquer cet élève comme vu pour le semestre en cours
-    },
-   
-
-    filterNotesBySemestre(eleveId, semestreId) {
-      if (!eleveId || !semestreId) {
-        return;
-      }
-
-      // Correction : Vérification de l'existence de notes pour le semestre
-      if (!this.notes[semestreId]) {
-        console.warn(`Notes non disponibles pour le semestre ${semestreId}`);
-        this.filteredNotes[eleveId] = [];
-        this.heuresParEleve[eleveId][semestreId] = 0;
-        this.notesConduite[eleveId][semestreId] = 0;
-        return;
-      }
-
-      const semestreNotes = this.notes[semestreId].filter((note) => note.eleveId === eleveId);
-
-      this.heuresParEleve[eleveId][semestreId] = 0;
-      this.notesConduite[eleveId][semestreId] = 0;
-
-      if (semestreNotes.length === 0) {
-        return;
-      }
-
-      const groupedNotes = {};
-      semestreNotes.forEach((note) => {
-        const noteHours = parseFloat(note.total_hours) || 0;
-        this.heuresParEleve[eleveId][semestreId] += noteHours;
-        this.notesConduite[eleveId][semestreId] = parseFloat(note.conduite) || 0;
-
-        const matiere = this.matieres.find((m) => m.id === note.matiereId);
-        if (!groupedNotes[note.matiereId]) {
-          groupedNotes[note.matiereId] = {
-            matiere_id: note.matiereId,
-            matiere_nom: matiere ? matiere.nom : 'Matière inconnue',
-            coef_id: note.coefficientId,
-            total_hours: 0,
-            conduite_note: 0,
-            totalCoefficient: 0,
-            totalMoy: 0,
-          };
-        }
-
-        groupedNotes[note.matiereId].total_hours += noteHours;
-        groupedNotes[note.matiereId].conduite_note = this.notesConduite[eleveId][semestreId];
-        groupedNotes[note.matiereId].totalCoefficient += parseFloat(note.coefficient || 1);
-        groupedNotes[note.matiereId].totalMoy += parseFloat(note.moy || 0) * parseFloat(note.coefficient || 1);
-      });
-
-      this.filteredNotes[eleveId] = Object.values(groupedNotes).map((item) => {
-        const averageMoy = (item.totalMoy / item.totalCoefficient).toFixed(2);
-        return {
-          ...item,
-          averageMoy: averageMoy,
-          moycoef: item.totalMoy.toFixed(2),
-        };
-      });
-    },
-calculateConduite(eleveId) {
-    // Récupère les valeurs pour le semestre sélectionné
-    const totalHours = (this.heuresParEleve[eleveId] && this.heuresParEleve[eleveId][this.selectedSemestre]) || 0;
-    const conduite = (this.notesConduite[eleveId] && this.notesConduite[eleveId][this.selectedSemestre]) || 0;
-
-    console.log(`Heures pour l'élève ${eleveId}, semestre ${this.selectedSemestre} : ${totalHours}`);
-    console.log(`Conduite pour l'élève ${eleveId}, semestre ${this.selectedSemestre} : ${conduite}`);
-
-    if (conduite === 0) return 0;  // Si la conduite est à zéro, retourne 0
-
-    // Calcule la note de conduite avec une formule personnalisée
-    const noteFinale = conduite - totalHours / 2;
-    console.log(`Note finale de conduite calculée : ${noteFinale}`);
-    this.noteConduiteIn[eleveId] = noteFinale;
-    return noteFinale.toFixed(2);
-},
-
-
-selectSemestre(semestreId, eleveId) {
-      this.selectedSemestre = semestreId;
-      this.filterNotesBySemestre(eleveId, semestreId);
-
-      // Calcul de la moyenne semestrielle pour cet élève et ce semestre
-      const moyenneSem = this.calculateMoySem(this.filteredNotes[eleveId], eleveId);
-      this.moyennesSemestrielles[eleveId][semestreId] = moyenneSem;
-      console.log(`Moyenne semestrielle stockée pour l'élève ${eleveId}, semestre ${semestreId}: ${moyenneSem}`);
-
-      // Si tous les semestres ont été parcourus, calculer la moyenne annuelle
-      if (Object.keys(this.moyennesSemestrielles[eleveId]).length === this.semestres.length) {
-        this.calculateMoyenneAnnuelle(eleveId);
-      }
     },
 
-
-    isLastSemestre(semestreId) {
-      return this.semestres.length && semestreId === this.semestres[this.semestres.length - 1].id;
+    selectSemestre(eleveId, semestreId) {
+      this.selectedSemestreParEleve = {
+        ...this.selectedSemestreParEleve,
+        [eleveId]: semestreId
+      };
     },
 
-    decision(eleveId) {
-      const moyenneAnnuelle = this.moyennesAnnuelles[eleveId];
-      return moyenneAnnuelle >= 10 ? 'Passage' : 'Redoublement';
+    getMatiereNom(matiereId) {
+      const matiere = this.matieres.find(m => m.id === matiereId);
+      return matiere ? matiere.nom : 'Inconnue';
     },
-    extractEleves(notes) {
-    const elevesMap = new Map();
-    Object.keys(notes).forEach(semestreId => {
-        notes[semestreId].forEach(note => {
-            if (!elevesMap.has(note.eleveId)) {
-                elevesMap.set(note.eleveId, {
-                    id: note.eleveId,
-                    nom: note.nom,
-                    prenom: note.prenom,
-                });
-            }
-        });
-    });
-    return Array.from(elevesMap.values());
-},
-
-async saveBulletin(eleveId) {
-  // Vérification du semestre sélectionné
-  if (!this.selectedSemestre) {
-    this.message = "Veuillez sélectionner un semestre.";
-    this.dialogTitle = "Erreur";
-    this.dialog = true;
-    return;
-  }
-
-  const notesEleve = this.filteredNotes[eleveId];
-  if (!notesEleve || notesEleve.length === 0) {
-    this.message = "Aucune note trouvée pour cet élève.";
-    this.dialogTitle = "Erreur";
-    this.dialog = true;
-    return;
-  }
-
-  // Vérification si tous les élèves ont été parcourus pour le semestre sélectionné
-  if (this.seenEleves.size !== this.eleves.length) {
-    this.message =
-      "Veuillez parcourir tous les élèves pour le même semestre sélectionné avant de sauvegarder.";
-    this.dialogTitle = "Erreur";
-    this.dialog = true;
-    return;
-  }
-
+    async sauvegarderTousLesBulletins() {
   try {
-    // Préparation des données pour l'élève
-    const isLastSemestre = this.isLastSemestre(this.selectedSemestre);
-    const moyenneSem = this.moyennesSemestrielles[eleveId][this.selectedSemestre] || "Non calculée";
-    const conduite = this.noteConduiteIn[eleveId] || 0;
-    const totalMoyCoef = this.calculateTotalMoyCoef(notesEleve, eleveId);
-    const moyenneAnnuelle = isLastSemestre ? this.moyennesAnnuelles[eleveId] : null;
-    const mention = this.calculateMention(moyenneSem);
-    const rang = this.calculateRang(eleveId, this.selectedSemestre);
+    for (const semestre of this.semestres) {
+      const semestreId = semestre.id;
 
-    const bulletinData = notesEleve.map(note => ({
-      eleve_id: eleveId,
-      semestre_id: this.selectedSemestre,
-      matiere_id: note.matiere_id,
-      coef_id: note.coef_id || null,
-      moy: note.averageMoy || 0,
-      moycoef: note.moycoef || 0,
-      total: totalMoyCoef,
-      moySem: moyenneSem,
-      rang: rang || "Non classé",
-      mention: mention || "Non défini",
-      conduite: conduite,
-      moyAn: moyenneAnnuelle,
-      decision: isLastSemestre 
-        ? (moyenneAnnuelle >= 10 ? "Admis" : "Redoublant") 
-        : null,
-      etablissement_id: this.etablissementId,
-      Annee_scolaire_id: this.anneeScolaireId
-    }));
+      for (const eleve of this.eleves) {
+        const eleveId = eleve.id;
+        const bulletin = this.notes[semestreId]?.[eleveId];
 
-    // Envoi des données au backend
-    const response = await axios.post("http://localhost:8080/api/save-bulletin", {
-      bulletin: bulletinData,
-    });
+        if (bulletin) {
+          const toutesLesNotes = bulletin.moyennes || [];
 
-    // Gestion des réponses du backend
-    if (response.data && response.data.message) {
-      this.message = response.data.message;
-      this.dialogTitle = "Succès";
-    } else {
-      this.message = "Bulletin sauvegardé avec succès !";
-      this.dialogTitle = "Succès";
+          const noteConduite = toutesLesNotes.find(n => n.matiereId === 'conduite');
+          const conduite = noteConduite ? noteConduite.moy : null;
+
+          const notesSansConduite = toutesLesNotes.filter(n => n.matiereId !== 'conduite');
+
+          const payload = {
+            eleveId,
+            classeId: this.classId,
+            etablissementId: this.etablissementId,
+            anneeScolaireId: this.anneeScolaireId,
+            semestreId,
+            notes: notesSansConduite,
+            moyenneSemestrielle: bulletin.moyenne_semestrielle,
+            moyenneAnnuelle: bulletin.moyenne_annuelle,
+            rang: bulletin.rang,
+            mention: bulletin.mention,
+            decision: bulletin.decision,
+            conduite: conduite
+          };
+
+          try {
+            await axios.post('http://localhost:8080/api/sauvegarde-bulletin', payload);
+          } catch (err) {
+            const apiError = err.response?.data;
+
+            // Cas où on a les noms des matières manquantes
+            if (apiError?.matieresManquantes?.length > 0) {
+              const noms = apiError.matieresManquantes.map(m => m.nom).join(', ');
+              this.message = `Impossible de sauvegarder le bulletin pour ${eleve.nom} (${eleveId}) :\nLes matières suivantes n'ont pas de moyenne : ${noms}`;
+            } else {
+              this.message = `Erreur pour ${eleve.nom} (${eleveId}) : ${apiError?.error || 'Erreur inconnue'}`;
+            }
+
+            this.dialogTitle = "Erreur lors de la sauvegarde";
+            this.dialog = true;
+            return;
+          }
+        }
+      }
     }
 
+    this.message = "Tous les bulletins ont été sauvegardés avec succès.";
+    this.dialogTitle = "Succès";
     this.dialog = true;
   } catch (error) {
-    // Gestion des erreurs spécifiques renvoyées par le backend
-    if (
-      error.response &&
-      error.response.data &&
-      error.response.data.message
-    ) {
-      // Vérifie si le message d'erreur correspond à un bulletin existant
-      if (error.response.data.type === "BULLETIN_EXISTS") {
-        const { eleveNom, elevePrenom, semestreNom } = error.response.data.details;
-
-        this.message = `Un bulletin a déjà été enregistré pour l'élève ${eleveNom} ${elevePrenom} pour le semestre ${semestreNom}.`;
-      } else {
-        this.message = error.response.data.message;
-      }
-    } else {
-      this.message = "Erreur lors de la sauvegarde du bulletin.";
-    }
-
-    console.error("Erreur lors de la sauvegarde du bulletin :", error);
-    this.dialogTitle = "Erreur";
+    this.message = "Une erreur inattendue est survenue.";
+    this.dialogTitle = "Erreur globale";
     this.dialog = true;
+    console.error(error);
   }
 },
-
 
     closeDialog() {
       this.dialog = false;
       this.message = '';
-    },
-  
-    calculateTotalCoefficient(notes) {
-      return (notes.reduce((sum, note) => sum + parseFloat(note.totalCoefficient), 0) + this.coefConduite).toFixed(2);
-    },
-    calculateTotalMoyCoef(notes, eleveId) {
-      const totalMoyCoef = notes.reduce((sum, note) => sum + parseFloat(note.moycoef), 0);
-      console.log(totalMoyCoef);
-      const conduite = parseFloat(this.calculateConduite(eleveId));
-      console.log(conduite);
-      const totalMoyCoefge = (totalMoyCoef + conduite).toFixed(2);
-      console.log(totalMoyCoefge);
-      return totalMoyCoefge ;
-    },
-    calculateMoySem(notes, eleveId) {
-  const totalMoyCoef = parseFloat(this.calculateTotalMoyCoef(notes, eleveId));
-  const totalCoef = parseFloat(this.calculateTotalCoefficient(notes));
-  
-  if (totalCoef === 0) {
-    console.warn(`Coefficient total nul pour l'élève ${eleveId}.`);
-    return 0; // Pour éviter la division par zéro
-  }
-  
-  const moyenneSemestrielle = (totalMoyCoef / totalCoef).toFixed(2);
-  console.log(`Moyenne semestrielle calculée pour l'élève ${eleveId}: ${moyenneSemestrielle}`);
-  return parseFloat(moyenneSemestrielle); // S'assure qu'une valeur numérique est retournée
-},
-async calculateMoyenneAnnuelle(eleveId) {
-      try {
-        const response = await axios.get('http://localhost:8080/api/etablissementStatut', {
-          params: { etablissementId: this.etablissementId },
-        });
-        let statutEtablissement = response.data.statut?.toLowerCase();
-        if (statutEtablissement === 'public') statutEtablissement = 'publique';
-        if (statutEtablissement === 'prive') statutEtablissement = 'prive';
-
-        const moyennes = Object.values(this.moyennesSemestrielles[eleveId]).filter((m) => !isNaN(m));
-
-        if (moyennes.length === 0) {
-          this.moyennesAnnuelles[eleveId] = 'Non calculée';
-          return;
-        }
-
-        const totalSemestres = moyennes.length;
-        const dernierSemestre = moyennes[totalSemestres - 1];
-        const autresSemestres = moyennes.slice(0, -1).reduce((sum, moy) => sum + moy, 0);
-
-        let moyenneAnnuelle;
-        if (statutEtablissement === 'publique') {
-          moyenneAnnuelle = (((dernierSemestre * 2) + autresSemestres) / 3).toFixed(2);
-        } else if (statutEtablissement === 'prive') {
-          moyenneAnnuelle = (((dernierSemestre * 2) + autresSemestres) / 4).toFixed(2);
-        }
-
-        this.moyennesAnnuelles[eleveId] = parseFloat(moyenneAnnuelle);
-        console.log(`Moyenne annuelle pour l'élève ${eleveId} : ${moyenneAnnuelle}`);
-      } catch (error) {
-        console.error('Erreur lors du calcul de la moyenne annuelle :', error);
-        this.moyennesAnnuelles[eleveId] = 'Erreur de calcul';
-      }
-    },
-
-    calculateRang(eleveId, semestre) {
-  // Vérification des moyennes semestrielles
-  if (!this.moyennesSemestrielles || Object.keys(this.moyennesSemestrielles).length === 0) {
-    console.warn("Les moyennes semestrielles ne sont pas définies.");
-    return "Non classé";
-  }
-
-  // Création d'une liste des moyennes pour le semestre spécifié
-  const moyennesSemestre = Object.entries(this.moyennesSemestrielles)
-    .map(([id, semestres]) => ({ 
-      id: parseInt(id), 
-      moyenne: semestres[semestre] 
-    }))
-    .filter(({ moyenne }) => !isNaN(moyenne)) // Exclure les moyennes non valides
-    .sort((a, b) => b.moyenne - a.moyenne); // Trier par ordre décroissant des moyennes
-
-  console.log(`Moyennes triées pour le semestre ${semestre}:`, moyennesSemestre);
-
-  // Trouver l'index de l'élève dans la liste triée
-  const rang = moyennesSemestre.findIndex(({ id }) => id === eleveId) + 1;
-
-  // Vérification du rang trouvé
-  if (rang === 0) {
-    console.warn(`Élève avec l'ID ${eleveId} non trouvé dans les moyennes pour le semestre ${semestre}.`);
-    return "Non classé";
-  }
-
-  // Retourner le rang avec le suffixe correct
-  if (rang === 1) return "1er";
-  if (rang === 2) return "2e";
-  if (rang === 3) return "3e";
-  return `${rang}e`;
-},
-
-    
-    calculateMention(moyenne) {
-      if (moyenne >= 16) return 'Très Bien';
-      if (moyenne >= 14) return 'Bien';
-      if (moyenne >= 12) return 'Assez Bien';
-      if (moyenne >= 10) return 'Passable';
-      return 'Insuffisant';
-    },
-    
+    }
   },
   mounted() {
-    this.fetchBulletin();
+    this.fetchBulletinData();
   }
 };
-
-
 </script>
-  
-  <style scoped>
-  .container {
-    font-family: 'Arial', sans-serif;
-    padding: 20px;
-    max-width: 1000px;
-    margin: auto;
-  }
-  
-  .eleve-item {
-    border: 1px solid #007BFF;
-    margin-bottom: 20px;
-    border-radius: 10px;
-    background-color: #E3F2FD;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  
-  .eleve-header {
-    padding: 15px;
-    cursor: pointer;
-    font-weight: bold;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
 
-  }
-  
-  .eleve-details {
-    padding: 20px;
-  }
-  
-  .eleve-info {
-    margin-bottom: 20px;
-  }
-  
-  .semestres {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  
-  .semestre-btn {
-    background-color: #007BFF;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    padding: 10px;
-    cursor: pointer;
-  }
-  
-  .semestre-btn.active {
-    background-color: #0056b3;
-  }
-  
-  .notes-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  
-  .notes-table th, .notes-table td {
-    border: 1px solid #007BFF;
-    padding: 10px;
-    text-align: center;
-  }
-  
-  .total-row {
-    font-weight: bold;
-  }
-  .save-btn {
+
+
+
+<style scoped>
+.container {
+  font-family: 'Arial', sans-serif;
+  padding: 20px;
+  max-width: 1000px;
+  margin: auto;
+  overflow-x: hidden;
+}
+.title {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+}
+.eleve-item {
+  border: 1px solid #007BFF;
+  margin-bottom: 20px;
+  border-radius: 10px;
+  background-color: #E3F2FD;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.eleve-header {
+  padding: 15px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.eleve-details {
+  padding: 20px;
+}
+.eleve-info {
+  margin-bottom: 20px;
+}
+.semestres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.semestre-btn {
+  background-color: #007BFF;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.semestre-btn.active {
+  background-color: #0056b3;
+}
+.notes-wrapper {
+  overflow-x: auto;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 15px;
+}
+.notes-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.notes-table th, .notes-table td {
+  border: 1px solid #007BFF;
+  padding: 10px;
+  text-align: center;
+}
+.total-row {
+  font-weight: bold;
+}
+.save-btn {
   margin-top: 10px;
   padding: 10px 20px;
   background-color: #28a745;
   color: white;
   border: none;
+  border-radius: 5px;
   cursor: pointer;
 }
-
 .save-btn:hover {
   background-color: #218838;
 }
-  
-  .no-data {
-    color: red;
-    font-weight: bold;
-  }
-  .message {
-  margin-top: 20px;
-  padding: 10px;
+.no-data {
+  color: red;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+.save-all-btn {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 10px 15px;
   border-radius: 5px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+}
+.save-all-btn:hover {
+  background-color: #45a049;
 }
 
-.success-message {
-  background-color: #d4edda;
-  color: #155724;
+/* Responsiveness */
+@media (max-width: 600px) {
+  .container {
+    padding: 10px;
+  }
+  h1, h2, h3 {
+    font-size: 1.1rem;
+  }
+  .semestre-btn,
+  .save-btn,
+  .save-all-btn {
+    padding: 6px 8px;
+    font-size: 0.75rem;
+  }
+  .notes-table th,
+  .notes-table td {
+    padding: 6px;
+    font-size: 0.75rem;
+  }
+  .eleve-header {
+    font-size: 0.95rem;
+  }
+  .no-data {
+    font-size: 0.9rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
-
-.error-message {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-/* Styles pour le v-dialog */
-.custom-dialog .v-card {
-  background-color: #f9f9f9; /* Couleur de fond du dialog */
-  border-radius: 8px; /* Coins arrondis */
-}
-
-.custom-dialog .v-card-title {
-  font-weight: bold; /* Titre en gras */
-  color: #333; /* Couleur du texte */
-}
-
-.custom-dialog .v-card-text {
-  color: #555; /* Couleur du texte */
-}
-
-.custom-dialog .v-btn {
-  background-color: #007bff; /* Couleur du bouton */
-  color: white; /* Couleur du texte du bouton */
-}
-
-.custom-dialog .v-btn:hover {
-  background-color: #0056b3; /* Couleur du bouton au survol */
-}
-  </style>
-  
+</style>

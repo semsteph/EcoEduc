@@ -1,103 +1,82 @@
 <template>
-  <v-container>
-    <v-toolbar flat>
-      <v-toolbar-title>Programme Hebdomadaire</v-toolbar-title>
+  <v-container class="programme-container">
+    <!-- Toolbar -->
+    <v-toolbar flat class="programme-toolbar">
+      <v-toolbar-title class="text-h6 text-md-h5">
+        <v-icon left class="mr-2">mdi-calendar-clock</v-icon> Programme Hebdomadaire
+      </v-toolbar-title>
       <v-spacer></v-spacer>
-      <v-btn color="primary" @click="afficherFormulaire">
-        Ajouter Programme
+      <v-btn color="primary" class="ma-1" @click="afficherFormulaire">
+        <v-icon left>mdi-plus</v-icon> Ajouter
       </v-btn>
-      <v-btn color="success" @click="telechargerProgrammePDF">
-        Télécharger PDF
+      <v-btn color="success" class="ma-1" @click="telechargerProgrammePDF">
+        <v-icon left>mdi-download</v-icon> PDF
       </v-btn>
     </v-toolbar>
 
-    <!-- Formulaire d'ajout de programme -->
+    <!-- Dialog Formulaire -->
     <v-dialog v-model="dialog" max-width="500px">
       <v-card>
         <v-card-title>
+          <v-icon left class="mr-2">mdi-calendar-plus</v-icon>
           <span class="headline">Ajouter un Programme</span>
         </v-card-title>
         <v-card-text>
           <v-form ref="form">
-            <v-text-field label="Classe" :value="classId" readonly></v-text-field>
-            <v-select
-              label="Jour"
-              v-model="nouveauProgramme.jour"
-              :items="joursDeLaSemaine"
-              item-title="label"
-              item-value="value"
-            ></v-select>
-            <v-text-field label="Horaire" v-model="nouveauProgramme.horaire"></v-text-field>
-            <v-select
-              label="Matière"
-              :items="matiereOptions"
-              v-model="nouveauProgramme.matiereId"
-              item-title="nom"
-              item-value="id"
-            ></v-select>
+            <v-text-field label="Classe" :value="classId" readonly dense></v-text-field>
+            <v-select label="Jour" v-model="nouveauProgramme.jour" :items="joursDeLaSemaine" item-title="label" item-value="value" dense></v-select>
+            <v-text-field label="Horaire" v-model="nouveauProgramme.horaire" dense></v-text-field>
+            <v-select label="Matière" :items="matiereOptions" v-model="nouveauProgramme.matiereId" item-title="nom" item-value="id" dense></v-select>
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="blue darken-1" text @click="dialog = false">
-            Annuler
-          </v-btn>
-          <v-btn color="blue darken-1" text @click="ajouterProgramme">
-            Ajouter
-          </v-btn>
+          <v-btn color="error" text @click="dialog = false">Annuler</v-btn>
+          <v-btn color="primary" text @click="ajouterProgramme">Ajouter</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <!-- Messages de succès et d'échec -->
+    <!-- Snackbar -->
     <v-snackbar v-model="snackbar" :color="snackbarColor">
       {{ snackbarMessage }}
       <v-btn color="white" text @click="snackbar = false">Fermer</v-btn>
     </v-snackbar>
 
-    <!-- Tableau des programmes -->
+    <!-- Tableau -->
     <div class="table-wrapper">
       <v-simple-table>
-        <template v-slot:default>
-          <!-- En-tête -->
-          <thead>
-            <tr>
-              <th class="matiere-header">Matières / Jours</th>
-              <th>Lundi</th>
-              <th>Mardi</th>
-              <th>Mercredi</th>
-              <th>Jeudi</th>
-              <th>Vendredi</th>
-            </tr>
-          </thead>
-          <!-- Corps du tableau -->
-          <tbody>
-            <tr v-for="matiere in matieres" :key="matiere.id">
-              <td class="matiere-cell">{{ matiere.nom }}</td>
-              <td v-for="jour in joursDeLaSemaine" :key="jour.value" class="programme-cell">
-                <div class="programme-content">
-                  <v-textarea 
-                    v-model="matiere[jour.value]" 
-                    label="Programme" 
-                    dense 
-                    hide-details 
-                    auto-grow
-                    readonly
-                    class="programme-textarea"
-                  ></v-textarea>
-                  <v-btn icon small @click="supprimerProgramme(matiere.id, jour.value)">
-                    <v-icon color="red">mdi-delete</v-icon>
-                  </v-btn>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </template>
+        <thead>
+          <tr>
+            <th class="matiere-header">Matières / Jours</th>
+            <th v-for="j in joursDeLaSemaine" :key="j.value">{{ j.label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="matiere in matieres" :key="matiere.id">
+            <td class="matiere-cell">{{ matiere.nom }}</td>
+            <td v-for="jour in joursDeLaSemaine" :key="jour.value" class="programme-cell">
+              <div class="programme-content">
+                <v-textarea
+                  v-model="matiere[jour.value]"
+                  label="Programme"
+                  dense
+                  hide-details
+                  auto-grow
+                  readonly
+                  class="programme-textarea"
+                ></v-textarea>
+                <v-btn icon small @click="supprimerProgramme(matiere.id, jour.value)">
+                  <v-icon color="red">mdi-delete</v-icon>
+                </v-btn>
+              </div>
+            </td>
+          </tr>
+        </tbody>
       </v-simple-table>
     </div>
   </v-container>
 </template>
-
 <script>
 import axios from 'axios';
 import jsPDF from 'jspdf';
@@ -272,33 +251,73 @@ export default {
 </script>
 
 <style scoped>
+.programme-container {
+  padding: 16px;
+  max-width: 1000px;
+  margin: auto;
+}
+
+.programme-toolbar {
+  flex-wrap: wrap;
+}
+
 .table-wrapper {
   overflow-x: auto;
   overflow-y: auto;
   max-height: 500px;
   border: 1px solid #ddd;
   background-color: #f5f5f5;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 16px;
 }
 
 thead th {
-  background-color: #f5f5f5;
+  background-color: #f0f0f0;
   position: sticky;
   top: 0;
   z-index: 2;
+  font-weight: bold;
+  font-size: 0.85rem;
 }
 
 .programme-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  padding: 4px;
 }
 
 .programme-textarea {
   flex: 1;
-  font-size: 12px;
+  font-size: 0.8rem;
 }
 
 .matiere-header {
   text-align: left;
+  font-weight: bold;
+  width: 150px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .programme-toolbar .v-btn {
+    font-size: 10px;
+    min-width: 100px;
+  }
+  .v-toolbar-title {
+    font-size: 14px !important;
+  }
+  thead th,
+  .matiere-header {
+    font-size: 10px !important;
+  }
+  .programme-textarea {
+    font-size: 10px !important;
+  }
+  .programme-content {
+    flex-direction: column;
+    gap: 4px;
+  }
 }
 </style>

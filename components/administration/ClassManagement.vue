@@ -1,53 +1,147 @@
 <template>
   <div class="container">
-    <!-- Boutons de gestion des classes -->
-    <div class="button-group">
-      <v-btn color="primary" @click="showForm = true" v-if="!showProgram && !showConductForm && !showSemesterForm">Ajouter Classe</v-btn>
-      <v-btn color="primary" @click="toggleClasses" v-if="!showProgram && !showConductForm && !showSemesterForm">Mes Classes</v-btn>
-      <v-btn @click="toggleProgram" :color="showProgram ? 'secondary' : 'primary'">Programme</v-btn>
-      <v-btn color="primary" @click="showConductForm = true" v-if="!showProgram && !showForm && !showSemesterForm">Note de conduite</v-btn>
-      <v-btn color="primary" @click="showSemesterForm = true" v-if="!showProgram && !showForm && !showConductForm">Ajouter Semestre/Trimestre</v-btn>
+    <!-- Groupe de boutons principaux -->
+    <div class="button-group" v-if="!activeForm && !showClasses">
+      <v-btn block color="primary" @click="activateForm('addClass')">
+        <v-icon start>mdi-plus</v-icon> Ajouter Classe
+      </v-btn>
+      <v-btn block :color="showClasses ? 'secondary' : 'primary'" @click="toggleClasses">
+        <v-icon start>mdi-school</v-icon> Mes Classes
+      </v-btn>
+      <v-btn block :color="activeForm === 'program' ? 'secondary' : 'primary'" @click="activateForm('program')">
+        <v-icon start>mdi-book-open-variant</v-icon> Programme
+      </v-btn>
+      <v-btn block color="primary" @click="activateForm('conduct')">
+        <v-icon start>mdi-clipboard-text</v-icon> Note de conduite
+      </v-btn>
     </div>
 
-    <!-- Formulaire pour ajouter une nouvelle classe -->
-    <v-card v-if="showForm && !showProgram" class="form-card">
+
+    <!-- Formulaire Ajouter Classe -->
+    <v-card v-if="activeForm === 'addClass'" class="form-card">
       <v-form @submit.prevent="submitForm">
-        <v-text-field v-model="newClassName" label="Nom de la classe" required></v-text-field>
+        <v-text-field
+          v-model.number="numberOfClasses"
+          label="Nombre de classes"
+          type="number"
+          min="1"
+          dense
+          prepend-inner-icon="mdi-counter"
+          required
+        ></v-text-field>
+
         <v-select
           v-model="selectedPromotionId"
           :items="promotions"
           item-title="nom"
           item-value="id"
           label="Promotion"
+          prepend-inner-icon="mdi-timeline"
+          dense
           required
         ></v-select>
+
+        <v-select
+          v-model="selectedCycle"
+          :items="['Cycle 1', 'Cycle 2']"
+          label="Cycle"
+          prepend-inner-icon="mdi-repeat"
+          dense
+          required
+        ></v-select>
+
         <div class="button-container">
-          <v-btn color="primary" type="submit">Ajouter</v-btn>
-          <v-btn @click="cancelForm">Annuler</v-btn>
+          <v-btn color="primary" type="submit">
+            <v-icon start>mdi-check</v-icon> Ajouter
+          </v-btn>
+          <v-btn color="grey" @click="cancelForm">
+            <v-icon start>mdi-close</v-icon> Annuler
+          </v-btn>
         </div>
       </v-form>
     </v-card>
 
-    <!-- Affichage des classes -->
+    <!-- Formulaire Note de conduite -->
+    <v-card v-if="activeForm === 'conduct'" class="form-card">
+      <v-form @submit.prevent="submitConductForm">
+        <v-text-field
+          v-model="conductNote"
+          label="Note de conduite"
+          prepend-inner-icon="mdi-note-text"
+          dense
+          required
+        ></v-text-field>
+
+        <v-select
+          v-model="selectedSemestreId"
+          :items="semestresOptions"
+          item-title="name"
+          item-value="id"
+          label="Semestre"
+          prepend-inner-icon="mdi-calendar"
+          dense
+          required
+        ></v-select>
+
+        <v-select
+          v-model="selectedClassIds"
+          :items="classesOptions"
+          item-title="name"
+          item-value="id"
+          label="Classes"
+          prepend-inner-icon="mdi-account-multiple"
+          dense
+          multiple
+          required
+        ></v-select>
+
+        <div class="button-container">
+          <v-btn color="primary" type="submit">
+            <v-icon start>mdi-check</v-icon> Ajouter
+          </v-btn>
+          <v-btn color="grey" @click="cancelForm">
+            <v-icon start>mdi-close</v-icon> Annuler
+          </v-btn>
+        </div>
+      </v-form>
+    </v-card>
+
+    <!-- Programme -->
+    <div v-if="activeForm === 'program'">
+      <Programme-cours :etablissement-id="etablissementId" :annee-scolaire="anneeScolaire" :annee-scolaire-id="anneeScolaireId"/>
+      <v-btn class="mt-3" color="secondary" @click="cancelForm">
+        <v-icon start>mdi-arrow-left</v-icon> Retour
+      </v-btn>
+    </div>
+
+    <!-- Liste des classes -->
     <div v-if="showClasses && classesByPromotion && Object.keys(classesByPromotion).length > 0">
+      <v-btn class="mt-3" color="secondary" @click="toggleClasses">
+        <v-icon start>mdi-arrow-left</v-icon> Retour
+      </v-btn>
       <div v-for="(classes, promotion) in classesByPromotion" :key="promotion">
         <h3 class="section-title">Promotion : {{ promotion }}</h3>
         <v-card v-for="classe in classes" :key="classe.id" class="class-card">
           <v-card-title class="class-title">
+            <v-icon class="mr-2">mdi-school</v-icon>
             {{ classe.name }} ({{ classe.studentCount }} élèves)
           </v-card-title>
           <v-card-actions>
-            <v-btn @click="editClass(classe)">Modifier</v-btn>
-            <v-btn color="red" @click="confirmDeleteClass(classe.id)">Supprimer</v-btn>
+            <v-btn color="info" @click="editClass(classe)">
+              <v-icon start>mdi-pencil</v-icon> Modifier
+            </v-btn>
+            <v-btn color="red" @click="confirmDeleteClass(classe.id)">
+              <v-icon start>mdi-delete</v-icon> Supprimer
+            </v-btn>
           </v-card-actions>
         </v-card>
       </div>
+      <v-btn class="mt-3" color="secondary" @click="toggleClasses">
+        <v-icon start>mdi-arrow-left</v-icon> Retour
+      </v-btn>
     </div>
 
-    <!-- Affichage du programme -->
-    <Programme-cours v-if="showProgram" :etablissement-id="etablissementId" :annee-scolaire="anneeScolaire" :annee-scolaire-id="anneeScolaireId"/>
-
-    <!-- Snackbar pour les messages -->
+    <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color">
       {{ snackbar.message }}
       <v-btn color="white" text @click="snackbar.show = false">Fermer</v-btn>
@@ -63,165 +157,98 @@ export default {
   name: 'ClassManagement',
   components: { ProgrammeCours },
   props: {
-    etablissementId: {
-      type: Number,
-      required: true
-    },
-    etablissementNom: {
-      type: String,
-      required: true
-    },
-    anneeScolaire: {
-      type: String,
-      required: true
-    },
-    anneeScolaireId: {
-      type: Number,
-      required: true
-    }
+    etablissementId: Number,
+    etablissementNom: String,
+    anneeScolaire: String,
+    anneeScolaireId: Number
   },
   data() {
     return {
-      classesByPromotion: {},
-      showClasses: false, // Variable pour gérer l'affichage des classes
-      showForm: false,
-      showConductForm: false,
-      newClassName: '',
+      activeForm: null,
+      showClasses: false,
+      numberOfClasses: 1,
+      selectedPromotionId: null,
+      selectedCycle: '',
       conductNote: '',
+      selectedSemestreId: null,
+      selectedClassIds: [],
       promotions: [],
       semestresOptions: [],
-      selectedSemestreId: null,
-      selectedPromotionId: null,
-      selectedClassIds: [],
       classesOptions: [],
+      classesByPromotion: {},
       editClassId: null,
       snackbar: {
         show: false,
         message: '',
         color: 'success'
-      },
-      showProgram: false,
-      showSemesterForm: false, // Ajouté pour gérer l'affichage du formulaire de semestre
-      newSemesterName: '' // Ajouté pour le nom du semestre
+      }
     };
   },
   methods: {
-    submitForm() {
-      console.log(this.etablissementId);
-      const url = this.editClassId
-        ? `http://localhost:8080/api/Classes/${this.editClassId}`
-        : 'http://localhost:8080/api/Classes'; // URL pour la création (POST) sans l'ID de l'établissement dans l'URL
-      const method = this.editClassId ? 'put' : 'post';
-
-      axios[method](url, {
-        nom: this.newClassName,
-        promotion_id: this.selectedPromotionId,
-        etablissement_id: this.etablissementId // Ajouter l'ID de l'établissement dans le corps de la requête
-      })
-      .then(() => {
-        this.fetchClasses();
-        this.cancelForm();
-        this.showSnackbar('Classe ajoutée/modifiée avec succès.', 'success');
-      })
-      .catch(error => {
-        console.error('Erreur lors de l\'ajout/modification de la classe :', error.response ? error.response.data : error.message);
-        this.showSnackbar('Erreur lors de l\'ajout/modification de la classe.', 'error');
-      });
+    activateForm(formName) {
+      this.activeForm = this.activeForm === formName ? null : formName;
+      this.showClasses = false;
+    },
+    cancelForm() {
+      this.activeForm = null;
+      this.showClasses = false;
+      this.numberOfClasses = 1;
+      this.selectedPromotionId = null;
+      this.selectedCycle = '';
+      this.conductNote = '';
+      this.selectedSemestreId = null;
+      this.selectedClassIds = [];
+      this.editClassId = null;
     },
     toggleClasses() {
       this.showClasses = !this.showClasses;
-      if (this.showClasses) {
-        this.fetchClasses(); // Récupérer les classes
-      }
+      if (this.showClasses) this.fetchClasses();
+      this.activeForm = null;
     },
-    submitSemester() {
-      if (!this.newSemesterName) {
-        this.showSnackbar('Le nom du semestre/trimestre est requis.', 'error');
-        return;
-      }
-
-      axios.post('http://localhost:8080/api/semestres', {
-        nom: this.newSemesterName,
-        etablissement_id: this.etablissementId
-      })
-      .then(response => {
-        this.fetchSemestre();
-        this.cancelSemesterForm();
-        this.showSnackbar(response.data.message || 'Semestre/Trimestre ajouté avec succès.', 'success');
-      })
-      .catch(error => {
-        console.error('Erreur lors de l\'ajout du semestre/trimestre :', error);
-        this.showSnackbar('Erreur lors de l\'ajout du semestre/trimestre.', 'error');
-      });
-    },
-
-    fetchSemestre() {
-      // Assurez-vous que l'ID de l'établissement est défini et est un nombre
-      if (!this.etablissementId || isNaN(this.etablissementId)) {
-        console.error('ID de l\'établissement non défini ou invalide.');
-        return;
-      }
-
-      // Envoyer l'ID de l'établissement à l'API
-      axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`)
-        .then(response => {
-          const data = response.data;
-          if (Array.isArray(data)) {  // Vérifier si les données sont un tableau
-            this.semestresOptions = data.map(semestre => ({
-              id: semestre.id,
-              name: semestre.nom
-            }));
-          } else {
-            console.error('Format de données inattendu.');
-          }
-        })
-        .catch(error => {
-          console.error('Erreur lors de la récupération des semestres :', error);
-        });
-    },
-
-    submitConductForm() {
-      // Vérifiez si tous les champs requis sont remplis
-      if (!this.conductNote || this.selectedClassIds.length === 0 || !this.selectedSemestreId) {
+    submitForm() {
+      if (!this.selectedPromotionId || !this.selectedCycle || !this.numberOfClasses) {
         this.showSnackbar('Veuillez remplir tous les champs.', 'error');
         return;
       }
 
-      // Effectuer la requête POST avec tous les identifiants de classe
+      const payload = {
+        promotion_id: this.selectedPromotionId,
+        cycle: this.selectedCycle,
+        nombre: this.numberOfClasses,
+        etablissement_id: this.etablissementId
+      };
+
+      axios.post('http://localhost:8080/api/Classes/multiple', payload)
+        .then(() => {
+          this.fetchClasses();
+          this.cancelForm();
+          this.showSnackbar('Classe(s) créée(s) avec succès.', 'success');
+        })
+        .catch(error => {
+          console.error('Erreur lors de la création des classes :', error);
+          this.showSnackbar('Erreur lors de la création des classes.', 'error');
+        });
+    },
+    submitConductForm() {
+      if (!this.conductNote || this.selectedClassIds.length === 0 || !this.selectedSemestreId) {
+        this.showSnackbar('Veuillez remplir tous les champs.', 'error');
+        return;
+      }
       axios.post('http://localhost:8080/api/conduite', {
         note_conduite: this.conductNote,
         classe_ids: this.selectedClassIds,
         semestre_id: this.selectedSemestreId,
-        etablissement_id: this.etablissementId, // Ajouter l'ID de l'établissement dans la requête,
+        etablissement_id: this.etablissementId,
         anneeScolaireId: this.anneeScolaireId
       })
       .then(() => {
-        this.cancelConductForm();
+        this.cancelForm();
         this.showSnackbar('Note de conduite ajoutée avec succès.', 'success');
       })
       .catch(error => {
         console.error('Erreur lors de l\'ajout de la note de conduite :', error);
         this.showSnackbar('Erreur lors de l\'ajout de la note de conduite.', 'error');
       });
-    },
-
-    cancelForm() {
-      this.showForm = false;
-      this.newClassName = '';
-      this.selectedPromotionId = null;
-      this.editClassId = null; // Réinitialiser l'ID de la classe à éditer
-    },
-
-    cancelSemesterForm() {
-      this.showSemesterForm = false;
-      this.newSemesterName = '';
-    },
-
-    cancelConductForm() {
-      this.showConductForm = false;
-      this.conductNote = '';
-      this.selectedClassIds = [];
-      this.selectedSemestreId = null; // Réinitialiser l'ID du semestre sélectionné
     },
     fetchPromotions() {
       axios.get('http://localhost:8080/api/Promotions')
@@ -232,95 +259,65 @@ export default {
           console.error('Erreur lors de la récupération des promotions :', error);
         });
     },
+    fetchSemestre() {
+      if (!this.etablissementId || isNaN(this.etablissementId)) return;
+      axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`)
+        .then(response => {
+          const data = response.data;
+          if (Array.isArray(data)) {
+            this.semestresOptions = data.map(sem => ({ id: sem.id, name: sem.nom }));
+          }
+        })
+        .catch(error => console.error('Erreur semestres :', error));
+    },
     fetchClasses() {
-  axios.get(`http://localhost:8080/api/classetablissement/${this.etablissementId}`)
-    .then(response => {
-      const data = response.data;
-
-      if (typeof data === 'object' && data !== null) {
-        console.log('Données de la réponse :', data);
-        this.classesByPromotion = data;
-        
-        // Extraire les options de classes pour le formulaire
-        this.classesOptions = Object.values(data).flat().map(classe => ({
-          id: classe.id,
-          name: classe.name
-        }));
-      } else {
-        console.error('Les données récupérées ne sont pas dans le format attendu', data);
-        this.classesByPromotion = {};
-      }
-    })
-    .catch(error => {
-      console.error('Erreur lors de la récupération des classes :', error);
-    });
-},
-
-
-
-    groupByPromotion(classes) {
-      return classes.reduce((acc, classe) => {
-        const promotionName = classe.promotion.nom; // Supposons que 'promotion' est une propriété de 'classe'
-        if (!acc[promotionName]) {
-          acc[promotionName] = [];
-        }
-        acc[promotionName].push(classe);
-        return acc;
-      }, {});
+      axios.get(`http://localhost:8080/api/classetablissement/${this.etablissementId}`)
+        .then(response => {
+          const data = response.data;
+          if (typeof data === 'object' && data !== null) {
+            this.classesByPromotion = data;
+            this.classesOptions = Object.values(data).flat().map(cl => ({ id: cl.id, name: cl.name }));
+          }
+        })
+        .catch(error => console.error('Erreur classes :', error));
     },
-
-    showSnackbar(message, color) {
-      this.snackbar.message = message;
-      this.snackbar.color = color;
-      this.snackbar.show = true;
+    editClass(classe) {
+      this.numberOfClasses = 1;
+      this.selectedPromotionId = classe.promotion_id;
+      this.editClassId = classe.id;
+      this.activeForm = 'addClass';
     },
-
-    toggleProgram() {
-      this.showProgram = !this.showProgram;
+    confirmDeleteClass(id) {
+      if (confirm('Supprimer cette classe ?')) this.deleteClass(id);
     },
-
-    confirmDeleteClass(classId) {
-      const confirmed = confirm('Êtes-vous sûr de vouloir supprimer cette classe ?');
-      if (confirmed) {
-        this.deleteClass(classId);
-      }
-    },
-
-    deleteClass(classId) {
-      axios.delete(`http://localhost:8080/api/Classes/${classId}`, {
-        data: {
-          etablissement_id: this.etablissementId
-        }
+    deleteClass(id) {
+      axios.delete(`http://localhost:8080/api/Classes/${id}`, {
+        data: { etablissement_id: this.etablissementId }
       })
       .then(() => {
         this.fetchClasses();
         this.showSnackbar('Classe supprimée avec succès.', 'success');
       })
-      .catch(error => {
-        console.error('Erreur lors de la suppression de la classe :', error);
-        this.showSnackbar('Impossible de supprimer cette classe car elle contient aumoins un eleve.', 'error');
+      .catch(() => {
+        this.showSnackbar('Impossible de supprimer cette classe car elle contient au moins un élève.', 'error');
       });
     },
-    editClass(classe) {
-      this.newClassName = classe.nom;
-      this.selectedPromotionId = classe.promotion_id; // Assurez-vous que 'promotion_id' existe
-      this.editClassId = classe.id; // Enregistrer l'ID de la classe pour la mise à jour
-      this.showForm = true;
+    showSnackbar(msg, color) {
+      this.snackbar = { message: msg, color, show: true };
     }
   },
   mounted() {
     this.fetchClasses();
-    this.fetchSemestre(); // Assurez-vous d'appeler cette méthode ici
-    this. fetchPromotions()  ;        // Fetch promotions if necessary, e.g. this.fetchPromotions();
+    this.fetchSemestre();
+    this.fetchPromotions();
   }
 };
 </script>
 
-
 <style scoped>
 .container {
   padding: 16px;
-  max-width: 900px;
+  max-width: 1024px;
   margin: auto;
 }
 
@@ -332,9 +329,12 @@ export default {
   margin: 20px 0;
 }
 
-.form-card, .class-card {
+.form-card,
+.class-card {
   padding: 16px;
   margin-top: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .button-container {
@@ -344,19 +344,28 @@ export default {
 }
 
 .section-title {
-  font-size: 1.4rem;
-  font-weight: bold;
-  margin-top: 16px;
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin-top: 24px;
+  color: #3f51b5;
 }
 
 .class-title {
-  font-size: 1.2rem;
+  font-size: 1.3rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
 }
 
 @media (max-width: 600px) {
   .button-group {
     flex-direction: column;
-    align-items: center;
+    gap: 8px;
+  }
+  .form-card,
+  .class-card {
+    padding: 8px;
+    margin-top: 12px;
   }
   .section-title {
     font-size: 1.2rem;
@@ -364,6 +373,29 @@ export default {
   }
   .class-title {
     font-size: 1rem;
+  }
+  .v-btn {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    min-height: 32px !important;
+  }
+  .v-icon {
+    font-size: 18px !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  .section-title {
+    font-size: 1.8rem;
+  }
+  .class-title {
+    font-size: 1.4rem;
+  }
+  .v-btn {
+    font-size: 1rem;
+  }
+  .v-icon {
+    font-size: 24px;
   }
 }
 </style>

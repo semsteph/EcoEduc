@@ -79,7 +79,17 @@ export default {
       type: Number,
       required: true,
     },
+    anneeScolaire: {
+      type: String,
+      required: true
+    },
+    anneeScolaireId: {
+      type: Number,
+      required: true
+    }
+  
   },
+  
   data() {
     return {
       dialog: false, // Contrôle de l'affichage du dialogue
@@ -95,25 +105,31 @@ export default {
       snackbarMessage: '', // Message du snackbar
       snackbarColor: '', // Couleur du snackbar
     };
+  
   },
+
   mounted() {
     this.fetchPermissions();
+    console.log(this.anneeScolaireId);
   },
   methods: {
     fetchPermissions() {
-      axios.get(`http://localhost:8080/api/permissions/${this.childId}/${this.etablissementId}`)
+      axios.get(`http://localhost:8080/api/permissions/${this.childId}/${this.etablissementId}/${this.anneeScolaireId}`)
         .then(response => {
           this.permissions = response.data;
         })
         .catch(error => {
           console.error('Erreur lors de la récupération des permissions:', error);
         });
+        
     },
     formatDate(date) {
       const options = { year: 'numeric', month: 'long', day: 'numeric' };
       return new Date(date).toLocaleDateString(undefined, options);
     },
+  
     addPermission() {
+      
       axios.post(`http://localhost:8080/api/permissions/${this.childId}`, {
         date: this.newPermission.date,
         motif: this.newPermission.motif,
@@ -121,7 +137,9 @@ export default {
         contact: this.newPermission.contact,
         statut: 'En attente',
         childId: this.childId,
-        etablissementId: this.etablissementId
+        etablissementId: this.etablissementId,
+        anneeScolaireId: this.anneeScolaireId
+
       })
       .then(response => {
         this.permissions.push({
@@ -135,10 +153,12 @@ export default {
         this.dialog = false;
         this.showSnackbar('Permission ajoutée avec succès', 'success');
         this.resetForm();
+      
       })
       .catch(error => {
         console.error('Erreur lors de l\'ajout de la permission:', error);
       });
+ 
     },
     deletePermission(permissionId) {
       axios.delete(`http://localhost:8080/api/permissions/${permissionId}`)

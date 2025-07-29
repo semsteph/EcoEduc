@@ -1,21 +1,123 @@
 <template>
-  <v-container>
-    <v-row justify="center" class="button-group">
-      <v-col cols="12" sm="4" class="d-flex justify-center">
-        <v-btn @click="showAddSubjectForm = true" class="mx-2">Ajouter Matière</v-btn>
-      </v-col>
-      <v-col cols="12" sm="4" class="d-flex justify-center">
-        <v-btn @click="showInscriptionForm = true" class="mx-2">Inscrire un Enseignant</v-btn>
-      </v-col>
-      <v-col cols="12" sm="4" class="d-flex justify-center">
-        <v-btn @click="showAddForm = true" class="mx-2">Ajouter un Enseignant</v-btn>
-      </v-col>
-    </v-row>
+  <v-container fluid>
+    <!-- Page par défaut -->
+    <div v-if="currentComponent === 'default'">
+      <v-row justify="center" class="my-6" dense>
+        <v-col cols="12" sm="4" md="3" class="d-flex justify-center">
+          <v-btn @click="showAddSubjectForm = true" color="primary" class="ma-2" block>
+            <v-icon start>mdi-book-plus</v-icon>
+            Ajouter Matière
+          </v-btn>
+        </v-col>
+        <v-col cols="12" sm="4" md="3" class="d-flex justify-center">
+          <v-btn @click="showInscriptionForm = true" color="primary" class="ma-2" block>
+            <v-icon start>mdi-account-plus</v-icon>
+            Inscrire Enseignant
+          </v-btn>
+        </v-col>
+        <v-col cols="12" sm="4" md="3" class="d-flex justify-center">
+          <v-btn @click="showAddForm = true" color="primary" class="ma-2" block>
+            <v-icon start>mdi-account-multiple-plus</v-icon>
+            Ajouter Enseignant
+          </v-btn>
+        </v-col>
+      </v-row>
 
-    <!-- Dialog: Inscription Enseignant -->
+      <!-- Navigation par cartes -->
+      <v-row justify="center" class="my-4" dense>
+        <v-col cols="12" sm="6" md="4">
+          <v-card @click="navigateTo('CahierDeTexte')" class="clickable-card lime lighten-5">
+            <v-card-title class="text-center d-flex justify-center align-center">
+              <v-icon color="green" class="mr-2">mdi-book-open-variant</v-icon>
+              Cahiers de Texte / Classe
+            </v-card-title>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="4">
+          <v-card @click="navigateTo('MesEnseignants')" class="clickable-card lime lighten-5">
+            <v-card-title class="text-center d-flex justify-center align-center">
+              <v-icon color="green" class="mr-2">mdi-account-group</v-icon>
+              Mes Enseignants
+            </v-card-title>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="4">
+          <v-card @click="navigateTo('EnseignantParclasse')" class="clickable-card lime lighten-5">
+            <v-card-title class="text-center d-flex justify-center align-center">
+              <v-icon color="green" class="mr-2">mdi-google-classroom</v-icon>
+              Enseignants / Classes
+            </v-card-title>
+          </v-card>
+        </v-col>
+      </v-row>
+    </div>
+
+    <!-- Composant sélectionné -->
+    <div v-else>
+      <v-btn icon @click="currentComponent = 'default'" class="mb-4">
+        <v-icon>mdi-arrow-left</v-icon>
+      </v-btn>
+      <component
+        :is="currentComponent"
+        :annee-scolaire="anneeScolaire"
+        :annee-scolaire-id="anneeScolaireId"
+        :etablissement-id="etablissementId"
+        @component-selected="currentComponent = $event"
+      />
+    </div>
+
+    <!-- Dialogues -->
+    <v-dialog v-model="errorDialog" max-width="400px">
+      <v-card color="red lighten-4">
+        <v-card-title class="text-h6">
+          <v-icon start color="red">mdi-alert-circle</v-icon>
+          Erreur
+        </v-card-title>
+        <v-card-text class="text-body-2">{{ errorMessage }}</v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="red darken-1" text @click="errorDialog = false">Fermer</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="alertDialog" max-width="500px">
+      <v-card>
+        <v-card-title class="text-h6">
+          <v-icon color="orange" class="mr-2">mdi-alert</v-icon>
+          Avertissement
+        </v-card-title>
+        <v-card-text class="text-body-2">{{ alertMessage }}</v-card-text>
+        <v-card-actions>
+          <v-btn color="error" @click="alertDialog = false">Non</v-btn>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" @click="confirmAddAnyway">Oui</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="replaceDialog" max-width="500px">
+      <v-card>
+        <v-card-title class="text-h6">
+          <v-icon color="warning" class="mr-2">mdi-alert-circle-outline</v-icon>
+          Confirmation de remplacement
+        </v-card-title>
+        <v-card-text class="text-body-2">{{ alertMessage }}</v-card-text>
+        <v-card-actions>
+          <v-btn color="error" @click="replaceDialog = false">Non</v-btn>
+          <v-spacer></v-spacer>
+          <v-btn color="success" @click="confirmReplacement">Oui</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Dialog: Inscription -->
     <v-dialog v-model="showInscriptionForm" max-width="500px">
       <v-card>
-        <v-card-title>Inscrire un Enseignant</v-card-title>
+        <v-card-title>
+          <v-icon class="mr-2">mdi-account-plus</v-icon>
+          Inscrire un Enseignant
+        </v-card-title>
         <v-card-text>
           <v-form @submit.prevent="handleInscription">
             <v-text-field v-model="newTeacher.name" label="Nom" required></v-text-field>
@@ -29,26 +131,13 @@
       </v-card>
     </v-dialog>
 
-    <!-- Dialog: Informations de Connexion -->
-    <v-dialog v-model="showGeneratedInfo" max-width="400px">
-      <v-card>
-        <v-card-title>Informations de Connexion</v-card-title>
-        <v-card-text>
-          <div v-if="generatedInfo">
-            <p><strong>Nom d'utilisateur:</strong> {{ generatedInfo.username }}</p>
-            <p><strong>Mot de passe:</strong> {{ generatedInfo.password }}</p>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" @click="showGeneratedInfo = false">Fermer</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <!-- Dialog: Ajouter Enseignant -->
     <v-dialog v-model="showAddForm" max-width="500px">
       <v-card>
-        <v-card-title>Ajouter un Enseignant</v-card-title>
+        <v-card-title>
+          <v-icon class="mr-2">mdi-account-multiple-plus</v-icon>
+          Ajouter un Enseignant
+        </v-card-title>
         <v-card-text>
           <v-form @submit.prevent="handleAdd">
             <v-autocomplete v-model="selectedTeacher" :items="teachers" item-title="fullname" item-value="id" label="Enseignant" required></v-autocomplete>
@@ -65,7 +154,10 @@
     <!-- Dialog: Ajouter Matière -->
     <v-dialog v-model="showAddSubjectForm" max-width="400px">
       <v-card>
-        <v-card-title>Ajouter une Matière</v-card-title>
+        <v-card-title>
+          <v-icon class="mr-2">mdi-book-plus</v-icon>
+          Ajouter une Matière
+        </v-card-title>
         <v-card-text>
           <v-form @submit.prevent="handleAddSubject">
             <v-text-field v-model="newSubject.name" label="Nom de la matière" required></v-text-field>
@@ -76,73 +168,53 @@
       </v-card>
     </v-dialog>
 
-    <v-row class="mt-8" justify="center">
-      <v-col cols="12" sm="6">
-        <v-card @click="navigateTo('CahierDeTexte')" color="lime lighten-4" class="clickable-card">
-          <v-card-title>Gestion des Cahiers de Texte</v-card-title>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6">
-        <v-card @click="navigateTo('MesEnseignants')" color="lime lighten-4" class="clickable-card">
-          <v-card-title>Mes Enseignants</v-card-title>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <component :is="currentComponent" @component-selected="currentComponent = $event" :annee-scolaire="anneeScolaire" :annee-scolaire-id="anneeScolaireId" :etablissement-id="etablissementId"></component>
+    <!-- Dialog: Informations de connexion -->
+    <v-dialog v-model="showGeneratedInfo" max-width="400px">
+      <v-card>
+        <v-card-title>
+          <v-icon class="mr-2">mdi-lock</v-icon>
+          Informations de Connexion
+        </v-card-title>
+        <v-card-text class="text-body-2">
+          <div v-if="generatedInfo">
+            <p><strong>Nom d'utilisateur:</strong> {{ generatedInfo.username }}</p>
+            <p><strong>Mot de passe:</strong> {{ generatedInfo.password }}</p>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="primary" @click="showGeneratedInfo = false">Fermer</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
+
 
 <script>
 import MesEnseignants from './MesEnseignants.vue';
 import CahierDeTexte from './CahierDeTexte.vue';
+import EnseignantParclasse from './EnseignantParclasse.vue';
 import axios from 'axios';
 
 export default {
-  components: {
-    MesEnseignants,
-    CahierDeTexte,
-  },
+  components: { MesEnseignants, CahierDeTexte,EnseignantParclasse },
   props: {
-    etablissementId: {
-      type: Number,
-      required: true
-    },
-    etablissementNom: {
-      type: String,
-      required: true
-    },
-    anneeScolaire: {
-      type: String,
-      required: true
-    },
-    anneeScolaireId: {
-      type: Number,
-      required: true
-    }
-
+    etablissementId: Number,
+    etablissementNom: String,
+    anneeScolaire: String,
+    anneeScolaireId: Number,
   },
   data() {
     return {
-      drawer: false,
       showInscriptionForm: false,
       showAddForm: false,
       showAddSubjectForm: false,
       showGeneratedInfo: false,
-      newTeacher: {
-        name: '',
-        firstName: '',
-        email: '',
-        phone: '',
-        username: '',
-        password: '',
-        etablissementId: this.etablissementId
-      },
-      newSubject: {
-        name: '',
-        etablissementId: this.etablissementId
-
-      },
+      errorDialog: false,
+      alertDialog: false,
+      replaceDialog: false,
+      errorMessage: '',
+      alertMessage: '',
       generatedInfo: null,
       teachers: [],
       classes: [],
@@ -153,6 +225,13 @@ export default {
       selectedSubject: null,
       selectedCoefficient: null,
       currentComponent: 'default',
+      pendingAssignmentData: null,
+      newTeacher: {
+        name: '', firstName: '', email: '', phone: '', username: '', password: '', etablissementId: this.etablissementId,
+      },
+      newSubject: {
+        name: '', etablissementId: this.etablissementId,
+      },
     };
   },
   mounted() {
@@ -167,44 +246,33 @@ export default {
           axios.get(`http://localhost:8080/api/Matieres/${this.etablissementId}`),
           axios.get('http://localhost:8080/api/Coefficient')
         ]);
-        this.teachers = teachersRes.data.map(teacher => ({
-          id: teacher.id,
-          fullname: `${teacher.nom} ${teacher.prenom}`
-        }));
+        this.teachers = teachersRes.data.map(t => ({ id: t.id, fullname: `${t.nom} ${t.prenom}` }));
         this.classes = classesRes.data;
         this.subjects = subjectsRes.data;
         this.coefficient = coefficientRes.data;
       } catch (error) {
-        console.error('Error fetching data:', error);
+        this.showError('Erreur de chargement des données.');
       }
+    },
+    navigateTo(component) {
+      this.currentComponent = component;
     },
     async handleInscription() {
   try {
-    // Générer le nom d'utilisateur et le mot de passe
     this.newTeacher.username = this.generateUsername(this.newTeacher.name, this.newTeacher.firstName);
     this.newTeacher.password = this.generatePassword();
 
-    // Envoyer les données de l'enseignant à l'API
     const response = await axios.post('http://localhost:8080/api/Enseignants', {
-      name: this.newTeacher.name,
-      firstName: this.newTeacher.firstName,
-      email: this.newTeacher.email,
-      phone: this.newTeacher.phone,
-      username: this.newTeacher.username,
-      password: this.newTeacher.password,
-      etablissementId: this.etablissementId, // Ajouter l'ID de l'établissement si requis
+      ...this.newTeacher,
+      etablissementId: this.etablissementId
     });
 
-    console.log('Teacher registered:', response.data);
-
-    // Afficher le dialogue avec les informations générées après succès de l'inscription
-    this.generatedInfo = { 
-      username: this.newTeacher.username, 
-      password: this.newTeacher.password 
+    this.generatedInfo = {
+      username: this.newTeacher.username,
+      password: this.newTeacher.password
     };
-    this.showGeneratedInfo = true; // Affiche le dialogue avec les informations
+    this.showGeneratedInfo = true;
 
-    // Réinitialiser le formulaire
     this.newTeacher = {
       name: '',
       firstName: '',
@@ -213,54 +281,112 @@ export default {
       username: '',
       password: ''
     };
-    this.showInscriptionForm = false;  // Ferme le formulaire d'inscription
+    this.showInscriptionForm = false;
+    this.fetchData();
 
   } catch (error) {
-    console.error('Error during registration:', error.response ? error.response.data : error.message);
-    this.snackbarMessage = 'Échec de l\'inscription de l\'enseignant.';
-    this.snackbar = true;
+    // Gestion d'erreur précise
+    if (error.response && error.response.status === 409) {
+      const message = error.response.data.error;
+      this.showError(message); // Ou utiliser une modal/dialogue
+    } else {
+      this.showError("Échec de l'inscription de l'enseignant.");
+    }
   }
 },
 
-    async handleAdd() {
-      try {
-        const data = {
-          teacherId: this.selectedTeacher,
-          class: this.selectedClass,
-          subject: this.selectedSubject,
-          coefficient: this.selectedCoefficient,
-          etablissement: this.etablissementId,
-          anneeScolaireId: this.anneeScolaireId
-        };
-        const response = await axios.post('http://localhost:8080/api/Enseignants/add', data);
-        console.log('Teacher added:', response.data);
-
-        // Réinitialiser les sélections
-        this.selectedTeacher = null;
-        this.selectedClass = null;
-        this.selectedSubject = null;
-        this.selectedCoefficient = null;
-        this.showAddForm = false;  // Ferme le formulaire d'ajout
-
-      } catch (error) {
-        console.error('Error adding teacher:', error.response ? error.response.data : error.message);
-      }
-    },
     async handleAddSubject() {
-      try {
-        const response = await axios.post('http://localhost:8080/api/Matieres',  this.newSubject) 
-          
-  
-        console.log('Subject added:', response.data);
+  if (!this.newSubject.name) {
+    this.showError("Le nom de la matière est requis.");
+    return;
+  }
 
-        this.newSubject.name = '';
-        this.showAddSubjectForm = false;  // Ferme le formulaire d'ajout de matière
-        this.fetchData();  // Met à jour la liste des matières
+  try {
+    // Envoi au backend
+    await axios.post('http://localhost:8080/api/Matieres', {
+      name: this.newSubject.name,
+      etablissementId: this.etablissementId
+    });
 
-      } catch (error) {
-        console.error('Error adding subject:', error.response ? error.response.data : error.message);
-      }
-    },
+    // Fermeture du formulaire + réinitialisation
+    this.showAddSubjectForm = false;
+    this.newSubject.name = '';
+
+    // Rafraîchir la liste des matières
+    this.fetchData();
+  } catch (error) {
+    this.showError("Erreur lors de l'ajout de la matière.");
+  }
+},
+
+async handleAdd() {
+  const data = {
+    teacherId: this.selectedTeacher,
+    class: this.selectedClass,
+    subject: this.selectedSubject,
+    coefficient: this.selectedCoefficient,
+    etablissement: this.etablissementId,
+    anneeScolaireId: this.anneeScolaireId
+  };
+
+  try {
+    await axios.post('http://localhost:8080/api/Enseignants/add', data);
+    this.resetAddForm();
+  } catch (error) {
+    const message = error?.response?.data?.message || "Une erreur est survenue.";
+    console.log("Message d'erreur reçu:", message);
+
+    if (message.includes("enseigné par un autre enseignant")) {
+      // Cas remplacement
+      this.alertMessage = "Un enseignant est déjà affecté à cette matière. Voulez-vous le remplacer ?";
+      this.pendingAssignmentData = { ...data, forceReplace: true };
+      this.replaceDialog = true;
+    } else if (message.includes("déjà une matière assignée")) {
+      // Cas avertissement simple
+      this.alertMessage = message;
+      this.pendingAssignmentData = data;
+      this.alertDialog = true;
+    } else {
+      // Cas d'erreur générique
+      this.showError(message);
+    }
+  }
+},
+
+
+// Appelé lorsque l’utilisateur confirme le remplacement
+async confirmReplacement() {
+  try {
+    await axios.post('http://localhost:8080/api/Enseignants/add', {
+      ...this.pendingAssignmentData,
+      forceReplace: true
+    });
+    this.replaceDialog = false;
+    this.resetAddForm();
+  } catch (error) {
+    this.showError(error?.response?.data?.message || "Échec du remplacement.");
+  }
+},
+
+async confirmAddAnyway() {
+  try {
+    this.pendingAssignmentData.force = true;
+    await axios.post('http://localhost:8080/api/Enseignants/add', this.pendingAssignmentData);
+    this.resetAddForm();
+    this.alertDialog = false;
+    this.pendingAssignmentData = null;
+  } catch (error) {
+    this.alertDialog = false;
+    this.showError("Erreur lors de l'ajout malgré l'avertissement.");
+  }
+},
+
+
+resetAddForm() {
+  this.selectedTeacher = this.selectedClass = this.selectedSubject = this.selectedCoefficient = null;
+  this.showAddForm = false;
+},
+
     generateUsername(name, firstName) {
       const randomNum = Math.floor(Math.random() * 1000);
       return `${name.toLowerCase()}.${firstName.toLowerCase()}${randomNum}`;
@@ -271,34 +397,77 @@ export default {
     navigateTo(component) {
       this.currentComponent = component;
     },
+    showError(message) {
+      this.errorMessage = message;
+      this.errorDialog = true;
+    }
   }
 };
 </script>
 
+
 <style scoped>
-.button-group {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0;
+.v-btn {
+  text-transform: none;
+  font-weight: 500;
+  border-radius: 8px;
+  font-size: 1rem;
 }
 
-.v-btn {
-  width: 100%;
-  max-width: 220px;
+.v-btn v-icon {
+  font-size: 20px;
 }
 
 .clickable-card {
   text-align: center;
-  padding: 16px;
+  padding: 20px;
   cursor: pointer;
-  transition: transform 0.3s ease;
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
 .clickable-card:hover {
-  transform: scale(1.05);
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.v-card-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+/* Responsive pour petits écrans */
+@media (max-width: 600px) {
+  .v-btn {
+    font-size: 0.75rem;
+    padding: 6px 12px;
+  }
+
+  .v-card-title,
+  .v-card-text,
+  .v-text-field,
+  .v-autocomplete {
+    font-size: 0.8rem !important;
+  }
+
+  .clickable-card {
+    padding: 12px;
+  }
+}
+
+/* Responsive pour grands écrans */
+@media (min-width: 960px) {
+  .v-btn {
+    font-size: 1rem;
+  }
+
+  .v-card-title {
+    font-size: 1.2rem;
+  }
+
+  .clickable-card {
+    padding: 28px;
+  }
 }
 </style>
-

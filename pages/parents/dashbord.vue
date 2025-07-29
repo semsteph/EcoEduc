@@ -46,6 +46,7 @@
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
+
     <v-main class="background">
       <div class="background-overlay"></div>
       <div class="content-overlay">
@@ -55,9 +56,11 @@
           :etablissementId="etablissementId"
           :anneeScolaireId="anneeScolaireId"
           @showComponent="showComponent"
+          :initialBadgeCount="initialBadgeCount"
         ></component>
       </div>
     </v-main>
+
     <LogoutDialog v-model="logoutDialogVisible" @logout="logout" />
   </v-app>
 </template>
@@ -66,6 +69,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import axios from 'axios';
+import { EventBus } from "@/event-bus";
 import ToolbarComponent from '@/components/parents/ToolbarComponent.vue';
 import ChildrenList from '@/components/parents/ChildrenList.vue';
 import Acceuil from '@/components/parents/Acceuil.vue';
@@ -83,50 +87,87 @@ export default {
   setup() {
     const router = useRouter();
     const route = useRoute();
-    const currentComponent = ref("Acceuil");
+const initialBadgeCount = ref(0);
+
     const drawer = ref(false);
     const logoutDialogVisible = ref(false);
+    const currentComponent = ref("Acceuil");
+
     const etablissementId = ref(null);
     const anneeScolaireId = ref(null);
-    const anneeScolaireNom = ref(null); 
+    const anneeScolaireNom = ref(null);
+
+   const fetchNotificationCount = async () => {
+  const parentId = route.query.id;
+  const token = localStorage.getItem("token");
+
+  if (!parentId || !etablissementId.value || !anneeScolaireId.value) return;
+
+  try {
+    const res = await axios.get(
+      `http://localhost:8080/api/notificationed/${parentId}/${etablissementId.value}/${anneeScolaireId.value}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    const notifs = res.data.alertMessages || [];
+
+    // ✅ Nombre de notifications contenant [NOUVELLE]
+    const currentTotal = notifs.filter((msg) => msg.includes("[NOUVELLE]")).length;
+
+    const previousTotal = parseInt(localStorage.getItem("notifications_total") || "0");
+    const read = parseInt(localStorage.getItem("notifications_read_count") || "0");
+
+    // ✅ Mets à jour le total si on détecte plus de notifications
+    if (currentTotal > previousTotal) {
+      localStorage.setItem("notifications_total", currentTotal);
+    }
+
+    // ✅ Calcule le nombre de notifications non lues
+    const unread = currentTotal - read;
+
+    // ✅ Met à jour la valeur du badge
+    initialBadgeCount.value = unread > 0 ? unread : 0;
+
+    // ✅ Émet l'événement pour le composant Toolbar
+    EventBus.emit("updateBadgeCount", unread);
+  } catch (error) {
+    console.error("❌ Erreur lors du chargement des notifications :", error);
+    EventBus.emit("updateBadgeCount", 0);
+  }
+};
+
+
+    const fetchAnneeScolaire = async () => {
+      try {
+        const res = await axios.get(`http://localhost:8080/api/annees-scolaires/${etablissementId.value}`);
+        let data = res.data;
+
+        if (Array.isArray(data)) {
+          data = data.length > 0 ? data[0] : null;
+        }
+
+        if (data) {
+          anneeScolaireId.value = data.id;
+          anneeScolaireNom.value = data.nom;
+
+          await fetchNotificationCount(); // ✅ Charger les notifs après chargement année
+        } else {
+          console.warn("Aucune année scolaire trouvée.");
+        }
+      } catch (error) {
+        console.error("Erreur de récupération année scolaire :", error);
+      }
+    };
 
     onMounted(async () => {
       etablissementId.value = Number(route.query.etablissement) || null;
+
       if (etablissementId.value) {
         await fetchAnneeScolaire();
       }
     });
-
-    const fetchAnneeScolaire = async () => {
-      try {
-        const response = await axios.get(`http://localhost:8080/api/annees-scolaires/${etablissementId.value}`);
-        console.log("API response:", response.data);
-
-        let data = response.data;
-        // Adapte l'extraction en fonction de la structure de la réponse :
-        if (Array.isArray(data)) {
-          if (data.length > 0) {
-            data = data[0]; // Extraction du premier élément du tableau
-          } else {
-            data = null;
-          }
-        }
-        // Si la réponse est un objet contenant une propriété "data", adapte ici :
-        // if(data && data.data) {
-        //   data = data.data;
-        // }
-
-        if (data) {
-          anneeScolaireId.value = data.id || null;
-          anneeScolaireNom.value = data.nom || null;
-          console.log("Année scolaire récupérée :", anneeScolaireNom.value);
-        } else {
-          console.warn("Aucune donnée d'année scolaire trouvée.");
-        }
-      } catch (error) {
-        console.error("Erreur lors de la récupération de l'année scolaire :", error);
-      }
-    };
 
     const toggleDrawer = () => {
       drawer.value = !drawer.value;
@@ -157,10 +198,12 @@ export default {
       etablissementId,
       anneeScolaireId,
       anneeScolaireNom,
+      initialBadgeCount,
     };
   },
 };
 </script>
+
 
 <style scoped>
 .background {

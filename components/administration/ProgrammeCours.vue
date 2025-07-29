@@ -1,10 +1,20 @@
 <template>
   <div class="button-group">
-    <v-btn icon @click="$emit('back')">
+    <v-btn icon @click="$emit('back')" class="ma-2">
       <v-icon>mdi-arrow-left</v-icon>
     </v-btn>
-    <v-card color="blue lighten-4" v-if="!selectedClassId">
-      <v-card-title>Gestion de Programme</v-card-title>
+
+    <v-card
+      color="blue lighten-5"
+      elevation="2"
+      class="pa-4 rounded-xl shadow-sm"
+      v-if="!selectedClassId"
+    >
+      <v-card-title class="text-h6 text-primary d-flex align-center">
+        <v-icon left class="mr-2">mdi-calendar-multiselect</v-icon>
+        Gestion de Programme
+      </v-card-title>
+
       <v-card-text>
         <v-row>
           <template v-if="classes.length > 0">
@@ -12,20 +22,27 @@
               v-for="classe in classes"
               :key="classe.id"
               cols="12"
+              sm="6"
               md="4"
+              class="d-flex"
             >
               <v-card
-                class="ma-2"
+                class="pa-3 rounded-xl hoverable elevation-2 w-100"
                 outlined
                 @click="goToClass(classe.id, classe.nom)"
               >
-                <v-card-title>{{ classe.nom }}</v-card-title>
+                <v-card-title class="text-subtitle-1 text-center w-100">
+                  <v-icon class="mr-2">mdi-school</v-icon>
+                  {{ classe.nom }}
+                </v-card-title>
               </v-card>
             </v-col>
           </template>
+
           <template v-else>
             <v-col cols="12">
-              <v-alert type="info" color="info" border="left">
+              <v-alert type="info" color="info" border="left" class="ma-2 text-caption text-md-body-2">
+                <v-icon left class="mr-1">mdi-information-outline</v-icon>
                 Aucune classe n'est disponible dans votre établissement. Veuillez ajouter des classes dans la gestion des classes.
               </v-alert>
             </v-col>
@@ -33,6 +50,7 @@
         </v-row>
       </v-card-text>
     </v-card>
+
     <!-- Affiche le composant enfant si une classe est sélectionnée -->
     <ProgrammeDetail 
       v-else 
@@ -105,3 +123,42 @@ export default {
   },
 };
 </script>
+<style scoped>
+.button-group {
+  padding: 1rem;
+}
+
+@media (max-width: 600px) {
+  .button-group {
+    padding: 0.5rem;
+  }
+  .v-card-title {
+    font-size: 0.9rem !important;
+  }
+  .v-btn {
+    font-size: 0.7rem !important;
+    min-height: 32px !important;
+  }
+  .v-icon {
+    font-size: 18px !important;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 960px) {
+  .v-card-title {
+    font-size: 1rem;
+  }
+  .v-btn {
+    font-size: 0.85rem;
+  }
+}
+
+@media (min-width: 961px) {
+  .v-card-title {
+    font-size: 1.2rem;
+  }
+  .v-btn {
+    font-size: 1rem;
+  }
+}
+</style>

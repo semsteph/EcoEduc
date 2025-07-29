@@ -52,12 +52,6 @@
               <td>{{ conduite }}</td>
             </tr>
             <tr>
-              <td>Total</td>
-              <td></td>
-              <td></td>
-              <td>{{ total }}</td>
-            </tr>
-            <tr>
               <td colspan="2">Moyenne Semestrielle</td>
               <td colspan="2">{{ moySem }}</td>
             </tr>
@@ -109,7 +103,6 @@ export default {
       semestres: [],
       selectedSemestre: null,
       filteredData: [],
-      total: 0,
       moySem: 0,
       moyAn: null,
       decision: null,
@@ -178,7 +171,6 @@ export default {
         }, []);
 
         this.filteredData = uniqueBulletins;
-        this.total = selectedSemestreData.total || 0;
         this.moySem = selectedSemestreData.moySem || 0;
         this.moyAn = selectedSemestreData.moyAn || 0;
         this.rang = selectedSemestreData.rang || "";

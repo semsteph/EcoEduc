@@ -6,65 +6,72 @@
         :etablissement-id="etablissementId" 
         :annee-scolaire="anneeScolaire"
         :annee-scolaire-id="anneeScolaireId"
+        :subject-id="subjectId"
         @back="goBack" 
         @navigate="navigateTo"
       />
     </template>
+
     <template v-else-if="currentView === 'NoteManager'">
       <NoteManager 
         :classe="selectedClass" 
-        :classeId="selectedClassId" 
-        :subjectId="subjectId" 
+        :classe-id="selectedClassId || selectedClass?.classe_id" 
+        :subject-id="subjectId" 
         :etablissement-id="etablissementId" 
         :annee-scolaire="anneeScolaire"
         :annee-scolaire-id="anneeScolaireId"
         @back="goBack"
       />
     </template>
+
     <template v-else-if="currentView === 'PresenceManager'">
       <PresenceManager 
         :classe="selectedClass" 
-        :classeId="selectedClassId" 
-        :subjectId="subjectId" 
+        :classe-id="selectedClassId || selectedClass?.classe_id" 
+        :subject-id="subjectId" 
         :etablissement-id="etablissementId"
         :annee-scolaire="anneeScolaire"
         :annee-scolaire-id="anneeScolaireId" 
         @back="goBack"
       />
     </template>
+
     <template v-else-if="currentView === 'PresencesPrecedantes'">
       <PresencesPrecedantes 
         :classe="selectedClass" 
-        :classeId="selectedClassId" 
-        :subjectId="subjectId" 
+        :classe-id="selectedClassId || selectedClass?.classe_id" 
+        :subject-id="subjectId" 
         :etablissement-id="etablissementId" 
         :annee-scolaire="anneeScolaire"
         :annee-scolaire-id="anneeScolaireId"
         @back="goBack"
       />
     </template>
+
     <template v-else-if="currentView === 'ConductManager'">
       <ConductManager 
         :classe="selectedClass" 
-        :classeId="selectedClassId" 
-        :subjectId="subjectId" 
+        :classe-id="selectedClassId || selectedClass?.classe_id" 
+        :subject-id="subjectId" 
         :etablissement-id="etablissementId" 
         :annee-scolaire="anneeScolaire"
         :annee-scolaire-id="anneeScolaireId"
         @back="goBack"
       />
     </template>
+
     <template v-else-if="currentView === 'CahierDeTexteManager'">
       <CahierDeTexteManager 
         :classe="selectedClass" 
-        :classeId="selectedClassId" 
-        :subjectId="subjectId" 
+        :classe-id="selectedClassId || selectedClass?.classe_id" 
+        :subject-id="subjectId" 
         :etablissement-id="etablissementId" 
         :annee-scolaire="anneeScolaire"
         :annee-scolaire-id="anneeScolaireId"
         @back="goBack"
       />
     </template>
+
     <template v-else>
       <v-row>
         <v-col v-for="classe in filteredClasses" :key="classe.classe_id" cols="12" md="4">
@@ -86,6 +93,7 @@ import CahierDeTexteManager from '~/components/professeurs/CahierDeTexteManager.
 import PresencesPrecedantes from '~/components/professeurs/PresencesPrecedantes.vue';
 
 export default {
+  name: 'ClassManager',
   components: {
     InfoClasse,
     NoteManager,
@@ -94,7 +102,6 @@ export default {
     ConductManager,
     CahierDeTexteManager,
   },
-  name: 'ClassManager',
   props: {
     subjectId: {
       type: Number,
@@ -114,17 +121,17 @@ export default {
     },
     anneeScolaire: {
       type: String,
-      required: true
+      required: true,
     },
     anneeScolaireId: {
       type: Number,
-      required: true
+      required: true,
     }
   },
   data() {
     return {
       selectedClass: null,
-      currentView: null, // Vue par défaut à null pour afficher la liste
+      currentView: null,
     };
   },
   computed: {
@@ -140,11 +147,9 @@ export default {
     },
     goBack() {
       if (this.currentView === 'details') {
-        // Si on est dans 'details', retourne à la liste des classes
         this.selectedClass = null;
         this.currentView = null;
       } else {
-        // Si on est dans une autre vue, retourne aux détails de la classe
         this.currentView = 'details';
       }
     },
@@ -153,7 +158,7 @@ export default {
     },
   },
   mounted() {
-    console.log(this.subjectId, this.etablissementId);
+    console.log("Subject ID:", this.subjectId, "Etablissement ID:", this.etablissementId);
   },
 };
 </script>
