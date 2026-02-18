@@ -1,110 +1,200 @@
 <template>
-  <v-app>
-    <!-- Image de fond -->
-    <div class="background-blur"></div>
+  <v-app class="app-shell">
+    <!-- Background -->
+    <div class="app-bg"></div>
+    <div class="app-overlay"></div>
 
-    <!-- Drawer latéral -->
+    <!-- Drawer -->
     <v-navigation-drawer
-      app
       v-model="drawer"
+      :temporary="smAndDown"
+      :permanent="!smAndDown"
       :width="drawerWidth"
-      color="blue darken-3"
+      class="app-drawer"
+      color="primary"
       dark
-      class="navigate"
+      app
+      elevation="12"
     >
-      <v-list dense>
-        <v-card class="pa-3 white--text text-center" flat>
-          <v-list-item-content>
-            <h3 class="mb-2"><strong>Etablissement:</strong> {{ nomEtablissement }}</h3>
-            <p><strong>Enseignant:</strong> {{ enseignantPrenom }} {{ enseignantNom }}</p>
-          </v-list-item-content>
-        </v-card>
+      <!-- Drawer header -->
+      <div class="drawer-header">
+        <div class="drawer-user">
+          <v-avatar size="44" class="drawer-avatar">
+            <v-icon size="26">mdi-account</v-icon>
+          </v-avatar>
 
-        <v-divider class="my-3"></v-divider>
+          <div class="drawer-user-info">
+            <div class="drawer-etab">
+              {{ nomEtablissement || "Établissement" }}
+            </div>
+            <div class="drawer-name">
+              {{ enseignantPrenom }} {{ enseignantNom }}
+            </div>
+          </div>
+        </div>
+
+        <div class="drawer-badges">
+          <v-chip size="small" variant="tonal" class="mr-2" color="white">
+            <v-icon start size="16">mdi-calendar</v-icon>
+            {{ anneeScolaire || "Année non définie" }}
+          </v-chip>
+
+          <v-chip
+            size="small"
+            variant="tonal"
+            color="white"
+            v-if="notifications?.length"
+          >
+            <v-icon start size="16">mdi-bell</v-icon>
+            {{ notifications.length }}
+          </v-chip>
+        </div>
+      </div>
+
+      <v-divider class="drawer-divider" />
+
+      <!-- Drawer content -->
+      <v-list density="compact" nav class="px-2">
+        <div class="drawer-section-title">
+          <v-icon size="18" class="mr-2">mdi-book-open-page-variant</v-icon>
+          Matières
+        </div>
 
         <v-list-item
           v-for="subject in uniqueSubjects"
           :key="subject.matiere_id"
+          class="drawer-item"
+          :active="selectedSubjectId === subject.matiere_id"
           @click="selectSubject(subject.matiere_id)"
-          class="white--text"
         >
-          <v-list-item-icon>
+          <template #prepend>
             <v-icon>mdi-book</v-icon>
-          </v-list-item-icon>
-          <v-list-item-content>{{ subject.matiere }}</v-list-item-content>
+          </template>
+          <v-list-item-title class="drawer-item-title">
+            {{ subject.matiere }}
+          </v-list-item-title>
         </v-list-item>
 
-        <v-divider class="my-3"></v-divider>
+        <v-divider class="my-3" />
 
-        <v-list-item @click="showLogoutDialog" class="red--text">
-          <v-list-item-icon>
+        <v-list-item class="drawer-item logout-item" @click="showLogoutDialog">
+          <template #prepend>
             <v-icon color="red">mdi-logout</v-icon>
-          </v-list-item-icon>
-          <v-list-item-content>Déconnexion</v-list-item-content>
+          </template>
+          <v-list-item-title class="logout-title">Déconnexion</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
 
-    <!-- Toolbar fixée en haut -->
-    <div class="fixed-toolbar">
-      <ToolbarComponents @toggleDrawer="toggleDrawer" @showNotifications="showNotifications" />
+    <!-- Top toolbar -->
+    <div class="topbar">
+      <div class="topbar-inner">
+        <ToolbarComponents
+          :notifications="notifications"
+          @toggleDrawer="toggleDrawer"
+          @showNotifications="showNotifications"
+        />
+      </div>
     </div>
 
-    <v-main class="pt-16">
-      <v-container class="py-5 content-container">
-        <v-alert v-if="!anneeScolaireId" type="warning" class="mb-4">
+    <!-- ✅ SCROLL UNIQUEMENT ICI -->
+    <v-main class="main main-scroll">
+      <v-container class="content-wrap">
+        <v-alert
+          v-if="!anneeScolaireId"
+          type="warning"
+          class="mb-4"
+          variant="tonal"
+        >
           L'année scolaire n'est pas encore définie.
         </v-alert>
 
-        <v-row v-if="showNotificationsComponent">
-          <v-col>
-            <NotificationComponent
-              :enseignant-id="enseignantId"
-              :annee-scolaire="anneeScolaire"
-              :annee-scolaire-id="anneeScolaireId"
-              :etablissement-id="etablissementId"
-            />
+        <!-- Notifications -->
+        <v-row v-if="showNotificationsComponent" class="mb-4">
+          <v-col cols="12">
+            <div class="section-card">
+              <div class="section-title">
+                <v-icon class="mr-2" color="primary">mdi-bell</v-icon>
+                Notifications
+              </div>
+
+              <NotificationComponent
+                :notifications="notifications"
+                :enseignant-id="enseignantId"
+                :annee-scolaire="anneeScolaire"
+                :annee-scolaire-id="anneeScolaireId"
+                :etablissement-id="etablissementId"
+              />
+            </div>
           </v-col>
         </v-row>
 
-        <v-row>
-          <v-col>
-            <ClassManager
-              v-if="selectedSubjectId"
-              :subject-id="selectedSubjectId"
-              :etablissement-id="etablissementId"
-              :classes="classes"
-              :annee-scolaire="anneeScolaire"
-              :annee-scolaire-id="anneeScolaireId"
-              :selected-class-id="selectedClassId"
-              @class-selected="showClassDetails"
-            />
+        <!-- Classes -->
+        <v-row class="mb-4">
+          <v-col cols="12">
+            <div class="section-card">
+              <div class="section-title">
+                <v-icon class="mr-2" color="primary">mdi-google-classroom</v-icon>
+                Classes
+              </div>
+
+              <ClassManager
+                v-if="selectedSubjectId"
+                :subject-id="selectedSubjectId"
+                :etablissement-id="etablissementId"
+                :classes="classes"
+                :annee-scolaire="anneeScolaire"
+                :annee-scolaire-id="anneeScolaireId"
+                :selected-class-id="selectedClassId"
+                @class-selected="showClassDetails"
+              />
+
+              <v-alert v-else type="info" variant="tonal" class="mt-3">
+                Sélectionnez une matière dans le menu pour afficher les classes.
+              </v-alert>
+            </div>
           </v-col>
         </v-row>
 
+        <!-- Détails Classe -->
         <v-row>
-          <v-col>
-            <ClassDetails
-              v-if="selectedClassId"
-              :class-id="selectedClassId"
-              :class-name="selectedClassName"
-              :etablissement-id="etablissementId"
-              :annee-scolaire="anneeScolaire"
-              :annee-scolaire-id="anneeScolaireId"
-            />
+          <v-col cols="12">
+            <div v-if="selectedClassId" class="section-card">
+              <div class="section-title">
+                <v-icon class="mr-2" color="primary">mdi-account-group</v-icon>
+                Détails de la classe — {{ selectedClassName }}
+              </div>
+
+              <ClassDetails
+                :class-id="selectedClassId"
+                :class-name="selectedClassName"
+                :etablissement-id="etablissementId"
+                :annee-scolaire="anneeScolaire"
+                :annee-scolaire-id="anneeScolaireId"
+              />
+            </div>
           </v-col>
         </v-row>
       </v-container>
     </v-main>
 
-    <v-dialog v-model="logoutDialog" max-width="400">
-      <v-card>
-        <v-card-title class="text-h5">Confirmer la déconnexion</v-card-title>
-        <v-card-text>Êtes-vous sûr de vouloir vous déconnecter ?</v-card-text>
+    <!-- Déconnexion -->
+    <v-dialog v-model="logoutDialog" max-width="420">
+      <v-card class="dialog-card">
+        <v-card-title class="text-h6 font-weight-bold">
+          Confirmer la déconnexion
+        </v-card-title>
+        <v-card-text class="text-body-2">
+          Êtes-vous sûr de vouloir vous déconnecter ?
+        </v-card-text>
         <v-card-actions>
-          <v-spacer></v-spacer>
-          <v-btn color="blue darken-1" text @click="logoutDialog = false">Annuler</v-btn>
-          <v-btn color="red darken-1" text @click="logout">Oui</v-btn>
+          <v-spacer />
+          <v-btn variant="tonal" color="black" @click="logoutDialog = false">
+            Annuler
+          </v-btn>
+          <v-btn variant="flat" color="red" @click="logout">
+            Oui, se déconnecter
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -112,39 +202,49 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import axios from 'axios';
-import { useRouter } from 'nuxt/app';
-import { useDisplay } from 'vuetify';
-import ToolbarComponents from '@/components/professeurs/ToolbarComponents.vue';
-import ClassManager from '@/components/professeurs/ClassManager.vue';
-import NotificationComponent from '@/components/professeurs/NotificationComponent.vue';
+import { ref, computed, onMounted } from "vue";
+import axios from "axios";
+import { useRouter } from "nuxt/app";
+import { useDisplay } from "vuetify";
 
-// Gestion drawer et affichage responsive
+import ToolbarComponents from "@/components/professeurs/ToolbarComponents.vue";
+import ClassManager from "@/components/professeurs/ClassManager.vue";
+import NotificationComponent from "@/components/professeurs/NotificationComponent.vue";
+
+// Responsive
 const drawer = ref(false);
 const { smAndDown } = useDisplay();
-const drawerWidth = computed(() => (smAndDown.value ? 200 : 300));
+const drawerWidth = computed(() => (smAndDown.value ? 260 : 320));
 
-// États de l'application
+// State
 const selectedSubjectId = ref(null);
 const selectedClassId = ref(null);
-const selectedClassName = ref('');
-const subjects = ref([]);
-const classes = ref([]);
-const etablissementId = ref(null);
-const nomEtablissement = ref('');
-const enseignantNom = ref('');
-const enseignantPrenom = ref('');
-const enseignantId = ref(null);
-const logoutDialog = ref(false);
-const anneeScolaire = ref('');
-const anneeScolaireId = ref(null);
-const showNotificationsComponent = ref(false);
+const selectedClassName = ref("");
 
-// Récupérer les matières uniques
+const subjects = ref([]); // [{matiere_id, matiere, classe_id, classe}, ...]
+const classes = ref([]);  // classes filtrées pour une matière
+
+const etablissementId = ref(null);
+const nomEtablissement = ref("");
+
+const enseignantNom = ref("");
+const enseignantPrenom = ref("");
+const enseignantId = ref(null);
+
+const logoutDialog = ref(false);
+
+const anneeScolaire = ref("");
+const anneeScolaireId = ref(null);
+
+const showNotificationsComponent = ref(false);
+const notifications = ref([]);
+
+const router = useRouter();
+
+// Matières uniques
 const uniqueSubjects = computed(() => {
   const map = new Map();
-  return subjects.value.filter(subject => {
+  return subjects.value.filter((subject) => {
     if (!map.has(subject.matiere_id)) {
       map.set(subject.matiere_id, true);
       return true;
@@ -153,40 +253,80 @@ const uniqueSubjects = computed(() => {
   });
 });
 
-// Router
-const router = useRouter();
+// API
+const API_BASE = "http://localhost:8080";
 
-// Actions
 const fetchAnneeScolaire = async () => {
   try {
-    const response = await axios.get(`http://localhost:8080/api/annees-scolaires/${etablissementId.value}`);
+    const response = await axios.get(
+      `${API_BASE}/api/annees-scolaires/${etablissementId.value}`
+    );
+
     if (response.data?.id) {
-      anneeScolaire.value = response.data.nom;
+      anneeScolaire.value = response.data.nom_annee ?? response.data.nom ?? "";
       anneeScolaireId.value = response.data.id;
     } else {
-      anneeScolaire.value = null;
+      anneeScolaire.value = "";
       anneeScolaireId.value = null;
       console.warn("Aucune année scolaire active.");
     }
   } catch (error) {
     console.error("Erreur année scolaire :", error);
+    anneeScolaire.value = "";
+    anneeScolaireId.value = null;
   }
 };
 
-const selectSubject = (id) => {
-  selectedSubjectId.value = id;
+// Sync + fetch notifications
+const syncAndFetchNotifications = async () => {
+  try {
+    await axios.post(
+      `${API_BASE}/api/notificationprof/sync/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`
+    );
+
+    const { data } = await axios.get(
+      `${API_BASE}/api/notificationprof/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`
+    );
+
+    notifications.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("❌ Erreur synchro/récup notifications :", error);
+  }
+};
+
+const selectSubject = (matiereId) => {
+  selectedSubjectId.value = matiereId;
   selectedClassId.value = null;
-  classes.value = subjects.value.filter(subject => subject.matiere_id === id);
+  selectedClassName.value = "";
+
+  // ✅ classes filtrées depuis la liste complète subjects
+  classes.value = subjects.value.filter((s) => s.matiere_id === matiereId);
+
+  // UX: fermer le drawer sur mobile après sélection
+  if (smAndDown.value) drawer.value = false;
 };
 
-const showClassDetails = (classId) => {
-  const selectedClass = classes.value.find(cl => cl.class_id === classId);
-  selectedClassId.value = classId;
-  selectedClassName.value = selectedClass ? selectedClass.class_name : '';
+const showClassDetails = (classeId) => {
+  // ✅ l’API renvoie classe_id et classe
+  const selected = classes.value.find((cl) => cl.classe_id === classeId);
+  selectedClassId.value = classeId;
+  selectedClassName.value = selected ? selected.classe : "";
 };
 
-const showNotifications = () => {
+// Show notifications + mark read
+const showNotifications = async () => {
   showNotificationsComponent.value = !showNotificationsComponent.value;
+
+  if (showNotificationsComponent.value && notifications.value.length > 0) {
+    try {
+      await axios.put(
+        `${API_BASE}/api/notificationprof/mark-read/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`
+      );
+      notifications.value = notifications.value.map((n) => ({ ...n, isRead: 1 }));
+    } catch (error) {
+      console.error("❌ Erreur marquage comme lues :", error);
+    }
+  }
 };
 
 const showLogoutDialog = () => {
@@ -198,60 +338,236 @@ const toggleDrawer = () => {
 };
 
 const logout = () => {
-  localStorage.removeItem('token');
-  router.push('/professeurs/connexion');
+  localStorage.removeItem("token");
+  router.push("/professeurs/connexion");
 };
 
-// Initialisation
+// Init
 onMounted(async () => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    try {
-      const decodedToken = JSON.parse(atob(token.split('.')[1]));
-      enseignantId.value = decodedToken.id;
-      etablissementId.value = decodedToken.etablissement;
-      nomEtablissement.value = decodedToken.etablissement_nom;
-      enseignantNom.value = decodedToken.enseignant_nom;
-      enseignantPrenom.value = decodedToken.enseignant_prenom;
+  const token = localStorage.getItem("token");
+  if (!token) return;
 
-      await fetchAnneeScolaire();
+  try {
+    const decodedToken = JSON.parse(atob(token.split(".")[1]));
+    enseignantId.value = decodedToken.id;
+    etablissementId.value = decodedToken.etablissement;
+    nomEtablissement.value = decodedToken.etablissement_nom;
+    enseignantNom.value = decodedToken.enseignant_nom;
+    enseignantPrenom.value = decodedToken.enseignant_prenom;
 
-      const response = await axios.get(
-        `http://localhost:8080/api/enseignant/matieres-classes/${enseignantId.value}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      subjects.value = response.data;
-    } catch (error) {
-      console.error('Erreur récupération données enseignant :', error);
+    await fetchAnneeScolaire();
+
+    // ✅ FIX 403 : on n’envoie PLUS l’id dans l’URL
+    const response = await axios.get(
+      `${API_BASE}/api/enseignant/matieres-classes`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    subjects.value = Array.isArray(response.data) ? response.data : [];
+
+    // Optionnel : sélectionner automatiquement la 1ère matière
+    if (uniqueSubjects.value.length) {
+      selectSubject(uniqueSubjects.value[0].matiere_id);
     }
+
+    if (anneeScolaireId.value) {
+      await syncAndFetchNotifications();
+    }
+  } catch (error) {
+    console.error("Erreur récupération données enseignant :", error);
   }
 });
 </script>
 
 <style scoped>
-.background-blur {
-  @apply fixed top-0 left-0 w-full h-full bg-cover bg-center filter blur-md;
-  background-image: url('/assets/professeurs/istockphoto-1328488607-1024x1024.jpg');
+/* ✅ IMPORTANT: bloquer le scroll global (page) */
+:global(html, body, #__nuxt) {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Charte: bleu/blanc + petit noir */
+:root {
+  --blue: #1976d2;
+  --blue-dark: #0b2e4a;
+  --black-soft: rgba(0, 0, 0, 0.55);
+}
+
+/* Background */
+.app-bg {
+  position: fixed;
+  inset: 0;
+  background-image: url("/assets/professeurs/istockphoto-1328488607-1024x1024.jpg");
+  background-size: cover;
+  background-position: center;
+  filter: blur(10px);
+  transform: scale(1.05);
+  z-index: -2;
+}
+
+.app-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(900px 500px at 20% 10%, rgba(25, 118, 210, 0.22), transparent 55%),
+    radial-gradient(800px 500px at 80% 0%, rgba(25, 118, 210, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.88));
   z-index: -1;
 }
 
-.fixed-toolbar {
+/* Drawer */
+.app-drawer {
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ✅ Drawer fixe + pas de scroll interne */
+:global(.app-drawer) {
+  height: 100vh !important;
+}
+:global(.app-drawer .v-navigation-drawer__content) {
+  height: 100%;
+  overflow: hidden !important;
+}
+
+.drawer-header {
+  padding: 16px 14px 10px;
+}
+
+.drawer-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drawer-avatar {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.drawer-user-info {
+  min-width: 0;
+}
+
+.drawer-etab {
+  font-weight: 900;
+  font-size: 0.95rem;
+  line-height: 1.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-name {
+  margin-top: 2px;
+  font-weight: 700;
+  opacity: 0.95;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-badges {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.drawer-divider {
+  opacity: 0.25;
+}
+
+.drawer-section-title {
+  margin: 10px 10px 6px;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  opacity: 0.95;
+  display: flex;
+  align-items: center;
+}
+
+.drawer-item {
+  border-radius: 12px;
+  margin: 4px 6px;
+}
+
+.drawer-item-title {
+  font-weight: 800;
+}
+
+.logout-item {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.logout-title {
+  font-weight: 900;
+  color: #ffd6d6;
+}
+
+/* Topbar */
+.topbar {
   position: fixed;
   top: 0;
   width: 100%;
-  z-index: 20;
-  background-color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 30;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom: 1px solid rgba(25, 118, 210, 0.12);
 }
 
-.v-main {
-  padding-top: 64px; /* hauteur de la toolbar */
+.topbar-inner {
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.content-container {
-  @apply bg-white bg-opacity-95 rounded-2xl shadow-md relative z-10 px-4 py-6 sm:px-8 sm:py-8;
+/* ✅ v-main devient la zone scrollable */
+.main-scroll {
+  padding-top: 64px;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-.navigate{
-   position: fixed;
+
+/* Content */
+.content-wrap {
+  padding-top: 18px;
+  padding-bottom: 28px;
+  max-width: 1400px;
+}
+
+/* Sections */
+.section-card {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(25, 118, 210, 0.12);
+  box-shadow: 0 18px 60px rgba(11, 46, 74, 0.10);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  font-weight: 950;
+  color: var(--blue-dark);
+  margin-bottom: 10px;
+  font-size: 1.02rem;
+}
+
+/* Dialog */
+.dialog-card {
+  border-radius: 16px !important;
+}
+
+/* Mobile tweaks */
+@media (max-width: 600px) {
+  .content-wrap {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .section-card {
+    border-radius: 16px;
+    padding: 12px;
+  }
 }
 </style>

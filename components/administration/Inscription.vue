@@ -1,346 +1,340 @@
 <template>
-  <div class="container">
-    <div class="header">
-      <v-btn icon @click="$emit('back')" class="btn-icon">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
-      <div class="actions">
-        <button @click="showForm = true" v-if="!showForm" class="btn-primary">Inscrire un élève</button>
-        <button @click="showBulkForm = true" v-if="!showBulkForm" class="btn-secondary">Inscrire plusieurs élèves</button>
-      </div>
-    </div>
-
-    <!-- Formulaire inscription individuelle -->
-    <div class="form-container" v-if="showForm">
-      <h2>Inscription d’un Élève</h2>
-
-      <form @submit.prevent="submitForm">
-        <div class="form-group" v-for="field in ['nom', 'prenom', 'dateNaissance', 'sexe']" :key="field">
-          <label :for="field">{{ labels[field] }} :</label>
-          <input
-            v-if="field !== 'sexe'"
-            :type="field === 'dateNaissance' ? 'date' : 'text'"
-            :id="field"
-            v-model="form[field]"
-            required
-          />
-          <select v-else v-model="form.sexe" required>
-            <option disabled value="">Choisir...</option>
-            <option value="M">Masculin</option>
-            <option value="F">Féminin</option>
-            <option value="Autre">Autre</option>
-          </select>
+  <v-container class="registration-page pa-4 pa-md-8" fluid>
+    <v-card class="mx-auto mb-6 elevation-1 rounded-lg" max-width="900">
+      <v-card-text class="d-flex flex-column flex-sm-row align-center justify-space-between pa-4">
+        <v-btn icon variant="tonal" color="primary" @click="$emit('back')" class="mb-4 mb-sm-0">
+          <v-icon>mdi-arrow-left</v-icon>
+        </v-btn>
+        
+        <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-sm-auto justify-end">
+          <v-btn 
+            prepend-icon="mdi-account-plus" 
+            color="primary" 
+            class="rounded-pill px-6"
+            @click="toggleSingleForm"
+            :variant="showForm ? 'flat' : 'outlined'"
+          >
+            Individuelle
+          </v-btn>
+          <v-btn 
+            prepend-icon="mdi-file-excel" 
+            color="secondary" 
+            class="rounded-pill px-6 ml-sm-2 mt-2 mt-sm-0"
+            @click="toggleBulkForm"
+            :variant="showBulkForm ? 'flat' : 'outlined'"
+          >
+            En masse (Excel)
+          </v-btn>
         </div>
+      </v-card-text>
+    </v-card>
 
-        <div class="form-group">
-          <label>Classe :</label>
-          <select v-model="form.classe" required>
-            <option disabled value="">Choisir...</option>
-            <option v-for="classe in classes" :key="classe.id" :value="classe.id">
-              {{ classe.nom }}
-            </option>
-          </select>
-        </div>
+    <v-expand-transition>
+      <v-card v-if="showForm" class="mx-auto elevation-2 rounded-xl pa-2 pa-md-6" max-width="900">
+        <v-card-title class="text-h5 font-weight-bold text-center py-4 text-primary">
+          <v-icon start>mdi-account-school</v-icon>
+          Fiche d'Inscription Élève
+        </v-card-title>
 
-        <div class="form-group">
-          <label>Parent :</label>
-          <v-autocomplete
-            v-model="form.parentId"
-            :items="parents"
-            item-value="id"
-            item-title="text"
-            label="Choisir un parent"
-            required
-          />
-        </div>
+        <v-divider class="mb-6"></v-divider>
 
-        <div class="btn-group">
-          <button type="submit" class="btn-success">S'inscrire</button>
-          <button @click="showForm = false" type="button" class="btn-cancel">Annuler</button>
-        </div>
-      </form>
-    </div>
+        <v-form @submit.prevent="submitForm">
+          <v-row>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="form.nom"
+                label="Nom de l'élève"
+                variant="outlined"
+                density="comfortable"
+                required
+                prepend-inner-icon="mdi-account-outline"
+                placeholder="Ex: KOUADIO"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="form.prenom"
+                label="Prénom de l'élève"
+                variant="outlined"
+                density="comfortable"
+                required
+                prepend-inner-icon="mdi-account-outline"
+                placeholder="Ex: Jean"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="form.dateNaissance"
+                label="Date de naissance"
+                type="date"
+                variant="outlined"
+                density="comfortable"
+                required
+                prepend-inner-icon="mdi-calendar"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="form.sexe"
+                :items="['M', 'F']"
+                label="Sexe"
+                variant="outlined"
+                density="comfortable"
+                required
+                prepend-inner-icon="mdi-gender-male-female"
+              ></v-select>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-select
+                v-model="form.classe"
+                :items="classes"
+                item-title="nom"
+                item-value="id"
+                label="Classe d'affectation"
+                variant="outlined"
+                density="comfortable"
+                required
+                prepend-inner-icon="mdi-google-classroom"
+              ></v-select>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-autocomplete
+                v-model="form.parentId"
+                :items="parents"
+                item-value="id"
+                item-title="text"
+                label="Rechercher le Parent"
+                variant="outlined"
+                density="comfortable"
+                required
+                prepend-inner-icon="mdi-account-child"
+                placeholder="Taper pour chercher..."
+              ></v-autocomplete>
+            </v-col>
+          </v-row>
 
-    <!-- Formulaire inscription multiple -->
-    <div class="form-container" v-if="showBulkForm">
-      <h2>Inscription en Masse</h2>
+          <v-card-actions class="justify-end mt-4">
+            <v-btn color="grey-darken-1" variant="text" @click="showForm = false" class="px-4">Annuler</v-btn>
+            <v-btn color="success" type="submit" variant="elevated" class="px-8 rounded-lg font-weight-bold" :loading="loading">
+              Valider l'Inscription
+            </v-btn>
+          </v-card-actions>
+        </v-form>
+      </v-card>
+    </v-expand-transition>
 
-      <button @click="generateExcelTemplate" class="btn-info">
-        📄 Générer le fichier modèle Excel
-      </button>
+    <v-expand-transition>
+      <v-card v-if="showBulkForm" class="mx-auto elevation-2 rounded-xl pa-2 pa-md-6" max-width="900">
+        <v-card-title class="text-h5 font-weight-bold text-center py-4 text-secondary">
+          <v-icon start>mdi-file-multiple</v-icon>
+          Importation par Fichier
+        </v-card-title>
 
-      <div class="form-group">
-        <label>Classe :</label>
-        <select v-model="bulkForm.classeId" required>
-          <option disabled value="">Choisir...</option>
-          <option v-for="classe in classes" :key="classe.id" :value="classe.id">
-            {{ classe.nom }}
-          </option>
-        </select>
-      </div>
+        <v-divider class="mb-6"></v-divider>
 
-      <div class="form-group">
-        <label>Fichier Excel :</label>
-        <input type="file" @change="handleFileUpload" accept=".xlsx, .xls" />
-      </div>
+        <v-row justify="center">
+          <v-col cols="12" class="text-center">
+            <v-btn 
+              color="info" 
+              variant="tonal" 
+              prepend-icon="mdi-download" 
+              class="mb-6 rounded-pill"
+              @click="generateExcelTemplate"
+            >
+              Télécharger le canevas Excel
+            </v-btn>
+          </v-col>
+          
+          <v-col cols="12" sm="8">
+            <v-select
+              v-model="bulkForm.classeId"
+              :items="classes"
+              item-title="nom"
+              item-value="id"
+              label="Classe de destination"
+              variant="outlined"
+              prepend-inner-icon="mdi-google-classroom"
+              class="mb-2"
+            ></v-select>
 
-      <div class="btn-group">
-        <button @click="submitBulkForm" class="btn-success">Soumettre</button>
-        <button @click="showBulkForm = false" type="button" class="btn-cancel">Annuler</button>
-      </div>
-    </div>
-  </div>
+            <v-file-input
+              @change="handleFileUpload"
+              label="Sélectionner le fichier Excel complété"
+              variant="outlined"
+              accept=".xlsx, .xls"
+              prepend-inner-icon="mdi-paperclip"
+              show-size
+            ></v-file-input>
+          </v-col>
+        </v-row>
+
+        <v-card-actions class="justify-end mt-4">
+          <v-btn color="grey-darken-1" variant="text" @click="showBulkForm = false" class="px-4">Annuler</v-btn>
+          <v-btn color="success" variant="elevated" class="px-8 rounded-lg font-weight-bold" @click="submitBulkForm" :loading="loading">
+            Lancer l'importation
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-expand-transition>
+  </v-container>
 </template>
 
-<script>
+<script setup>
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
-export default {
-  props: {
-    etablissementId: Number,
-    etablissementNom: String,
-    anneeScolaire: String,
-    anneeScolaireId: Number
-  },
-  data() {
-    return {
-      form: {
-        nom: '',
-        prenom: '',
-        dateNaissance: '',
-        sexe: '',
-        classe: '',
-        parentId: ''
-      },
-      bulkForm: {
-        classeId: '',
-        file: null
-      },
-      showForm: false,
-      showBulkForm: false,
-      classes: [],
-      parents: [],
-      labels: {
-        nom: 'Nom',
-        prenom: 'Prénom',
-        dateNaissance: 'Date de naissance',
-        sexe: 'Sexe'
-      }
-    };
-  },
-  async created() {
-    await this.fetchClasses();
-    await this.fetchParents();
-  },
-  methods: {
-    async fetchClasses() {
-      try {
-        const res = await axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`);
-        this.classes = res.data;
-      } catch (e) {
-        console.error("Erreur chargement classes :", e);
-      }
-    },
-    async fetchParents() {
-      try {
-        const res = await axios.get(`http://localhost:8080/api/Parents/${this.etablissementId}`);
-        this.parents = res.data.map(p => ({
-          id: p.id,
-          text: `${p.name} ${p.firstName}`
-        }));
-      } catch (e) {
-        console.error("Erreur chargement parents :", e);
-      }
-    },
-    async submitForm() {
-      try {
-        await axios.post('http://localhost:8080/api/inscription', {
-          ...this.form,
-          etablissementId: this.etablissementId,
-          anneeScolaireId: this.anneeScolaireId
-        });
-        alert("Inscription réussie !");
-        this.resetForm();
-      } catch (e) {
-        console.error("Erreur inscription :", e);
-        alert("Erreur lors de l'inscription.");
-      }
-    },
-    resetForm() {
-      this.form = {
-        nom: '',
-        prenom: '',
-        dateNaissance: '',
-        sexe: '',
-        classe: '',
-        parentId: ''
-      };
-    },
-    handleFileUpload(event) {
-  this.bulkForm.file = event.target.files[0];
-},
+const props = defineProps({
+  etablissementId: Number,
+  etablissementNom: String,
+  anneeScolaire: String,
+  anneeScolaireId: Number
+});
 
-async generateExcelTemplate() {
+const emit = defineEmits(['back']);
+
+const form = ref({ nom: '', prenom: '', dateNaissance: '', sexe: '', classe: '', parentId: '' });
+const bulkForm = ref({ classeId: '', file: null });
+const showForm = ref(false);
+const showBulkForm = ref(false);
+const loading = ref(false);
+const classes = ref([]);
+const parents = ref([]);
+
+const toggleSingleForm = () => {
+  showForm.value = !showForm.value;
+  if (showForm.value) showBulkForm.value = false;
+};
+
+const toggleBulkForm = () => {
+  showBulkForm.value = !showBulkForm.value;
+  if (showBulkForm.value) showForm.value = false;
+};
+
+const fetchClasses = async () => {
+  try {
+    const res = await axios.get(`http://localhost:8080/api/classe/${props.etablissementId}`);
+    classes.value = res.data;
+  } catch (e) {
+    console.error("Erreur classes:", e);
+  }
+};
+
+const fetchParents = async () => {
+  try {
+    const res = await axios.get(`http://localhost:8080/api/Parents/${props.etablissementId}`);
+    parents.value = res.data.map(p => ({
+      id: p.id,
+      text: `${p.name} ${p.firstName}`
+    }));
+  } catch (e) {
+    console.error("Erreur parents:", e);
+  }
+};
+
+const submitForm = async () => {
+  loading.value = true;
+  try {
+    await axios.post('http://localhost:8080/api/inscription', {
+      ...form.value,
+      etablissementId: props.etablissementId,
+      anneeScolaireId: props.anneeScolaireId
+    });
+    alert("L'élève a été inscrit avec succès !");
+    resetForm();
+    showForm.value = false;
+  } catch (e) {
+    alert("Erreur lors de l'inscription.");
+  } finally {
+    loading.value = false;
+  }
+};
+
+const resetForm = () => {
+  form.value = { nom: '', prenom: '', dateNaissance: '', sexe: '', classe: '', parentId: '' };
+};
+
+const handleFileUpload = (event) => {
+  const file = event.target.files ? event.target.files[0] : null;
+  bulkForm.value.file = file;
+};
+
+const generateExcelTemplate = async () => {
   const XLSX = await import('xlsx');
-
-  // Utilisation de date ISO (yyyy-mm-dd)
   const data = [
+    ['NOTE:', 'NE PAS SUPPRIMER LA LIGNE D\'ENTETE. L\'EXEMPLE EN LIGNE 3 NE SERA PAS IMPORTE.'],
     ['Nom Élève', 'Prénom Élève', 'Date de naissance', 'Sexe', 'Nom Parent', 'Prénom Parent', 'Email Parent', 'Téléphone'],
-    ['Kouadio', 'Jean', '2011-05-12', 'M', 'Kouadio', 'Claudine', 'claudine.kouadio@mail.com', '0700000000']
+    ['KOUADIO', 'Jean', '12/05/2011', 'M', 'KOUADIO', 'Claudine', 'claudine.kouadio@mail.com', '0700000000']
   ];
-
   const ws = XLSX.utils.aoa_to_sheet(data);
-
-  // Définir le format de la cellule "Date de naissance"
-  ws['C2'].z = 'yyyy-mm-dd';
-
-  ws['!cols'] = [
-    { wch: 20 }, // Nom élève
-    { wch: 20 }, // Prénom élève
-    { wch: 15 }, // Date de naissance
-    { wch: 10 }, // Sexe
-    { wch: 20 }, // Nom parent
-    { wch: 20 }, // Prénom parent
-    { wch: 30 }, // Email parent
-    { wch: 20 }  // Téléphone
-  ];
-
+  ws['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 20 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Inscriptions');
-  XLSX.writeFile(wb, 'modele_inscription_eleves.xlsx');
-},
+  XLSX.writeFile(wb, 'canevas_inscription_eleves.xlsx');
+};
 
-    async submitBulkForm() {
-  if (!this.bulkForm.file || !this.bulkForm.classeId) {
+const submitBulkForm = async () => {
+  if (!bulkForm.value.file || !bulkForm.value.classeId) {
     alert("Veuillez sélectionner une classe et un fichier.");
     return;
   }
+  loading.value = true;
 
   const formData = new FormData();
-  formData.append('file', this.bulkForm.file);
-  formData.append('classeId', this.bulkForm.classeId);
-  formData.append('etablissementId', this.etablissementId);
-  formData.append('anneeScolaireId', this.anneeScolaireId);
+  formData.append('file', bulkForm.value.file);
+  formData.append('classeId', bulkForm.value.classeId);
+  formData.append('etablissementId', props.etablissementId);
+  formData.append('anneeScolaireId', props.anneeScolaireId);
 
   try {
-    const response = await axios.post('http://localhost:8080/api/import-eleves', formData, {
+    // Utilisation de l'URL correcte de votre API Node
+    await axios.post('http://localhost:8080/api/import-eleves', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
-
     alert("Importation réussie !");
-    console.log("Réponse du serveur :", response.data);
-
-    this.bulkForm.file = null;
-    this.bulkForm.classeId = '';
-    this.showBulkForm = false;
+    showBulkForm.value = false;
   } catch (e) {
-    console.error("Erreur importation :", e);
-    alert("Erreur lors de l'importation du fichier.");
-  }
-}
-
+    console.error("Erreur:", e);
+    alert("Erreur lors de l'importation.");
+  } finally {
+    loading.value = false;
   }
 };
+
+onMounted(() => {
+  fetchClasses();
+  fetchParents();
+});
 </script>
 
 <style scoped>
-.container {
-  padding: 30px;
-  max-width: 800px;
-  margin: auto;
+.registration-page {
+  background-color: #f4f7f9;
+  min-height: 100vh;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-}
-
-.form-container {
-  background: #fff;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
-  margin-bottom: 30px;
-}
-
-.form-container h2 {
-  margin-bottom: 25px;
-  text-align: center;
-  font-size: 22px;
-  color: #333;
-}
-
-.form-group {
-  margin-bottom: 18px;
-}
-
-.form-group label {
-  font-weight: 600;
-  margin-bottom: 6px;
-  display: block;
-  color: #444;
-}
-
-.form-group input,
-.form-group select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 15px;
-  background: #fefefe;
-}
-
-.btn-group {
-  display: flex;
-  justify-content: flex-end;
+.gap-2 {
   gap: 12px;
-  margin-top: 20px;
 }
 
-button {
-  padding: 10px 16px;
-  font-size: 14px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  transition: background 0.3s ease;
+.rounded-pill {
+  border-radius: 50px !important;
 }
 
-.btn-primary {
-  background-color: #007bff;
-  color: white;
+.rounded-xl {
+  border-radius: 20px !important;
 }
 
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-}
+@media (max-width: 600px) {
+  .registration-page {
+    padding: 10px !important;
+  }
+  
+  .v-card-title {
+    font-size: 1.15rem !important;
+  }
 
-.btn-success {
-  background-color: #28a745;
-  color: white;
-}
-
-.btn-cancel {
-  background-color: #dc3545;
-  color: white;
-}
-
-.btn-info {
-  background-color: #17a2b8;
-  color: white;
-  margin-bottom: 20px;
-}
-
-button:hover {
-  opacity: 0.9;
+  .w-100 {
+    width: 100% !important;
+  }
 }
 </style>

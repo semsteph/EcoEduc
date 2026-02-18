@@ -1,45 +1,38 @@
 <template>
-  <v-app>
-    <!-- Sidebar -->
+  <v-app class="no-scroll-x">
     <v-navigation-drawer
-      app
-      color="primary"
       v-model="drawer"
+      :permanent="mdAndUp"
+      app
+      fixed
+      color="primary"
       dark
-      permanent
-      class="elevation-2"
+      elevation="2"
+      width="260"
     >
-      <v-toolbar flat color="primary">
-        <v-img
-          src="@/assets/administration/logooff.png"
-          max-width="140"
-          class="mx-auto mt-3"
-        />
+      <v-toolbar flat color="primary" class="d-flex justify-center pt-4">
+        <v-img src="@/assets/administration/logooff.png" max-width="140" contain />
       </v-toolbar>
 
-      <v-divider></v-divider>
+      <v-divider class="mt-2"></v-divider>
 
-      <v-list dense nav class="mt-4">
-        <v-list-item>
-          <v-list-item-content>
-            <v-list-item-title class="text-caption grey--text text--lighten-3">
-              Etablissement
-            </v-list-item-title>
-            <v-list-item-subtitle class="white--text font-weight-bold">
-              {{ etablissementNom }}
-            </v-list-item-subtitle>
-          </v-list-item-content>
+      <v-list density="compact" nav class="mt-4">
+        <v-list-item class="mb-2">
+          <v-list-item-title class="text-caption grey--text text-lighten-3">
+            Etablissement
+          </v-list-item-title>
+          <v-list-item-subtitle class="white--text font-weight-bold">
+            {{ etablissementNom }}
+          </v-list-item-subtitle>
         </v-list-item>
 
-        <v-list-item>
-          <v-list-item-content>
-            <v-list-item-title class="text-caption grey--text text--lighten-3">
-              Année scolaire
-            </v-list-item-title>
-            <v-list-item-subtitle class="white--text font-weight-bold">
-              {{ anneeScolaireNom }}
-            </v-list-item-subtitle>
-          </v-list-item-content>
+        <v-list-item class="mb-4">
+          <v-list-item-title class="text-caption grey--text text-lighten-3">
+            Année scolaire
+          </v-list-item-title>
+          <v-list-item-subtitle class="white--text font-weight-bold">
+            {{ anneeScolaireNom }}
+          </v-list-item-subtitle>
         </v-list-item>
 
         <v-divider class="my-3"></v-divider>
@@ -50,46 +43,53 @@
           @click="changeComponent(item.component)"
           :class="{ 'active-item': currentComponent === item.component }"
         >
-          <v-list-item-icon>
-            <v-icon>{{ item.icon }}</v-icon>
-          </v-list-item-icon>
-          <v-list-item-content>
-            <v-list-item-title>{{ item.title }}</v-list-item-title>
-          </v-list-item-content>
+          <template #prepend>
+            <v-icon :icon="item.icon" color="white"></v-icon>
+          </template>
+          <v-list-item-title class="white--text">{{ item.title }}</v-list-item-title>
         </v-list-item>
       </v-list>
+
+      <template #append>
+        <div class="pa-4">
+          <v-btn block color="rgba(255,255,255,0.1)" depressed @click="showLogoutDialog">
+            <v-icon left color="red lighten-1">mdi-logout</v-icon>
+            Déconnexion
+          </v-btn>
+        </div>
+      </template>
     </v-navigation-drawer>
 
-    <!-- Top Bar -->
-    <v-app-bar app color="white" class="elevation-1">
-      <v-app-bar-nav-icon @click="drawer = !drawer" class="text-primary" />
+    <v-app-bar app fixed color="white" elevation="1" height="64">
+      <v-app-bar-nav-icon
+        v-if="!mdAndUp"
+        @click.stop="drawer = !drawer"
+        class="text-primary"
+      />
       <v-toolbar-title class="font-weight-bold text-primary">
         EchoEducation
       </v-toolbar-title>
-
       <v-spacer />
 
       <v-btn icon @click="showMessages">
         <v-badge
           :content="permissionCount"
+          :model-value="permissionCount > 0 && currentComponent !== 'MessageComponent'"
           color="deep-orange"
-          v-if="permissionCount > 0"
           overlap
         >
-          <v-icon>mdi-email</v-icon>
+          <v-icon color="primary">mdi-email</v-icon>
         </v-badge>
-        <template v-else>
-          <v-icon>mdi-email-outline</v-icon>
-        </template>
       </v-btn>
 
       <v-btn icon @click="showNotifications">
         <v-badge
           :content="notificationCount"
-          :color="notificationBadgeColor"
+          :model-value="notificationCount > 0 && currentComponent !== 'NotificationComponent'"
+          color="deep-orange accent-3"
           overlap
         >
-          <v-icon>mdi-bell-outline</v-icon>
+          <v-icon color="primary">mdi-bell</v-icon>
         </v-badge>
       </v-btn>
 
@@ -98,32 +98,55 @@
       </v-btn>
     </v-app-bar>
 
-    <!-- Main Content -->
-    <v-main>
-      <v-container
-        fluid
-        class="pa-6 main-content"
-      >
-        <component
-          :is="currentComponent"
-          :etablissement-id="etablissementId"
-          :annee-scolaire="anneeScolaire"
-          :annee-scolaire-id="anneeScolaireId"
-          @component-selected="selectComponent"
-          @back="currentComponent = previousComponent"
-          @update-notification-count="updateNotificationCount"
-        />
+    <v-main class="main-scroll-area bg-grey-lighten-4">
+      <v-container fluid class="pa-6 main-content">
+        <div v-if="currentComponent === 'Dashboard'">
+          <h2 class="text-h5 font-weight-bold text-primary mb-6">Tableau de bord</h2>
+          <v-row>
+            <v-col cols="12" sm="6" md="3" v-for="(stat, i) in dashStats" :key="i">
+              <v-card class="rounded-lg pa-4 elevation-2 border-card">
+                <div class="d-flex align-center">
+                  <v-avatar :color="stat.color" variant="tonal" size="48" class="mr-4">
+                    <v-icon :color="stat.color">{{ stat.icon }}</v-icon>
+                  </v-avatar>
+                  <div>
+                    <div class="text-caption text-grey font-weight-bold">{{ stat.title }}</div>
+                    <div class="text-h6 font-weight-black">{{ stat.value }}</div>
+                  </div>
+                </div>
+              </v-card>
+            </v-col>
+          </v-row>
+        </div>
+
+        <div v-else>
+          <component
+            :is="componentsMap[currentComponent]"
+            :etablissement-id="etablissementId"
+            :etablissement-nom="etablissementNom"
+            :annee-scolaire-id="anneeScolaireId"
+            :annee-scolaire="anneeScolaireNom"
+            :permissions="filteredPermissions"
+            @component-selected="selectComponent"
+            @back="currentComponent = previousComponent || 'Dashboard'"
+            @update-notification-count="fetchNotificationCount"
+            @update-permission-count="fetchPermissions"
+          />
+        </div>
       </v-container>
     </v-main>
 
-    <!-- Logout Dialog -->
-    <logout-dialog ref="logoutDialog" @confirm-logout="logout" />
+    <logout-dialog ref="logoutDialogComp" @confirm-logout="logout" />
   </v-app>
 </template>
 
-<script>
+<script setup>
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { useDisplay } from 'vuetify';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
-// Composants
+
+// IMPORTATION DE TOUS LES COMPOSANTS
 import ParentManagement from '@/components/administration/ParentManagement.vue';
 import MessageComponent from '@/components/administration/MessageComponent.vue';
 import NotificationComponent from '@/components/administration/NotificationComponent.vue';
@@ -136,166 +159,190 @@ import PresenceManagement from '@/components/administration/PresenceManagement.v
 import PunishmentManagement from '@/components/administration/PunishmentManagement.vue';
 import NoteConsultation from '@/components/administration/NoteConsultation.vue';
 import BulletinManagement from '@/components/administration/BulletinManagement.vue';
-import Parametre from '~/components/administration/Parametre.vue';
-import Reinscription from '~/components/administration/Reinscription.vue';
-import MesEleves from '~/components/administration/MesEleves.vue';
+import Parametre from '@/components/administration/Parametre.vue';
+import Reinscription from '@/components/administration/Reinscription.vue';
+import MesEleves from '@/components/administration/MesEleves.vue';
+import CarteScolaire from '~/components/administration/CarteScolaire.vue';
 
-export default {
-  components: {
-    MessageComponent,
-    ParentManagement,
-    NotificationComponent,
-    LogoutDialog,
-    ClassManagement,
-    StudentManagement,
-    TeacherManagement,
-    Inscription,
-    PresenceManagement,
-    PunishmentManagement,
-    NoteConsultation,
-    BulletinManagement,
-    Reinscription,
-    Parametre,
-    MesEleves,
-  },
-  data() {
-    return {
-      drawer: true,
-      currentComponent: 'ClassManagement',
-      previousComponent: null,
-      notificationCount: 0,
-      notificationBadgeColor: 'deep-orange accent-3',
-      permissionCount: 0,
-      etablissementId: null,
-      etablissementNom: '',
-      anneeScolaire: '',
-      anneeScolaireId: null,
-      permissionInterval: null,
-      menuItems: [
-        { title: 'Classes', component: 'ClassManagement', icon: 'mdi-school-outline' },
-        { title: 'Elèves', component: 'StudentManagement', icon: 'mdi-account-group-outline' },
-        { title: 'Enseignants', component: 'TeacherManagement', icon: 'mdi-teach' },
-        { title: 'Parents', component: 'ParentManagement', icon: 'mdi-account-child-outline' },
-        { title: 'Paramètres', component: 'Parametre', icon: 'mdi-cog-outline' },
-      ],
-    };
-  },
-  created() {
-    this.etablissementId = parseInt(this.$route.query.etablissement_id, 10);
-    this.etablissementNom = this.$route.query.etablissement_nom;
-    this.fetchAnneeScolaire().then(() => {
-      this.fetchPermissionCount();
-      this.startPermissionPolling();
-    });
-  },
-  beforeDestroy() {
-    clearInterval(this.permissionInterval);
-  },
-  methods: {
-    async fetchAnneeScolaire() {
-      try {
-        const res = await axios.get(`http://localhost:8080/api/annees-scolaires/${this.etablissementId}`);
-        if (res.data) {
-          const { id, nom } = res.data;
-          this.anneeScolaireNom = nom || 'Non spécifiée';
-          this.anneeScolaireId = id || null;
-        }
-      } catch (error) {
-        console.error(error);
-        this.anneeScolaireNom = 'Erreur de chargement';
-        this.anneeScolaireId = null;
-      }
-    },
-    async fetchPermissionCount() {
-      if (!this.etablissementId || !this.anneeScolaireId) return;
-      try {
-        const response = await axios.get(`http://localhost:8080/api/permissions/${this.etablissementId}/${this.anneeScolaireId}`);
-        const now = new Date();
-        const filtered = response.data.filter(p => {
-          const date = new Date(p.date);
-          return (
-            date.getMonth() === now.getMonth() &&
-            date.getFullYear() === now.getFullYear() &&
-            !p.is_read
-          );
-        });
-        this.permissionCount = filtered.length;
-      } catch (error) {
-        console.error('Erreur permissions:', error);
-        this.permissionCount = 0;
-      }
-    },
-    startPermissionPolling() {
-      this.permissionInterval = setInterval(() => {
-        this.fetchPermissionCount();
-      }, 30000);
-    },
-    changeComponent(component) {
-      this.previousComponent = this.currentComponent;
-      this.currentComponent = component;
-    },
-    showMessages() {
-      this.permissionCount = 0;
-      this.currentComponent = 'MessageComponent';
-    },
-    showNotifications() {
-      this.notificationCount = 0;
-      this.currentComponent = 'NotificationComponent';
-    },
-    showLogoutDialog() {
-      this.$refs.logoutDialog.dialog = true;
-    },
-    logout() {
-      this.$router.push('/administration/connexion');
-    },
-    selectComponent(component) {
-      this.previousComponent = this.currentComponent;
-      this.currentComponent = component;
-    },
-    updateNotificationCount(newCount) {
-      this.notificationCount = newCount;
-    },
-  },
+const API_BASE = 'http://localhost:8080';
+
+const { mdAndUp } = useDisplay();
+const drawer = ref(null);
+const route = useRoute();
+const router = useRouter();
+
+const currentComponent = ref('Dashboard');
+const previousComponent = ref(null);
+const etablissementId = ref(null);
+const etablissementNom = ref('');
+const anneeScolaireNom = ref('');
+const anneeScolaireId = ref(null);
+const permissionCount = ref(0);
+const notificationCount = ref(0);
+const filteredPermissions = ref([]);
+const logoutDialogComp = ref(null);
+
+// MAP DE TOUS LES COMPOSANTS POUR LE RENDU DYNAMIQUE
+const componentsMap = {
+  ParentManagement,
+  MessageComponent,
+  NotificationComponent,
+  ClassManagement,
+  StudentManagement,
+  TeacherManagement,
+  Inscription,
+  PresenceManagement,
+  PunishmentManagement,
+  NoteConsultation,
+  BulletinManagement,
+  Reinscription,
+  Parametre,
+  MesEleves,
+  CarteScolaire,
 };
+
+const dashStats = [
+  { title: 'Classes', value: '12', icon: 'mdi-school', color: 'blue' },
+  { title: 'Elèves', value: '450', icon: 'mdi-account-group', color: 'success' },
+  { title: 'Enseignants', value: '24', icon: 'mdi-teach', color: 'purple' },
+  { title: 'Alertes', value: '3', icon: 'mdi-alert-circle', color: 'error' },
+];
+
+const menuItems = [
+  { title: 'Tableau de bord', component: 'Dashboard', icon: 'mdi-view-dashboard' },
+  { title: 'Classes', component: 'ClassManagement', icon: 'mdi-school-outline' },
+  { title: 'Elèves', component: 'StudentManagement', icon: 'mdi-account-group-outline' },
+  { title: 'Enseignants', component: 'TeacherManagement', icon: 'mdi-teach' },
+  { title: 'Parents', component: 'ParentManagement', icon: 'mdi-account-child-outline' },
+  { title: 'Paramètres', component: 'Parametre', icon: 'mdi-cog-outline' },
+];
+
+const changeComponent = (component) => {
+  previousComponent.value = currentComponent.value;
+  currentComponent.value = component;
+  if (!mdAndUp.value) drawer.value = false;
+};
+
+const selectComponent = (component) => {
+  previousComponent.value = currentComponent.value;
+  currentComponent.value = component;
+};
+
+const showMessages = () => changeComponent('MessageComponent');
+const showNotifications = () => changeComponent('NotificationComponent');
+const showLogoutDialog = () => { logoutDialogComp.value.dialog = true; };
+const logout = () => router.push('/administration/connexion');
+
+// --- LOGIQUE NOTIFICATIONS : GEN + COUNT ---
+const generateNotifications = async () => {
+  if (!etablissementId.value || !anneeScolaireId.value) return;
+
+  try {
+    await axios.post(`${API_BASE}/api/notifications/generate`, {
+      etablissement_id: etablissementId.value,
+      annee_scolaire_id: anneeScolaireId.value,
+    });
+  } catch (err) {
+    // on log, mais on ne bloque pas l'UI
+    console.error('❌ Erreur generate notifications:', err);
+  }
+};
+
+const fetchAnneeScolaire = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/annees-scolaires/${etablissementId.value}`);
+    if (res.data) {
+      anneeScolaireNom.value = res.data.nom || 'Non spécifiée';
+      anneeScolaireId.value = res.data.id || null;
+    }
+  } catch (error) {
+    anneeScolaireNom.value = 'Année clôturée';
+    anneeScolaireId.value = null;
+  }
+};
+
+const fetchPermissions = async () => {
+  if (!etablissementId.value || !anneeScolaireId.value) return;
+  try {
+    const response = await axios.get(`${API_BASE}/api/permissions/${etablissementId.value}/${anneeScolaireId.value}`);
+    const now = new Date();
+    const filtered = (response.data || []).filter(p => {
+      const date = new Date(p.Date || p.date);
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    });
+    filteredPermissions.value = filtered;
+    permissionCount.value = filtered.filter(p => Number(p.is_read) === 0).length;
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const fetchNotificationCount = async () => {
+  if (!etablissementId.value || !anneeScolaireId.value) return;
+  try {
+    const res = await axios.get(`${API_BASE}/api/notifications/unread/${etablissementId.value}/${anneeScolaireId.value}`);
+    notificationCount.value = res.data.count || 0;
+  } catch (err) {
+    notificationCount.value = 0;
+  }
+};
+
+// ✅ SYNC COMPLET : generate puis compter
+const syncNotifications = async () => {
+  await generateNotifications();
+  await fetchNotificationCount();
+};
+
+let permissionInterval, notificationInterval;
+
+onMounted(async () => {
+  etablissementId.value = parseInt(route.query.etablissement_id, 10);
+  etablissementNom.value = route.query.etablissement_nom || '';
+
+  // 1) Charger l'année scolaire
+  await fetchAnneeScolaire();
+
+  // 2) Permissions + notif init
+  fetchPermissions();
+  await syncNotifications();
+
+  // 3) Polling régulier
+  permissionInterval = setInterval(fetchPermissions, 30000);
+
+  // IMPORTANT : on fait sync (generate + count), pas seulement count
+  notificationInterval = setInterval(syncNotifications, 30000);
+});
+
+onBeforeUnmount(() => {
+  clearInterval(permissionInterval);
+  clearInterval(notificationInterval);
+});
 </script>
 
 <style scoped>
-.v-list-item.active-item {
-  background-color: rgba(255, 255, 255, 0.15);
+.no-scroll-x {
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
+}
+
+.main-scroll-area {
+  height: 100vh;
+  overflow-y: auto !important;
+  background-color: #F4F7FA !important;
+}
+
+.active-item {
+  background-color: rgba(255, 255, 255, 0.15) !important;
   border-left: 4px solid #FFC107;
 }
 
-.main-content {
-  background-color: #F4F7FA;
-  height: calc(100vh - 64px); /* Adjust if your app-bar height differs */
-  overflow-y: auto;
+.border-card {
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 
-.v-toolbar-title {
-  font-weight: 600;
-  font-size: 18px;
-}
-
-.v-list-item-title {
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.v-icon {
-  font-size: 22px;
-}
-
-@media (max-width: 768px) {
-  .v-toolbar-title {
-    font-size: 16px;
-  }
-
-  .v-list-item-title {
-    font-size: 13px;
-  }
-
-  .v-icon {
-    font-size: 18px !important;
-  }
+/* Fixation pour s'assurer que Header et Sidebar ne bougent pas */
+header.v-app-bar.v-app-bar--fixed,
+nav.v-navigation-drawer--fixed {
+  z-index: 1000 !important;
 }
 </style>

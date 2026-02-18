@@ -33,71 +33,56 @@ import { EventBus } from "@/event-bus";
 
 export default {
   props: {
-    initialBadgeCount: {
-      type: Number,
-      default: 0,
-    },
+    initialBadgeCount: { type: Number, default: 0 },
   },
   data() {
     return {
-      badgeCount: this.initialBadgeCount,
-      totalNotifications: 0,
+      badgeCount: 0,
     };
   },
   mounted() {
-    this.initBadgeCount();
-    EventBus.on("updateBadgeCount", this.updateBadgeCount);
+    this.badgeCount = Number(this.initialBadgeCount || 0);
+
+    // ✅ On reçoit un nombre "sticky" déjà calculé côté parent
+    EventBus.on("badge:set", this.setBadgeCount);
   },
   beforeUnmount() {
-    EventBus.off("updateBadgeCount", this.updateBadgeCount);
+    EventBus.off("badge:set", this.setBadgeCount);
+  },
+  watch: {
+    initialBadgeCount(newVal) {
+      // ✅ ne jamais descendre automatiquement
+      const current = Number(this.badgeCount || 0);
+      const n = Number(newVal || 0);
+      this.badgeCount = Math.max(current, n);
+    },
   },
   methods: {
-    initBadgeCount() {
-      const total = parseInt(localStorage.getItem("notifications_total") || "0");
-      const read = parseInt(localStorage.getItem("notifications_read_count") || "0");
-      const unread = total - read;
-
-      this.totalNotifications = total;
-
-      if (this.initialBadgeCount > 0) {
-        this.badgeCount = this.initialBadgeCount;
-      } else {
-        this.badgeCount = unread > 0 ? unread : 0;
-      }
+    setBadgeCount(value) {
+      // ✅ ne jamais descendre automatiquement
+      const current = Number(this.badgeCount || 0);
+      const n = Number(value || 0);
+      this.badgeCount = Math.max(current, n);
     },
     showMessages() {
       this.$emit("showComponent", "MessagesComponent");
     },
     handleNotificationClick() {
+      // ✅ ici seulement on efface
       this.badgeCount = 0;
-      localStorage.setItem("notifications_read_count", this.totalNotifications);
+
+      // ✅ dit au parent : "j’ai ouvert les notifications"
+      this.$emit("notificationsOpened");
+
+      // ✅ navigue vers le composant notifications
       this.$emit("showComponent", "NotificationsComponent");
-    },
-    updateBadgeCount(newNotificationsCount) {
-      const previousTotal = parseInt(localStorage.getItem("notifications_total") || "0");
-      const read = parseInt(localStorage.getItem("notifications_read_count") || "0");
-
-      const updatedTotal = previousTotal + parseInt(newNotificationsCount || "0");
-      localStorage.setItem("notifications_total", updatedTotal);
-
-      this.totalNotifications = updatedTotal;
-      const unread = updatedTotal - read;
-
-      this.badgeCount = unread > 0 ? unread : 0;
     },
   },
 };
 </script>
 
 <style scoped>
-.v-app-bar {
-  background-color: #1976d2;
-}
-.v-toolbar-title {
-  font-family: 'Roboto', sans-serif;
-  font-size: 1.25rem;
-}
-.v-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
+.v-app-bar { background-color: #1976d2; }
+.v-toolbar-title { font-family: "Roboto", sans-serif; font-size: 1.25rem; }
+.v-btn:hover { background-color: rgba(255, 255, 255, 0.1); }
 </style>

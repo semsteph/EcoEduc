@@ -1,108 +1,149 @@
 <template>
-  <div class="container">
-    <h1 class="title">
-      <v-icon class="icon-left" small>mdi-book-open-page-variant</v-icon>
-      Cahier de Notes
-    </h1>
+  <v-container class="notes-container pa-4 pa-sm-6">
+    <v-row align="center" class="mb-6">
+      <v-col cols="auto">
+        <v-btn icon variant="tonal" color="primary" @click="$emit('back')">
+          <v-icon>mdi-arrow-left</v-icon>
+        </v-btn>
+      </v-col>
+      <v-col>
+        <h1 class="text-h5 font-weight-bold text-primary d-flex align-center">
+          <v-icon start color="primary">mdi-book-open-variant</v-icon>
+          Cahier de Notes
+        </h1>
+        <p class="text-caption text-grey-darken-1 mb-0">
+          Année scolaire : {{ anneeScolaire }}
+        </p>
+      </v-col>
+    </v-row>
 
-    <div v-if="matieres.length === 0">
-      <p class="no-data">
-        <v-icon color="error" class="mr-2">mdi-alert-circle</v-icon>
-        Aucune donnée n'est encore disponible pour cette classe ou le cahier de notes n'est pas encore disponible pour cette classe.
-      </p>
-    </div>
+    <v-alert
+      v-if="matieres.length === 0"
+      type="info"
+      variant="tonal"
+      rounded="lg"
+      icon="mdi-information"
+      class="mt-6"
+    >
+      Aucune donnée n'est disponible pour cette classe actuellement.
+    </v-alert>
 
-    <div v-else>
-      <div
+    <div v-else class="matieres-list">
+      <v-card
         v-for="matiere in matieres"
         :key="matiere.id"
-        class="matiere"
+        class="mb-6 rounded-xl elevation-2 overflow-hidden border"
       >
-        <div class="matiere-header" @click="toggleMatiere(matiere.id)">
-          <div class="matiere-title">
-            <v-icon left class="mr-2">mdi-book</v-icon>
-            {{ matiere.nom }}
-          </div>
-          <v-icon>{{ activeMatiere === matiere.id ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-        </div>
-
-        <div v-if="activeMatiere === matiere.id" class="matiere-details">
-          <div class="semestres">
-            <v-btn
-              v-for="semestre in semestres"
-              :key="semestre.id"
-              @click="selectSemestre(semestre.id)"
-              :color="selectedSemestre === semestre.id ? 'primary' : 'blue lighten-2'"
-              class="semestre-btn"
-              small
-              elevation="1"
+        <div
+          class="matiere-header d-flex align-center justify-space-between pa-4 cursor-pointer"
+          :class="activeMatiere === matiere.id ? 'bg-primary' : 'bg-grey-lighten-4'"
+          @click="toggleMatiere(matiere.id)"
+        >
+          <div class="d-flex align-center">
+            <v-avatar
+              size="40"
+              :color="activeMatiere === matiere.id ? 'white' : 'primary'"
+              variant="flat"
+              class="mr-4"
             >
-              {{ semestre.nom }}
-            </v-btn>
+              <v-icon :color="activeMatiere === matiere.id ? 'primary' : 'white'">mdi-book-open</v-icon>
+            </v-avatar>
+            <span :class="['text-h6', activeMatiere === matiere.id ? 'text-white' : 'text-grey-darken-3']">
+              {{ matiere.nom }}
+            </span>
           </div>
-
-          <v-table
-            v-if="getUniqueElevesForMatiere(matiere.id).length"
-            class="notes-table"
-            dense
-          >
-            <thead>
-              <tr>
-                <th>Nom/Prenom</th>
-                <th>Inter1</th>
-                <th>Inter2</th>
-                <th>Inter3</th>
-                <th>Inter4</th>
-                <th>Moy Inter</th>
-                <th>Dev1</th>
-                <th>Dev2</th>
-                <th>Moy</th>
-                <th>Moy Coef</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="eleve in getUniqueElevesForMatiere(matiere.id)"
-                :key="eleve.eleveId"
-              >
-                <td>{{ eleve.nom }} {{ eleve.prenom }}</td>
-                <td>{{ eleve.inter1 || '' }}</td>
-                <td>{{ eleve.inter2 || '' }}</td>
-                <td>{{ eleve.inter3 || '' }}</td>
-                <td>{{ eleve.inter4 || '' }}</td>
-                <td>{{ eleve.moyInter || '' }}</td>
-                <td>{{ eleve.dev1 || '' }}</td>
-                <td>{{ eleve.dev2 || '' }}</td>
-                <td>{{ eleve.moy || '' }}</td>
-                <td>{{ eleve.moycoef || '' }}</td>
-              </tr>
-            </tbody>
-          </v-table>
-
-          <p v-else class="no-data">
-            <v-icon color="warning" class="mr-2">mdi-information</v-icon>
-            Aucune note disponible pour cette matière dans le semestre sélectionné.
-          </p>
+          <v-icon :color="activeMatiere === matiere.id ? 'white' : 'grey'">
+            {{ activeMatiere === matiere.id ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
+          </v-icon>
         </div>
-      </div>
+
+        <v-expand-transition>
+          <div v-if="activeMatiere === matiere.id" class="pa-4 pa-sm-6 bg-white">
+            <div class="semestres-container mb-6">
+              <span class="text-caption font-weight-bold text-uppercase text-grey mb-3 d-block">
+                Choisir un Semestre
+              </span>
+              <v-btn-toggle
+                v-model="selectedSemestre"
+                mandatory
+                color="primary"
+                variant="outlined"
+                class="rounded-lg flex-wrap"
+                divided
+              >
+                <v-btn
+                  v-for="semestre in semestres"
+                  :key="semestre.id"
+                  :value="semestre.id"
+                  @click="selectSemestre(semestre.id)"
+                  class="text-none"
+                >
+                  {{ semestre.nom }}
+                </v-btn>
+              </v-btn-toggle>
+            </div>
+
+            <v-responsive v-if="getUniqueElevesForMatiere(matiere.id).length" class="border rounded-lg">
+              <v-table density="comfortable" hover striped class="custom-table">
+                <thead class="bg-grey-lighten-4">
+                  <tr>
+                    <th class="text-left font-weight-bold">Nom & Prénoms</th>
+                    <th class="text-center">Int 1</th>
+                    <th class="text-center">Int 2</th>
+                    <th class="text-center">Int 3</th>
+                    <th class="text-center">Int 4</th>
+                    <th class="text-center bg-blue-lighten-5">Moy Int</th>
+                    <th class="text-center">Dev 1</th>
+                    <th class="text-center">Dev 2</th>
+                    <th class="text-center bg-indigo-lighten-5">Moy Gen</th>
+                    <th class="text-center font-weight-black bg-primary-lighten-5">Moy Coef</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="eleve in getUniqueElevesForMatiere(matiere.id)"
+                    :key="eleve.eleveId"
+                  >
+                    <td class="font-weight-medium">{{ eleve.nom }} {{ eleve.prenom }}</td>
+                    <td class="text-center">{{ formatNote(eleve.inter1) }}</td>
+                    <td class="text-center">{{ formatNote(eleve.inter2) }}</td>
+                    <td class="text-center">{{ formatNote(eleve.inter3) }}</td>
+                    <td class="text-center">{{ formatNote(eleve.inter4) }}</td>
+                    <td class="text-center font-weight-bold text-blue-darken-2 bg-blue-lighten-5">
+                      {{ formatNote(eleve.moyInter) }}
+                    </td>
+                    <td class="text-center">{{ formatNote(eleve.dev1) }}</td>
+                    <td class="text-center">{{ formatNote(eleve.dev2) }}</td>
+                    <td class="text-center font-weight-bold text-indigo-darken-2 bg-indigo-lighten-5">
+                      {{ formatNote(eleve.moy) }}
+                    </td>
+                    <td class="text-center font-weight-black text-primary bg-primary-lighten-5">
+                      {{ formatNote(eleve.moycoef) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </v-table>
+            </v-responsive>
+
+            <div v-else class="text-center pa-8 border-dashed rounded-lg grey--text">
+              <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-database-off</v-icon>
+              <p>Aucune note enregistrée pour cette période.</p>
+            </div>
+          </div>
+        </v-expand-transition>
+      </v-card>
     </div>
-  </div>
+  </v-container>
 </template>
 
 <script>
 import axios from 'axios';
-import { VIcon, VBtn, VTable } from 'vuetify/components';
 
 export default {
   props: {
     classId: Number,
     anneeScolaire: String,
     anneeScolaireId: Number
-  },
-  components: {
-    VIcon,
-    VBtn,
-    VTable
   },
   data() {
     return {
@@ -123,17 +164,16 @@ export default {
             anneeScolaireId: this.anneeScolaireId,
           },
         });
-
         this.semestres = response.data.semestres || [];
         this.matieres = response.data.matieres || [];
         this.allNotes = response.data.notes || {};
-
+          
         if (this.semestres.length) {
           this.selectedSemestre = this.semestres[0].id;
           this.filterNotes();
         }
       } catch (error) {
-        console.error('Erreur lors de la récupération des données :', error);
+        console.error('Erreur API :', error);
       }
     },
     toggleMatiere(id) {
@@ -152,13 +192,17 @@ export default {
       notes.forEach(n => {
         if (map.has(n.eleveId)) {
           const ex = map.get(n.eleveId);
-          Object.assign(ex, { ...ex, ...n });
+          // On fusionne les données si l'élève existe déjà
+          map.set(n.eleveId, { ...ex, ...n });
         } else {
-          map.set(n.eleveId, n);
+          map.set(n.eleveId, { ...n });
         }
       });
       return Array.from(map.values());
     },
+    formatNote(note) {
+      return note !== null && note !== undefined ? note : '-';
+    }
   },
   mounted() {
     this.fetchData();
@@ -167,100 +211,54 @@ export default {
 </script>
 
 <style scoped>
-.container {
-  padding: 20px;
-  max-width: 1000px;
-  margin: auto;
-  font-family: 'Roboto', sans-serif;
-}
-
-.title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 1.5rem;
-  margin-bottom: 20px;
-  color: #1976D2;
-  text-align: center;
-}
-
-.matiere {
-  border: 1px solid #90CAF9;
-  border-radius: 10px;
-  background: #E3F2FD;
-  margin-bottom: 20px;
-  overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+.notes-container {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .matiere-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #2196F3;
-  color: white;
-  padding: 12px 20px;
-  font-weight: 500;
+  user-select: none;
+  transition: background-color 0.3s ease;
+}
+
+.matiere-header:hover {
+  filter: brightness(0.95);
+}
+
+.custom-table :deep(th) {
+  text-transform: uppercase;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.05em;
+  color: #616161 !important;
+}
+
+.custom-table :deep(td) {
+  font-size: 0.875rem !important;
+  border-right: 1px solid #f5f5f5;
+}
+
+.border-dashed {
+  border: 2px dashed #e0e0e0;
+}
+
+.cursor-pointer {
   cursor: pointer;
-  font-size: 1.1rem;
 }
 
-.matiere-title {
-  display: flex;
-  align-items: center;
-}
+/* Backgrounds spécifiques pour les moyennes */
+.bg-blue-lighten-5 { background-color: #E3F2FD !important; }
+.bg-indigo-lighten-5 { background-color: #E8EAF6 !important; }
+.bg-primary-lighten-5 { background-color: #EEF2FF !important; }
 
-.matiere-details {
-  padding: 15px;
-  background-color: white;
-}
-
-.semestres {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.notes-table {
-  width: 100%;
-  font-size: 0.9rem;
-}
-
-.no-data {
-  color: #e53935;
-  font-size: 0.95rem;
-  text-align: center;
-  margin: 15px 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-@media (max-width: 768px) {
-  .container {
-    padding: 10px;
-  }
-
-  .title {
-    font-size: 1.2rem;
-  }
-
-  .matiere-header {
-    font-size: 1rem;
-    padding: 10px;
-  }
-
-  .semestres {
+@media (max-width: 600px) {
+  .v-btn-toggle {
+    display: flex;
     flex-direction: column;
+    width: 100%;
   }
-
-  .notes-table {
-    font-size: 0.75rem;
-  }
-
-  .no-data {
-    font-size: 0.85rem;
+  .v-btn-toggle .v-btn {
+    border-radius: 0 !important;
+    width: 100%;
   }
 }
 </style>

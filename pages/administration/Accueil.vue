@@ -1,213 +1,281 @@
 <template>
-  <v-app>
-    <!-- Barre de navigation FIXÉE -->
-    <v-app-bar color="primary" dark app dense>
-      <!-- Logo à la place du texte -->
-      <img
-        src="@/assets/administration/logooff.png"
-        alt="Logo EchoEducation"
-        class="app-logo"
-      />
-      <v-spacer></v-spacer>
-      <v-btn text class="nav-btn" @click="navigateTo('/administration/Accueil')">Accueil</v-btn>
-      <v-btn text class="nav-btn" @click="navigateTo('/administration/connexion')">Se connecter</v-btn>
-      <v-btn text class="nav-btn" @click="navigateTo('/administration/inscription')">S'inscrire</v-btn>
+  <v-app class="no-scroll-x">
+    <v-navigation-drawer
+      v-model="drawer"
+      location="right"
+      temporary
+      class="bg-primary text-white"
+    >
+      <v-list color="transparent">
+        <v-list-item 
+          prepend-icon="mdi-home" 
+          title="Accueil" 
+          @click="navigateTo('/administration/Accueil')"
+        ></v-list-item>
+        <v-list-item 
+          prepend-icon="mdi-login" 
+          title="Se connecter" 
+          @click="navigateTo('/administration/connexion')"
+        ></v-list-item>
+        <v-list-item 
+          prepend-icon="mdi-account-plus" 
+          title="S'inscrire" 
+          @click="navigateTo('/administration/inscription')"
+        ></v-list-item>
+      </v-list>
+    </v-navigation-drawer>
+
+    <v-app-bar 
+      fixed
+      app
+      elevation="4"
+      color="primary"
+      class="custom-navbar"
+    >
+      <v-container class="d-flex align-center py-0 px-4" fluid>
+        <img
+          src="@/assets/administration/logooff.png"
+          alt="Logo EchoEducation"
+          class="app-logo"
+        />
+        
+        <v-spacer></v-spacer>
+
+        <div class="hidden-sm-and-down">
+          <v-btn variant="text" class="nav-btn" @click="navigateTo('/administration/Accueil')">Accueil</v-btn>
+          <v-btn variant="text" class="nav-btn" @click="navigateTo('/administration/connexion')">Se connecter</v-btn>
+          <v-btn variant="outlined" class="nav-btn-action ml-2" @click="navigateTo('/administration/inscription')">S'inscrire</v-btn>
+        </div>
+        
+        <v-app-bar-nav-icon 
+          class="hidden-md-and-up" 
+          icon="mdi-menu" 
+          color="white"
+          @click="drawer = !drawer"
+        ></v-app-bar-nav-icon>
+      </v-container>
     </v-app-bar>
 
-    <!-- Section principale -->
-    <div class="background">
-      <div class="overlay"></div>
-      <v-container class="content" fluid>
-        <!-- Titre défilant -->
-        <div class="scroll-wrapper">
-          <marquee behavior="scroll" direction="left" class="scroll-title">
-            Bienvenue sur EchoEducation — Plateforme de gestion scolaire moderne
-          </marquee>
+    <v-main class="main-content">
+      <div class="background-container">
+        <div class="background-image"></div>
+        <div class="darker-overlay"></div>
+      </div>
+
+      <v-container class="content-wrapper px-4" fluid>
+        <div class="welcome-banner">
+          <div class="moving-text">
+            Bienvenue sur EchoEducation — Plateforme de gestion moderne • Centralisez vos données • Suivez vos élèves • Simplifiez votre administration
+          </div>
         </div>
 
-        <!-- Cartes d'information -->
-        <v-row justify="center">
-          <v-col cols="12" md="8">
-            <v-card class="info-card" elevation="6">
-              <v-card-title class="headline">Pourquoi le suivi scolaire est-il important ?</v-card-title>
-              <v-card-text>
-                Le suivi scolaire permet aux établissements de mieux comprendre le parcours de chaque élève,
-                d'identifier rapidement les difficultés, et d'offrir un accompagnement personnalisé.
-              </v-card-text>
+        <v-row justify="center" class="mt-5 no-margin-row">
+          <v-col cols="12" md="10" lg="9">
+            <v-row class="no-margin-row">
+              <v-col cols="12" md="4" v-for="(item, i) in features" :key="i" class="pa-2">
+                <v-card class="info-card" elevation="10">
+                  <v-card-text class="pa-6 text-center">
+                    <v-icon color="primary" size="48" class="mb-4">{{ item.icon }}</v-icon>
+                    <h3 class="headline-modern">{{ item.title }}</h3>
+                    <p class="body-text">{{ item.text }}</p>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
+            
+            <v-card class="cta-card mt-10" elevation="12">
+              <v-row no-gutters align="center">
+                <v-col cols="12" md="8" class="pa-8">
+                  <h2 class="text-h4 font-weight-bold mb-2">Prêt à commencer ?</h2>
+                  <p class="text-subtitle-1">Rejoignez l'avenir de l'éducation numérique dès aujourd'hui.</p>
+                </v-col>
+                <v-col cols="12" md="4" class="text-center pa-8">
+                  <v-btn size="x-large" color="white" variant="elevated" class="text-primary font-weight-black" rounded @click="navigateTo('/administration/inscription')">
+                    S'inscrire
+                  </v-btn>
+                </v-col>
+              </v-row>
             </v-card>
-          </v-col>
 
-          <v-col cols="12" md="8">
-            <v-card class="info-card" elevation="6">
-              <v-card-title class="headline">Comment EchoEducation peut vous aider ?</v-card-title>
-              <v-card-text>
-                EchoEducation centralise les informations scolaires : suivi des notes, gestion des absences,
-                planification des cours, et plus encore. L'interface est intuitive et moderne.
-              </v-card-text>
-            </v-card>
-          </v-col>
-
-          <v-col cols="12" md="8">
-            <v-card class="info-card" elevation="6">
-              <v-card-title class="headline">Utilisez EchoEducation pour un suivi efficace</v-card-title>
-              <v-card-text>
-                Suivez les performances des élèves, générez des rapports détaillés et communiquez facilement
-                avec les parents. Améliorez l'expérience éducative avec EchoEducation.
-              </v-card-text>
-            </v-card>
+            <div style="height: 100px;"></div>
           </v-col>
         </v-row>
       </v-container>
-    </div>
+    </v-main>
   </v-app>
 </template>
 
-<script>
-export default {
-  methods: {
-    navigateTo(route) {
-      this.$router.push(route);
-    },
-  },
+<script setup>
+import { ref } from 'vue'
+
+const router = useRouter();
+const drawer = ref(false);
+
+const navigateTo = (route) => {
+  drawer.value = false;
+  router.push(route);
 };
+
+const features = [
+  {
+    title: "Suivi Précis",
+    icon: "mdi-account-search",
+    text: "Analysez les performances individuelles en temps réel."
+  },
+  {
+    title: "Gestion 360°",
+    icon: "mdi-layers-outline",
+    text: "Notes, absences et documents centralisés en un seul lieu."
+  },
+  {
+    title: "Connectivité",
+    icon: "mdi-account-group",
+    text: "Un pont direct entre l'administration, les profs et les parents."
+  }
+];
 </script>
 
 <style scoped>
-/* Fond avec image */
-.background {
-  position: relative;
-  background-image: url('assets/administration/Image collée.png');
-  background-size: cover;
-  background-position: center;
-  min-height: 100vh;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 100px 20px 20px; /* Ajout de padding-top pour tenir compte de la v-app-bar */
+/* EMPÊCHER LE SCROLL HORIZONTAL SUR TOUTE LA PAGE */
+.no-scroll-x {
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
 }
 
-/* Flou de fond */
-.overlay {
+/* FIXATION DU HEADER */
+.custom-navbar {
+  position: fixed !important;
+  top: 0 !important;
+  z-index: 1000 !important;
+  width: 100vw !important;
+}
+
+/* GESTION DU FOND */
+.background-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.background-image {
+  width: 100%;
+  height: 100%;
+  background-image: url('@/assets/administration/Image collée.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.darker-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  backdrop-filter: blur(10px);
-  background-color: rgba(0, 0, 0, 0.2);
-  z-index: 1;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(240, 244, 248, 0.85));
+  backdrop-filter: blur(4px);
 }
 
-/* Contenu principal */
-.content {
+/* CONTENU */
+.main-content {
   position: relative;
-  z-index: 2;
-  background-color: rgba(255, 255, 255, 0.92);
-  border-radius: 18px;
-  padding: 40px 30px;
-  max-width: 1000px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  text-align: center;
+  z-index: 1;
+  padding-top: 80px;
+  max-width: 100vw !important;
+  overflow-x: hidden !important;
 }
 
-/* Marquee wrapper pour éviter le débordement */
-.scroll-wrapper {
-  overflow: hidden;
-  white-space: nowrap;
-  margin-bottom: 30px;
+.content-wrapper {
+  position: relative;
+  max-width: 100% !important;
 }
 
-.scroll-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #007BFF;
+/* Suppression des marges négatives de v-row qui causent le scroll horizontal */
+.no-margin-row {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
 }
 
-/* Cartes d'information */
+/* DESIGN DES CARTES */
 .info-card {
-  background-color: #fdfdfd;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 25px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.95);
   transition: transform 0.3s ease;
+  border-top: 4px solid #007BFF;
+  height: 100%;
 }
 
 .info-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-10px);
 }
 
-.headline {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 10px;
-  word-wrap: break-word;
-  white-space: normal;
+.cta-card {
+  background: linear-gradient(45deg, #0056b3, #007BFF) !important;
+  color: white;
+  border-radius: 20px;
+  overflow: hidden; /* Important pour mobile */
 }
 
-/* Logo */
+/* BANNIERE DEFILANTE */
+.welcome-banner {
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  border-left: 5px solid #007BFF;
+  width: 100%;
+}
+
+.moving-text {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: marquee 20s linear infinite;
+  font-weight: bold;
+}
+
+@keyframes marquee {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-100%, 0); }
+}
+
+/* LOGO & BOUTONS */
 .app-logo {
-  height: 36px;
-  width: auto;
-  max-width: 130px;
-  margin-left: 10px;
+  height: 40px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 
-/* Barre de navigation */
-.v-app-bar {
-  background-color: #007BFF;
-  padding-left: 10px;
-  padding-right: 10px;
-  z-index: 10;
-}
-
-/* Boutons navigation */
 .nav-btn {
-  color: white !important;
-  font-weight: 500;
-  font-size: 0.85rem;
+  font-weight: bold;
   text-transform: none;
-  padding: 6px 8px;
-  min-width: 0;
+  color: white !important;
 }
 
-.nav-btn:hover {
-  background-color: #0056b3;
+.nav-btn-action {
+  border: 2px solid white !important;
+  color: white !important;
+  border-radius: 8px;
+  text-transform: none;
 }
 
-/* Responsive pour petits écrans */
-@media screen and (max-width: 600px) {
-  .content {
-    padding: 20px 15px;
-    margin-top: 20px;
-  }
-
-  .scroll-title {
-    font-size: 0.9rem;
-    white-space: nowrap;
-  }
-
-  .info-card {
-    padding: 14px;
-  }
-
-  .headline {
-    font-size: 15px;
-  }
-
+/* AJUSTEMENTS MOBILE */
+@media (max-width: 600px) {
   .app-logo {
-    height: 28px;
-    max-width: 90px;
+    height: 32px;
   }
-
-  .nav-btn {
-    font-size: 0.65rem !important;
-    padding: 4px 5px !important;
+  .welcome-banner {
+    font-size: 0.8rem;
   }
-
-  .v-app-bar {
-    height: 48px;
+  .text-h4 {
+    font-size: 1.4rem !important;
+  }
+  .pa-8 {
+    padding: 20px !important; /* Réduit le padding sur mobile pour éviter le débordement */
   }
 }
 </style>

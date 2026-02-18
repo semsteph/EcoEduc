@@ -1,63 +1,123 @@
 <template>
-  <v-app>
-    <ToolbarComponent @toggleDrawer="toggleDrawer" @showComponent="showComponent" />
+  <v-app class="app-root">
+    <ToolbarComponent
+      class="white-toolbar"
+      :initialBadgeCount="initialBadgeCount"
+      @toggleDrawer="toggleDrawer"
+      @showComponent="showComponent"
+      @notificationsOpened="onNotificationsOpened"
+    />
 
-    <v-navigation-drawer v-model="drawer" app color="primary" dark>
-      <v-list dense>
-        <v-subheader class="white--text">Menu Principal</v-subheader>
-        <v-list-item>
-          <v-list-item-content class="white--text text-center">
-            Année scolaire: {{ anneeScolaireNom || 'Non définie' }}
-          </v-list-item-content>
-        </v-list-item>
-        <v-divider></v-divider>
-        <v-list-item @click="showComponent('Acceuil')">
-          <v-list-item-icon>
-            <v-icon class="white--text">mdi-home</v-icon>
-          </v-list-item-icon>
-          <v-list-item-content>
-            <v-list-item-title class="white--text">Accueil</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item @click="showComponent('ChildrenList')">
-          <v-list-item-icon>
-            <v-icon class="white--text">mdi-account-child</v-icon>
-          </v-list-item-icon>
-          <v-list-item-content>
-            <v-list-item-title class="white--text">Mes enfants</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item @click="showComponent('ContactAdmin')">
-          <v-list-item-icon>
-            <v-icon class="white--text">mdi-email</v-icon>
-          </v-list-item-icon>
-          <v-list-item-content>
-            <v-list-item-title class="white--text">Contacter administration</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-divider></v-divider>
-        <v-list-item @click="openLogoutDialog">
-          <v-list-item-icon>
-            <v-icon class="white--text">mdi-logout</v-icon>
-          </v-list-item-icon>
-          <v-list-item-content>
-            <v-list-item-title class="white--text">Déconnexion</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-      </v-list>
+    <v-navigation-drawer
+      v-model="drawer"
+      app
+      :temporary="isMobile"
+      :width="drawerWidth"
+      class="app-drawer"
+      color="primary"
+      dark
+    >
+      <div class="drawer-shell">
+        <div class="drawer-header">
+          <div class="drawer-brand">
+            <div class="drawer-logo">
+              <v-icon size="20">mdi-school-outline</v-icon>
+            </div>
+            <div class="drawer-brand-text">
+              <div class="drawer-title">EchoEducation</div>
+              <div class="drawer-subtitle">Espace Parent</div>
+            </div>
+          </div>
+
+          <div class="drawer-meta">
+            <v-chip size="small" class="drawer-chip" variant="tonal" label>
+              <v-icon start size="16">mdi-calendar</v-icon>
+              {{ anneeScolaireNom || "Année non définie" }}
+            </v-chip>
+          </div>
+        </div>
+
+        <v-divider class="drawer-divider" />
+
+        <div class="drawer-scroll">
+          <v-list density="compact" nav class="drawer-list">
+            <div class="drawer-section">Menu principal</div>
+
+            <v-list-item
+              :active="currentComponent === 'Acceuil'"
+              @click="showComponent('Acceuil')"
+              class="drawer-item"
+              rounded="lg"
+            >
+              <template #prepend><v-icon>mdi-home</v-icon></template>
+              <v-list-item-title>Accueil</v-list-item-title>
+            </v-list-item>
+
+            <v-list-item
+              :active="currentComponent === 'ChildrenList'"
+              @click="showComponent('ChildrenList')"
+              class="drawer-item"
+              rounded="lg"
+            >
+              <template #prepend><v-icon>mdi-account-child</v-icon></template>
+              <v-list-item-title>Mes enfants</v-list-item-title>
+            </v-list-item>
+
+            <v-list-item
+              :active="currentComponent === 'NotificationsComponent'"
+              @click="showComponent('NotificationsComponent')"
+              class="drawer-item"
+              rounded="lg"
+            >
+              <template #prepend><v-icon>mdi-bell-outline</v-icon></template>
+              <v-list-item-title>Notifications</v-list-item-title>
+            </v-list-item>
+
+            <v-list-item
+              :active="currentComponent === 'ContactAdmin'"
+              @click="showComponent('ContactAdmin')"
+              class="drawer-item"
+              rounded="lg"
+            >
+              <template #prepend><v-icon>mdi-email</v-icon></template>
+              <v-list-item-title>Contacter l’administration</v-list-item-title>
+            </v-list-item>
+
+            <v-divider class="my-3 drawer-divider" />
+
+            <div class="drawer-section">Compte</div>
+
+            <v-list-item
+              @click="openLogoutDialog"
+              class="drawer-item drawer-logout"
+              rounded="lg"
+            >
+              <template #prepend><v-icon>mdi-logout</v-icon></template>
+              <v-list-item-title>Déconnexion</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </div>
+
+        <div class="drawer-footer">
+          <div class="drawer-footer-text">© {{ currentYear }} — EchoEducation</div>
+        </div>
+      </div>
     </v-navigation-drawer>
 
-    <v-main class="background">
-      <div class="background-overlay"></div>
-      <div class="content-overlay">
-        <component
-          :is="currentComponent"
-          v-if="currentComponent"
-          :etablissementId="etablissementId"
-          :anneeScolaireId="anneeScolaireId"
-          @showComponent="showComponent"
-          :initialBadgeCount="initialBadgeCount"
-        ></component>
+    <v-main class="main-background main-scroll">
+      <div class="page-shell">
+        <div class="content-container">
+          <client-only>
+            <component
+              :is="currentComponent"
+              v-if="currentComponent"
+              :etablissementId="etablissementId"
+              :anneeScolaireId="anneeScolaireId"
+              :initialBadgeCount="initialBadgeCount"
+              @showComponent="showComponent"
+            />
+          </client-only>
+        </div>
       </div>
     </v-main>
 
@@ -66,15 +126,16 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import axios from 'axios';
+import { ref, onMounted, computed, onBeforeUnmount } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import axios from "axios";
 import { EventBus } from "@/event-bus";
-import ToolbarComponent from '@/components/parents/ToolbarComponent.vue';
-import ChildrenList from '@/components/parents/ChildrenList.vue';
-import Acceuil from '@/components/parents/Acceuil.vue';
-import LogoutDialog from '@/components/parents/LogoutDialog.vue';
-import NotificationsComponent from '@/components/parents/NotificationsComponent.vue';
+
+import ToolbarComponent from "@/components/parents/ToolbarComponent.vue";
+import ChildrenList from "@/components/parents/ChildrenList.vue";
+import Acceuil from "@/components/parents/Acceuil.vue";
+import LogoutDialog from "@/components/parents/LogoutDialog.vue";
+import NotificationsComponent from "@/components/parents/NotificationsComponent.vue";
 
 export default {
   components: {
@@ -87,7 +148,8 @@ export default {
   setup() {
     const router = useRouter();
     const route = useRoute();
-const initialBadgeCount = ref(0);
+
+    const API_BASE = "http://localhost:8080";
 
     const drawer = ref(false);
     const logoutDialogVisible = ref(false);
@@ -97,157 +159,360 @@ const initialBadgeCount = ref(0);
     const anneeScolaireId = ref(null);
     const anneeScolaireNom = ref(null);
 
-   const fetchNotificationCount = async () => {
-  const parentId = route.query.id;
-  const token = localStorage.getItem("token");
+    // ✅ Badge sticky
+    const initialBadgeCount = ref(0);
 
-  if (!parentId || !etablissementId.value || !anneeScolaireId.value) return;
+    const width = ref(1024);
+    const currentYear = computed(() => new Date().getFullYear());
 
-  try {
-    const res = await axios.get(
-      `http://localhost:8080/api/notificationed/${parentId}/${etablissementId.value}/${anneeScolaireId.value}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    const onResize = () => {
+      if (typeof window !== "undefined") width.value = window.innerWidth;
+    };
 
-    const notifs = res.data.alertMessages || [];
+    const isMobile = computed(() => width.value <= 600);
+    const drawerWidth = computed(() => (isMobile.value ? 280 : 320));
 
-    // ✅ Nombre de notifications contenant [NOUVELLE]
-    const currentTotal = notifs.filter((msg) => msg.includes("[NOUVELLE]")).length;
+    const pollingTimer = ref(null);
 
-    const previousTotal = parseInt(localStorage.getItem("notifications_total") || "0");
-    const read = parseInt(localStorage.getItem("notifications_read_count") || "0");
+    const getToken = () =>
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-    // ✅ Mets à jour le total si on détecte plus de notifications
-    if (currentTotal > previousTotal) {
-      localStorage.setItem("notifications_total", currentTotal);
-    }
-
-    // ✅ Calcule le nombre de notifications non lues
-    const unread = currentTotal - read;
-
-    // ✅ Met à jour la valeur du badge
-    initialBadgeCount.value = unread > 0 ? unread : 0;
-
-    // ✅ Émet l'événement pour le composant Toolbar
-    EventBus.emit("updateBadgeCount", unread);
-  } catch (error) {
-    console.error("❌ Erreur lors du chargement des notifications :", error);
-    EventBus.emit("updateBadgeCount", 0);
-  }
-};
-
-
-    const fetchAnneeScolaire = async () => {
+    const decodeJwtPayload = (token) => {
       try {
-        const res = await axios.get(`http://localhost:8080/api/annees-scolaires/${etablissementId.value}`);
-        let data = res.data;
-
-        if (Array.isArray(data)) {
-          data = data.length > 0 ? data[0] : null;
-        }
-
-        if (data) {
-          anneeScolaireId.value = data.id;
-          anneeScolaireNom.value = data.nom;
-
-          await fetchNotificationCount(); // ✅ Charger les notifs après chargement année
-        } else {
-          console.warn("Aucune année scolaire trouvée.");
-        }
-      } catch (error) {
-        console.error("Erreur de récupération année scolaire :", error);
+        return JSON.parse(atob(token.split(".")[1]));
+      } catch {
+        return null;
       }
     };
 
+    const getParentIdFromToken = () => {
+      const token = getToken();
+      if (!token) return null;
+      const decoded = decodeJwtPayload(token);
+      return decoded?.id || null;
+    };
+
+    const toBool = (v) => v === true || v === 1 || v === "1";
+
+    // ✅ IMPORTANT: on n'écrase JAMAIS le badge vers 0 automatiquement
+    const applyStickyBadge = (serverUnread) => {
+      const current = Number(initialBadgeCount.value || 0);
+      const n = Number(serverUnread || 0);
+
+      // on ne descend jamais automatiquement
+      const next = Math.max(current, n);
+      initialBadgeCount.value = next;
+
+      // push vers toolbar
+      EventBus.emit("badge:set", next);
+    };
+
+    const fetchNotificationCount = async () => {
+      const token = getToken();
+      const parentId = getParentIdFromToken();
+
+      if (!token || !parentId || !etablissementId.value || !anneeScolaireId.value) return;
+
+      try {
+        const res = await axios.get(
+          `${API_BASE}/api/notificationed/${parentId}/${etablissementId.value}/${anneeScolaireId.value}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const notifs = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
+        const unread = notifs.filter((n) => !toBool(n.is_read)).length;
+
+        // ✅ sticky update (ne descend pas)
+        applyStickyBadge(unread);
+
+      } catch (err) {
+        const status = err?.response?.status;
+        if (status === 401 || status === 403) {
+          if (typeof window !== "undefined") localStorage.removeItem("token");
+          router.push({ name: "parents-connexion" });
+          return;
+        }
+        console.error("Erreur notifications :", err?.response?.data || err);
+        // ⚠️ on ne met PAS à 0 ici sinon ça ferait disparaître le badge
+      }
+    };
+
+    const startPolling = () => {
+      stopPolling();
+      fetchNotificationCount();
+      pollingTimer.value = setInterval(fetchNotificationCount, 10000);
+    };
+
+    const stopPolling = () => {
+      if (pollingTimer.value) {
+        clearInterval(pollingTimer.value);
+        pollingTimer.value = null;
+      }
+    };
+
+    const fetchAnneeScolaire = async () => {
+      if (!etablissementId.value) return;
+
+      try {
+        const res = await axios.get(`${API_BASE}/api/annees-scolaires/${etablissementId.value}`);
+        const data = Array.isArray(res.data) ? res.data[0] : res.data;
+
+        if (data) {
+          anneeScolaireId.value = Number(data.id) || null;
+          anneeScolaireNom.value = data.nom_annee ?? data.nom ?? null;
+          startPolling();
+        }
+      } catch (err) {
+        console.error("Erreur année scolaire :", err?.response?.data || err);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") fetchNotificationCount();
+    };
+
     onMounted(async () => {
+      onResize();
+      window.addEventListener("resize", onResize);
+
+      const token = getToken();
+      if (!token) {
+        router.push({ name: "parents-connexion" });
+        return;
+      }
+
       etablissementId.value = Number(route.query.etablissement) || null;
 
       if (etablissementId.value) {
         await fetchAnneeScolaire();
       }
+
+      drawer.value = !isMobile.value;
+
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      window.addEventListener("focus", fetchNotificationCount);
     });
 
-    const toggleDrawer = () => {
-      drawer.value = !drawer.value;
+    onBeforeUnmount(() => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", onResize);
+        window.removeEventListener("focus", fetchNotificationCount);
+      }
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      stopPolling();
+    });
+
+    const toggleDrawer = () => (drawer.value = !drawer.value);
+
+    const showComponent = (comp) => {
+      currentComponent.value = comp;
+      if (isMobile.value) drawer.value = false;
+
+      if (comp === "NotificationsComponent") {
+        // refresh direct mais sticky
+        fetchNotificationCount();
+      }
     };
 
-    const showComponent = (component) => {
-      currentComponent.value = component;
-      drawer.value = false;
-    };
+    const openLogoutDialog = () => (logoutDialogVisible.value = true);
 
-    const openLogoutDialog = () => {
-      logoutDialogVisible.value = true;
+    // ✅ Quand l’utilisateur clique sur la cloche, la toolbar va demander d’effacer.
+    // Ici on accepte : le badge tombe à 0 UNIQUEMENT sur action utilisateur.
+    const onNotificationsOpened = () => {
+      initialBadgeCount.value = 0;
+      EventBus.emit("badge:set", 0);
     };
 
     const logout = () => {
       logoutDialogVisible.value = false;
-      router.push({ name: 'parents-connexion' });
+      stopPolling();
+      if (typeof window !== "undefined") localStorage.removeItem("token");
+      router.push({ name: "parents-connexion" });
     };
 
     return {
-      currentComponent,
       drawer,
       logoutDialogVisible,
+      currentComponent,
       toggleDrawer,
       showComponent,
       openLogoutDialog,
       logout,
+      onNotificationsOpened,
       etablissementId,
       anneeScolaireId,
       anneeScolaireNom,
       initialBadgeCount,
+      isMobile,
+      drawerWidth,
+      currentYear,
     };
   },
 };
 </script>
 
-
 <style scoped>
-.background {
-  position: relative;
-  min-height: 100vh;
+.app-root {
+  height: 100vh;
   overflow: hidden;
 }
 
-.background-overlay {
-  background-image: url('/assets/parents/ecolier-fait-ses-devoirs-ses-parents_1290988-1159.jpg');
-  background-size: cover;
-  background-position: center;
-  filter: blur(8px);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
+.main-scroll {
+  height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-drawer {
+  height: 100vh;
+}
+.app-drawer :deep(.v-navigation-drawer__content) {
   height: 100%;
-  z-index: 1;
+  overflow: hidden;
 }
 
-.content-overlay {
-  position: relative;
-  z-index: 2;
-  background-color: rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  margin: 24px auto;
+.drawer-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-header {
+  padding: 18px 16px 12px;
+}
+
+.drawer-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drawer-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+}
+
+.drawer-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.drawer-title {
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.drawer-subtitle {
+  opacity: 0.9;
+  font-size: 0.86rem;
+}
+
+.drawer-meta {
+  margin-top: 12px;
+}
+
+.drawer-chip {
+  font-weight: 800;
+  border-radius: 999px;
+}
+
+.drawer-divider {
+  opacity: 0.35;
+}
+
+.drawer-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.drawer-list {
+  padding: 10px 12px 12px;
+}
+
+.drawer-section {
+  padding: 8px 10px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+.drawer-item {
+  margin: 6px 4px;
+  border-radius: 14px !important;
+  transition: background-color 0.2s ease, transform 0.12s ease;
+}
+
+.drawer-item:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.drawer-item:deep(.v-list-item-title) {
+  font-weight: 800;
+}
+
+.drawer-logout {
+  background: rgba(0, 0, 0, 0.10);
+}
+.drawer-logout:hover {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.drawer-footer {
+  padding: 12px 16px 16px;
+  opacity: 0.9;
+}
+.drawer-footer-text {
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.main-background {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 500px at 20% 15%, rgba(25, 118, 210, 0.16), transparent 60%),
+    radial-gradient(700px 500px at 80% 10%, rgba(11, 46, 74, 0.10), transparent 55%),
+    linear-gradient(180deg, #eaf2ff 0%, #ffffff 45%, #f6f9ff 100%);
+}
+
+.page-shell {
+  padding: 26px 18px;
+}
+
+.content-container {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(25, 118, 210, 0.12);
+  border-radius: 22px;
+  padding: 28px;
   max-width: 1200px;
+  margin: 0 auto;
+  box-shadow: 0 16px 60px rgba(11, 46, 74, 0.12);
+  backdrop-filter: blur(8px);
 }
 
-.v-list-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  transition: background-color 0.3s ease;
+.white-toolbar {
+  background-color: #ffffff !important;
+  color: #0b2e4a !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
-.v-subheader {
-  font-weight: bold;
-  letter-spacing: 1px;
+@media (max-width: 600px) {
+  .page-shell { padding: 16px 10px; }
+  .content-container { padding: 16px; border-radius: 18px; }
 }
 
-.v-list-item-title {
-  font-size: 16px;
-  font-weight: 500;
+@media (max-width: 360px) {
+  .content-container { padding: 14px; }
+  .drawer-title { font-size: 0.98rem; }
 }
 </style>

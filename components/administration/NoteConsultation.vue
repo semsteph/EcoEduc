@@ -1,92 +1,117 @@
 <template>
-  <v-container fluid class="pa-2">
-    <!-- Bouton retour -->
-    <v-btn
-      icon
-      class="ma-2"
-      variant="text"
-      color="primary"
-      @click="$emit('back')"
-    >
-      <v-icon :size="$vuetify.display.smAndDown ? 20 : 28">mdi-arrow-left</v-icon>
-    </v-btn>
-
-    <!-- Liste des classes -->
-    <v-card v-if="!selectedClassId" class="elevation-3 rounded-xl pa-4">
-      <v-card-title class="d-flex justify-space-between align-center">
-        <span
-          class="font-weight-bold"
-          :class="$vuetify.display.smAndDown ? 'text-body-2' : 'text-h6'"
+  <v-container fluid class="pa-4 bg-grey-lighten-4">
+    
+    <v-row align="center" class="mb-6">
+      <v-col cols="auto">
+        <v-btn
+          icon
+          variant="elevated"
+          color="white"
+          elevation="2"
+          @click="selectedClassId ? clearSelection() : $emit('back')"
         >
-          Consulter les notes
-        </span>
-        <v-avatar size="32" color="blue lighten-4">
-          <v-icon color="blue">mdi-school</v-icon>
-        </v-avatar>
-      </v-card-title>
+          <v-icon color="indigo-darken-2">mdi-arrow-left</v-icon>
+        </v-btn>
+      </v-col>
+      <v-col>
+        <h1 class="text-h5 font-weight-bold text-indigo-darken-3 d-flex align-center">
+          <v-icon start size="32" color="indigo">mdi-notebook-check</v-icon>
+          {{ selectedClassId ? 'Relevés de notes' : 'Consultation des Notes' }}
+        </h1>
+        <div class="text-caption text-grey-darken-1">
+          {{ etablissementNom }} • <v-chip size="x-small" color="indigo" variant="flat">{{ anneeScolaire }}</v-chip>
+        </div>
+      </v-col>
+    </v-row>
 
-      <v-divider class="my-2" />
+    <v-row>
+      <v-col cols="12">
+        <v-window v-model="activeView" disabled>
+          
+          <v-window-item value="list">
+            <v-card border flat class="rounded-xl overflow-hidden elevation-1 w-100">
+              <v-toolbar color="indigo-lighten-5" flat px-4>
+                <v-icon start color="indigo" class="ml-4">mdi-filter-variant</v-icon>
+                <span class="text-subtitle-1 font-weight-bold text-indigo-darken-2">
+                  Choisir une classe pour voir les résultats
+                </span>
+              </v-toolbar>
 
-      <v-card-text>
-        <v-row dense>
-          <!-- Si classes disponibles -->
-          <template v-if="classes.length > 0">
-            <v-col
-              v-for="classe in classes"
-              :key="classe.id"
-              cols="12"
-              sm="6"
-              md="4"
-            >
-              <v-hover v-slot:default="{ isHovering, props }">
-                <v-card
-                  v-bind="props"
-                  class="pa-3 transition-swing"
-                  elevation="2"
-                  @click="goToClass(classe.id)"
-                  :color="isHovering ? 'blue lighten-5' : 'white'"
-                  rounded="lg"
-                  outlined
-                  style="cursor: pointer"
-                >
-                  <v-row align="center" no-gutters>
-                    <v-avatar class="me-3" size="36" color="indigo lighten-4">
-                      <v-icon color="indigo">mdi-domain</v-icon>
-                    </v-avatar>
-                    <span
-                      :class="$vuetify.display.smAndDown ? 'text-body-2' : 'text-subtitle-1'"
-                      class="font-weight-medium"
+              <v-card-text class="pa-4 pa-md-6">
+                <v-row v-if="loading" justify="center" class="py-12">
+                  <v-progress-circular indeterminate color="indigo" size="48"></v-progress-circular>
+                </v-row>
+
+                <v-row v-else dense>
+                  <template v-if="classes.length > 0">
+                    <v-col
+                      v-for="classe in classes"
+                      :key="classe.id"
+                      cols="12"
+                      sm="6"
+                      md="4"
+                      lg="3"
                     >
-                      {{ classe.nom }}
-                    </span>
-                  </v-row>
-                </v-card>
-              </v-hover>
-            </v-col>
-          </template>
+                      <v-card
+                        variant="outlined"
+                        class="class-note-card rounded-lg transition-swing"
+                        @click="goToClass(classe.id)"
+                        ripple
+                      >
+                        <v-card-text class="d-flex align-center pa-4">
+                          <v-avatar color="indigo-lighten-4" rounded="lg" size="48" class="me-4">
+                            <v-icon color="indigo-darken-2">mdi-google-classroom</v-icon>
+                          </v-avatar>
+                          
+                          <div class="overflow-hidden">
+                            <div class="text-h6 font-weight-black text-indigo-darken-4 text-truncate">
+                              {{ classe.nom }}
+                            </div>
+                            <div class="text-caption text-grey-darken-1 d-flex align-center">
+                              <v-icon size="12" class="me-1">mdi-account-group</v-icon>
+                              Consulter les moyennes
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+                    </v-col>
+                  </template>
 
-          <!-- Aucune classe disponible -->
-          <template v-else>
-            <v-col cols="12">
-              <v-alert type="info" border="start" color="blue lighten-5" icon="mdi-information">
-                Aucune classe disponible dans votre établissement.<br />
-                Veuillez en ajouter depuis la section « Gestion des classes ».
-              </v-alert>
-            </v-col>
-          </template>
-        </v-row>
-      </v-card-text>
-    </v-card>
+                  <template v-else>
+                    <v-col cols="12">
+                      <v-alert
+                        type="info"
+                        variant="tonal"
+                        rounded="lg"
+                        icon="mdi-information-outline"
+                        class="indigo-lighten-5"
+                      >
+                        <div class="text-subtitle-2 font-weight-bold">Aucune classe disponible</div>
+                        <div class="text-caption">Veuillez d'abord enregistrer des classes dans le menu de configuration.</div>
+                      </v-alert>
+                    </v-col>
+                  </template>
+                </v-row>
+              </v-card-text>
+            </v-card>
+          </v-window-item>
 
-    <!-- Composant enfant : consultation des notes -->
-    <note-details
-      v-else
-      :class-id="selectedClassId"
-      :annee-scolaire="anneeScolaire"
-      :annee-scolaire-id="anneeScolaireId"
-      :etablissement-id="etablissementId"
-      @back="clearSelection"
-    />
+          <v-window-item value="detail">
+            <div class="w-100">
+              <note-details
+                v-if="selectedClassId"
+                :class-id="selectedClassId"
+                :annee-scolaire="anneeScolaire"
+                :annee-scolaire-id="anneeScolaireId"
+                :etablissement-id="etablissementId"
+                @back="clearSelection"
+              />
+            </div>
+          </v-window-item>
+
+        </v-window>
+      </v-col>
+    </v-row>
   </v-container>
 </template>
 
@@ -96,37 +121,38 @@ import NoteDetails from './NoteDetails.vue'
 
 export default {
   name: 'NoteConsultation',
-  components: {
-    NoteDetails
-  },
+  components: { NoteDetails },
   props: {
     etablissementId: { type: Number, required: true },
     etablissementNom: { type: String, required: true },
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true }
   },
-  data() {
-    return {
-      classes: [],
-      selectedClassId: null
-    }
-  },
+  data: () => ({
+    classes: [],
+    selectedClassId: null,
+    loading: false,
+    activeView: 'list'
+  }),
   methods: {
-    fetchClasses() {
-      axios
-        .get(`http://localhost:8080/api/classe/${this.etablissementId}`)
-        .then((response) => {
-          this.classes = response.data
-        })
-        .catch((error) => {
-          console.error('Erreur lors de la récupération des classes:', error)
-        })
+    async fetchClasses() {
+      this.loading = true
+      try {
+        const res = await axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
+        this.classes = res.data
+      } catch (err) {
+        console.error('Erreur classes:', err)
+      } finally {
+        this.loading = false
+      }
     },
     goToClass(classId) {
       this.selectedClassId = classId
+      this.activeView = 'detail'
     },
     clearSelection() {
       this.selectedClassId = null
+      this.activeView = 'list'
     }
   },
   created() {
@@ -136,40 +162,26 @@ export default {
 </script>
 
 <style scoped>
-/* Responsive et esthétique améliorée */
-.v-card {
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+.w-100 {
+  width: 100% !important;
 }
 
-.v-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+.class-note-card {
+  border: 1px solid #E0E0E0 !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  background-color: white !important;
+}
+
+.class-note-card:hover {
+  border-color: #3F51B5 !important;
+  background-color: #F5F7FF !important;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(63, 81, 181, 0.1) !important;
 }
 
 @media (max-width: 600px) {
-  .v-card-title {
-    font-size: 0.85rem !important;
-    padding: 6px 8px !important;
-  }
-
-  .v-btn {
-    min-height: 32px !important;
-    font-size: 0.75rem !important;
-  }
-
-  .v-icon {
-    font-size: 18px !important;
-  }
-
-  .v-card {
-    padding: 10px !important;
-  }
-
-  .v-alert {
-    font-size: 0.75rem !important;
-  }
-
-  .v-col {
-    padding: 4px !important;
+  h1 {
+    font-size: 1.1rem !important;
   }
 }
 </style>

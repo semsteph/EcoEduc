@@ -1,73 +1,103 @@
 <template>
-  <v-container fluid class="pa-2">
-    <!-- Bouton retour -->
-    <v-btn
-      icon
-      class="ma-2"
-      @click="$emit('back')"
-      :size="$vuetify.display.smAndDown ? 'x-small' : 'default'"
-    >
-      <v-icon :size="$vuetify.display.smAndDown ? 16 : 24">mdi-arrow-left</v-icon>
-    </v-btn>
+  <v-container fluid class="pa-0">
+    <v-row align="center" class="mb-6 px-4 pt-2">
+      <v-col cols="auto">
+        <v-btn
+          icon
+          variant="tonal"
+          color="error"
+          @click="selectedStudentId ? clearSelection() : $emit('back')"
+          elevation="0"
+        >
+          <v-icon>mdi-arrow-left</v-icon>
+        </v-btn>
+      </v-col>
+      <v-col>
+        <h2 class="text-h5 font-weight-bold text-error d-flex align-center">
+          <v-icon start size="32" color="error">mdi-book-alert</v-icon>
+          {{ selectedStudentId ? 'Historique disciplinaire' : 'Répertoire des élèves' }}
+        </h2>
+        <div class="text-caption text-grey-darken-1">
+          Année scolaire : {{ anneeScolaire }} | {{ etablissementNom }}
+        </div>
+      </v-col>
+    </v-row>
 
-    <!-- Liste des élèves -->
-    <v-card
-      color="light-blue lighten-4"
-      elevation="2"
-      class="pa-2 rounded-lg"
-      v-if="!selectedStudentId"
-    >
-      <v-card-title class="text-subtitle-1 text-md-h6 font-weight-bold">
-        Liste des élèves
-      </v-card-title>
+    <v-window v-model="activeView" disabled>
+      <v-window-item value="list">
+        <v-card border flat class="rounded-xl overflow-hidden elevation-1 mx-4">
+          <v-toolbar color="error-lighten-5" flat class="px-4">
+            <v-toolbar-title class="text-subtitle-1 font-weight-bold text-error">
+              Liste des élèves inscrits
+            </v-toolbar-title>
+            <v-spacer></v-spacer>
+            <v-chip color="error" variant="flat" size="small" class="font-weight-bold">
+              {{ eleves.length }} Élèves
+            </v-chip>
+          </v-toolbar>
 
-      <v-card-text>
-        <v-row dense>
-          <template v-if="eleves.length > 0">
-            <v-col
-              v-for="eleve in eleves"
-              :key="eleve.id"
-              cols="12"
-              sm="6"
-              md="4"
-            >
-              <v-card
-                class="ma-1"
-                outlined
-                elevation="1"
-                hover
-                @click="selectStudent(eleve.id)"
+          <v-card-text class="pa-4 pa-md-6 bg-grey-lighten-5">
+            <v-row v-if="eleves.length > 0">
+              <v-col
+                v-for="eleve in eleves"
+                :key="eleve.id"
+                cols="12"
+                sm="6"
+                md="4"
+                lg="3"
               >
-                <v-card-title
-                  class="text-body-2 text-md-body-1 font-weight-medium justify-center text-center"
+                <v-card
+                  class="student-card rounded-lg border-sm"
+                  variant="flat"
+                  @click="selectStudent(eleve)"
+                  ripple
                 >
-                  {{ eleve.prenom }} {{ eleve.nom }}
-                </v-card-title>
-              </v-card>
-            </v-col>
-          </template>
+                  <v-card-text class="d-flex align-center pa-4">
+                    <v-avatar color="error-lighten-4" size="48" class="me-4 font-weight-bold text-error">
+                      {{ eleve.nom.charAt(0) }}{{ eleve.prenom.charAt(0) }}
+                    </v-avatar>
+                    
+                    <div class="overflow-hidden">
+                      <div class="text-subtitle-2 font-weight-black text-uppercase text-truncate">
+                        {{ eleve.nom }}
+                      </div>
+                      <div class="text-body-2 text-error text-truncate">
+                        {{ eleve.prenom }}
+                      </div>
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
 
-          <template v-else>
-            <v-col cols="12">
-              <v-alert type="info" color="info" border="start" density="compact">
-                Aucun élève n'est encore inscrit dans la classe sélectionnée.<br />
-                Veuillez aller dans la Gestion des classes pour inscrire des élèves dans cette classe.
-              </v-alert>
-            </v-col>
-          </template>
-        </v-row>
-      </v-card-text>
-    </v-card>
+            <v-row v-else justify="center" class="py-12">
+              <v-col cols="12" md="8" class="text-center">
+                <v-icon size="80" color="grey-lighten-2">mdi-account-off-outline</v-icon>
+                <div class="text-h6 text-grey mt-4">Aucun élève trouvé</div>
+                <div class="text-body-2 text-grey">
+                  Allez dans la Gestion des classes pour inscrire des élèves.
+                </div>
+              </v-col>
+            </v-row>
+          </v-card-text>
+        </v-card>
+      </v-window-item>
 
-    <!-- Cahier de punition de l'élève sélectionné -->
-    <cahier-punition
-      v-else
-      :student-id="selectedStudentId"
-      :annee-scolaire="anneeScolaire"
-      :annee-scolaire-id="anneeScolaireId"
-      :etablissement-id="etablissementId"
-      @back="clearSelection"
-    />
+      <v-window-item value="detail">
+        <div class="w-100 px-4">
+          <cahier-punition
+            v-if="selectedStudentId"
+            :student-id="selectedStudentId"
+            :student-nom="selectedStudentNom"
+            :student-prenom="selectedStudentPrenom"
+            :annee-scolaire="anneeScolaire"
+            :annee-scolaire-id="anneeScolaireId"
+            :etablissement-id="etablissementId"
+            @back="clearSelection"
+          />
+        </div>
+      </v-window-item>
+    </v-window>
   </v-container>
 </template>
 
@@ -89,6 +119,9 @@ export default {
     return {
       eleves: [],
       selectedStudentId: null,
+      selectedStudentNom: '',
+      selectedStudentPrenom: '',
+      activeView: 'list'
     }
   },
   methods: {
@@ -102,11 +135,18 @@ export default {
           console.error('Erreur lors de la récupération des élèves:', error)
         })
     },
-    selectStudent(studentId) {
-      this.selectedStudentId = studentId
+    // Modification pour accepter l'objet eleve
+    selectStudent(eleve) {
+      this.selectedStudentId = eleve.id
+      this.selectedStudentNom = eleve.nom
+      this.selectedStudentPrenom = eleve.prenom
+      this.activeView = 'detail'
     },
     clearSelection() {
       this.selectedStudentId = null
+      this.selectedStudentNom = ''
+      this.selectedStudentPrenom = ''
+      this.activeView = 'list'
     }
   },
   created() {
@@ -114,24 +154,3 @@ export default {
   }
 }
 </script>
-
-<style scoped>
-@media (max-width: 600px) {
-  .v-card-title {
-    font-size: 0.8rem !important;
-  }
-
-  .v-btn {
-    min-width: 32px !important;
-    height: 32px !important;
-  }
-
-  .v-icon {
-    font-size: 16px !important;
-  }
-
-  .v-card {
-    padding: 4px !important;
-  }
-}
-</style>
