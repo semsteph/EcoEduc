@@ -102,6 +102,7 @@
       <v-container fluid class="pa-6 main-content">
         <div v-if="currentComponent === 'Dashboard'">
           <h2 class="text-h5 font-weight-bold text-primary mb-6">Tableau de bord</h2>
+
           <v-row>
             <v-col cols="12" sm="6" md="3" v-for="(stat, i) in dashStats" :key="i">
               <v-card class="rounded-lg pa-4 elevation-2 border-card">
@@ -109,9 +110,13 @@
                   <v-avatar :color="stat.color" variant="tonal" size="48" class="mr-4">
                     <v-icon :color="stat.color">{{ stat.icon }}</v-icon>
                   </v-avatar>
+
                   <div>
                     <div class="text-caption text-grey font-weight-bold">{{ stat.title }}</div>
-                    <div class="text-h6 font-weight-black">{{ stat.value }}</div>
+                    <div class="text-h6 font-weight-black">
+                      <span v-if="dashLoading">...</span>
+                      <span v-else>{{ stat.value }}</span>
+                    </div>
                   </div>
                 </div>
               </v-card>
@@ -137,50 +142,68 @@
     </v-main>
 
     <logout-dialog ref="logoutDialogComp" @confirm-logout="logout" />
+
+    <!-- ✅ Snack erreur dashboard -->
+    <v-snackbar v-model="dashErrorDialog" color="red darken-2" rounded="pill" elevation="10">
+      {{ dashErrorMessage }}
+      <template v-slot:actions>
+        <v-btn text @click="dashErrorDialog = false">Fermer</v-btn>
+      </template>
+    </v-snackbar>
   </v-app>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { useDisplay } from 'vuetify';
-import { useRoute, useRouter } from 'vue-router';
-import axios from 'axios';
+import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
+import { useDisplay } from "vuetify";
+import { useRoute, useRouter } from "vue-router";
+import axios from "axios";
 
 // IMPORTATION DE TOUS LES COMPOSANTS
-import ParentManagement from '@/components/administration/ParentManagement.vue';
-import MessageComponent from '@/components/administration/MessageComponent.vue';
-import NotificationComponent from '@/components/administration/NotificationComponent.vue';
-import LogoutDialog from '@/components/administration/LogoutDialog.vue';
-import ClassManagement from '@/components/administration/ClassManagement.vue';
-import StudentManagement from '@/components/administration/StudentManagement.vue';
-import TeacherManagement from '@/components/administration/TeacherManagement.vue';
-import Inscription from '@/components/administration/Inscription.vue';
-import PresenceManagement from '@/components/administration/PresenceManagement.vue';
-import PunishmentManagement from '@/components/administration/PunishmentManagement.vue';
-import NoteConsultation from '@/components/administration/NoteConsultation.vue';
-import BulletinManagement from '@/components/administration/BulletinManagement.vue';
-import Parametre from '@/components/administration/Parametre.vue';
-import Reinscription from '@/components/administration/Reinscription.vue';
-import MesEleves from '@/components/administration/MesEleves.vue';
-import CarteScolaire from '~/components/administration/CarteScolaire.vue';
+import ParentManagement from "@/components/administration/ParentManagement.vue";
+import MessageComponent from "@/components/administration/MessageComponent.vue";
+import NotificationComponent from "@/components/administration/NotificationComponent.vue";
+import LogoutDialog from "@/components/administration/LogoutDialog.vue";
+import ClassManagement from "@/components/administration/ClassManagement.vue";
+import StudentManagement from "@/components/administration/StudentManagement.vue";
+import TeacherManagement from "@/components/administration/TeacherManagement.vue";
+import Inscription from "@/components/administration/Inscription.vue";
+import PresenceManagement from "@/components/administration/PresenceManagement.vue";
+import PunishmentManagement from "@/components/administration/PunishmentManagement.vue";
+import NoteConsultation from "@/components/administration/NoteConsultation.vue";
+import BulletinManagement from "@/components/administration/BulletinManagement.vue";
+import Parametre from "@/components/administration/Parametre.vue";
+import Reinscription from "@/components/administration/Reinscription.vue";
+import MesEleves from "@/components/administration/MesEleves.vue";
+import CarteScolaire from "~/components/administration/CarteScolaire.vue";
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = "http://localhost:8080";
 
 const { mdAndUp } = useDisplay();
 const drawer = ref(null);
 const route = useRoute();
 const router = useRouter();
 
-const currentComponent = ref('Dashboard');
+const currentComponent = ref("Dashboard");
 const previousComponent = ref(null);
 const etablissementId = ref(null);
-const etablissementNom = ref('');
-const anneeScolaireNom = ref('');
+const etablissementNom = ref("");
+const anneeScolaireNom = ref("");
 const anneeScolaireId = ref(null);
+
 const permissionCount = ref(0);
 const notificationCount = ref(0);
 const filteredPermissions = ref([]);
 const logoutDialogComp = ref(null);
+
+// ✅ Dashboard counts (réels via API)
+const dashLoading = ref(false);
+const dashErrorDialog = ref(false);
+const dashErrorMessage = ref("");
+
+const nbClasses = ref(0);
+const nbEleves = ref(0);
+const nbEnseignants = ref(0);
 
 // MAP DE TOUS LES COMPOSANTS POUR LE RENDU DYNAMIQUE
 const componentsMap = {
@@ -201,37 +224,45 @@ const componentsMap = {
   CarteScolaire,
 };
 
-const dashStats = [
-  { title: 'Classes', value: '12', icon: 'mdi-school', color: 'blue' },
-  { title: 'Elèves', value: '450', icon: 'mdi-account-group', color: 'success' },
-  { title: 'Enseignants', value: '24', icon: 'mdi-teach', color: 'purple' },
-  { title: 'Alertes', value: '3', icon: 'mdi-alert-circle', color: 'error' },
-];
+// ✅✅✅ Tableau de bord SANS "Alertes" + valeurs issues des API
+const dashStats = computed(() => [
+  { title: "Classes", value: nbClasses.value, icon: "mdi-school", color: "blue" },
+  { title: "Elèves", value: nbEleves.value, icon: "mdi-account-group", color: "success" },
+  { title: "Enseignants", value: nbEnseignants.value, icon: "mdi-teach", color: "purple" },
+]);
 
 const menuItems = [
-  { title: 'Tableau de bord', component: 'Dashboard', icon: 'mdi-view-dashboard' },
-  { title: 'Classes', component: 'ClassManagement', icon: 'mdi-school-outline' },
-  { title: 'Elèves', component: 'StudentManagement', icon: 'mdi-account-group-outline' },
-  { title: 'Enseignants', component: 'TeacherManagement', icon: 'mdi-teach' },
-  { title: 'Parents', component: 'ParentManagement', icon: 'mdi-account-child-outline' },
-  { title: 'Paramètres', component: 'Parametre', icon: 'mdi-cog-outline' },
+  { title: "Tableau de bord", component: "Dashboard", icon: "mdi-view-dashboard" },
+  { title: "Classes", component: "ClassManagement", icon: "mdi-school-outline" },
+  { title: "Elèves", component: "StudentManagement", icon: "mdi-account-group-outline" },
+  { title: "Enseignants", component: "TeacherManagement", icon: "mdi-teach" },
+  { title: "Parents", component: "ParentManagement", icon: "mdi-account-child-outline" },
+  { title: "Paramètres", component: "Parametre", icon: "mdi-cog-outline" },
 ];
 
 const changeComponent = (component) => {
   previousComponent.value = currentComponent.value;
   currentComponent.value = component;
   if (!mdAndUp.value) drawer.value = false;
+
+  // ✅ si on revient au dashboard, refresh counts
+  if (component === "Dashboard") fetchDashboardCounts();
 };
 
 const selectComponent = (component) => {
   previousComponent.value = currentComponent.value;
   currentComponent.value = component;
+
+  // ✅ si on revient au dashboard, refresh counts
+  if (component === "Dashboard") fetchDashboardCounts();
 };
 
-const showMessages = () => changeComponent('MessageComponent');
-const showNotifications = () => changeComponent('NotificationComponent');
-const showLogoutDialog = () => { logoutDialogComp.value.dialog = true; };
-const logout = () => router.push('/administration/connexion');
+const showMessages = () => changeComponent("MessageComponent");
+const showNotifications = () => changeComponent("NotificationComponent");
+const showLogoutDialog = () => {
+  logoutDialogComp.value.dialog = true;
+};
+const logout = () => router.push("/administration/connexion");
 
 // --- LOGIQUE NOTIFICATIONS : GEN + COUNT ---
 const generateNotifications = async () => {
@@ -243,8 +274,7 @@ const generateNotifications = async () => {
       annee_scolaire_id: anneeScolaireId.value,
     });
   } catch (err) {
-    // on log, mais on ne bloque pas l'UI
-    console.error('❌ Erreur generate notifications:', err);
+    console.error("❌ Erreur generate notifications:", err);
   }
 };
 
@@ -252,11 +282,11 @@ const fetchAnneeScolaire = async () => {
   try {
     const res = await axios.get(`${API_BASE}/api/annees-scolaires/${etablissementId.value}`);
     if (res.data) {
-      anneeScolaireNom.value = res.data.nom || 'Non spécifiée';
+      anneeScolaireNom.value = res.data.nom || "Non spécifiée";
       anneeScolaireId.value = res.data.id || null;
     }
   } catch (error) {
-    anneeScolaireNom.value = 'Année clôturée';
+    anneeScolaireNom.value = "Année clôturée";
     anneeScolaireId.value = null;
   }
 };
@@ -264,14 +294,16 @@ const fetchAnneeScolaire = async () => {
 const fetchPermissions = async () => {
   if (!etablissementId.value || !anneeScolaireId.value) return;
   try {
-    const response = await axios.get(`${API_BASE}/api/permissions/${etablissementId.value}/${anneeScolaireId.value}`);
+    const response = await axios.get(
+      `${API_BASE}/api/permissions/${etablissementId.value}/${anneeScolaireId.value}`
+    );
     const now = new Date();
-    const filtered = (response.data || []).filter(p => {
+    const filtered = (response.data || []).filter((p) => {
       const date = new Date(p.Date || p.date);
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     });
     filteredPermissions.value = filtered;
-    permissionCount.value = filtered.filter(p => Number(p.is_read) === 0).length;
+    permissionCount.value = filtered.filter((p) => Number(p.is_read) === 0).length;
   } catch (error) {
     console.error(error);
   }
@@ -280,7 +312,9 @@ const fetchPermissions = async () => {
 const fetchNotificationCount = async () => {
   if (!etablissementId.value || !anneeScolaireId.value) return;
   try {
-    const res = await axios.get(`${API_BASE}/api/notifications/unread/${etablissementId.value}/${anneeScolaireId.value}`);
+    const res = await axios.get(
+      `${API_BASE}/api/notifications/unread/${etablissementId.value}/${anneeScolaireId.value}`
+    );
     notificationCount.value = res.data.count || 0;
   } catch (err) {
     notificationCount.value = 0;
@@ -293,23 +327,67 @@ const syncNotifications = async () => {
   await fetchNotificationCount();
 };
 
+// ✅✅✅ Récupérer les vrais nombres via TES API
+const showDashError = (msg) => {
+  dashErrorMessage.value = msg || "Erreur lors du chargement du tableau de bord.";
+  dashErrorDialog.value = true;
+};
+
+const fetchDashboardCounts = async () => {
+  if (!etablissementId.value || !anneeScolaireId.value) return;
+
+  dashLoading.value = true;
+  try {
+    // 1) classes (GET) -> peut renvoyer 404 si zéro
+    let classes = [];
+    try {
+      const resClasses = await axios.get(`${API_BASE}/api/classe/${etablissementId.value}`);
+      classes = Array.isArray(resClasses.data) ? resClasses.data : [];
+    } catch (e) {
+      if (e?.response?.status === 404) classes = [];
+      else throw e;
+    }
+
+    // 2) enseignants (GET)
+    const resTeachers = await axios.get(`${API_BASE}/api/Enseignants/${etablissementId.value}`);
+    const teachers = Array.isArray(resTeachers.data) ? resTeachers.data : [];
+
+    // 3) élèves (POST) (année scolaire prise en compte)
+    const resEleves = await axios.post(`${API_BASE}/api/eleves`, {
+      etablissement_id: etablissementId.value,
+      annee_scolaire_id: anneeScolaireId.value,
+    });
+    const eleves = Array.isArray(resEleves.data) ? resEleves.data : [];
+
+    nbClasses.value = classes.length;
+    nbEnseignants.value = teachers.length;
+    nbEleves.value = eleves.length;
+  } catch (err) {
+    console.error("❌ Dashboard counts error:", err);
+    showDashError(err?.response?.data?.error || err?.response?.data?.message);
+  } finally {
+    dashLoading.value = false;
+  }
+};
+
 let permissionInterval, notificationInterval;
 
 onMounted(async () => {
   etablissementId.value = parseInt(route.query.etablissement_id, 10);
-  etablissementNom.value = route.query.etablissement_nom || '';
+  etablissementNom.value = route.query.etablissement_nom || "";
 
   // 1) Charger l'année scolaire
   await fetchAnneeScolaire();
 
-  // 2) Permissions + notif init
+  // 2) Charger le dashboard (vraies valeurs)
+  await fetchDashboardCounts();
+
+  // 3) Permissions + notif init
   fetchPermissions();
   await syncNotifications();
 
-  // 3) Polling régulier
+  // 4) Polling régulier
   permissionInterval = setInterval(fetchPermissions, 30000);
-
-  // IMPORTANT : on fait sync (generate + count), pas seulement count
   notificationInterval = setInterval(syncNotifications, 30000);
 });
 
@@ -317,6 +395,14 @@ onBeforeUnmount(() => {
   clearInterval(permissionInterval);
   clearInterval(notificationInterval);
 });
+
+// ✅ si l'année scolaire change après fetchAnneeScolaire (ou si route change), refresh dashboard
+watch(
+  () => [etablissementId.value, anneeScolaireId.value],
+  () => {
+    fetchDashboardCounts();
+  }
+);
 </script>
 
 <style scoped>
@@ -328,19 +414,19 @@ onBeforeUnmount(() => {
 .main-scroll-area {
   height: 100vh;
   overflow-y: auto !important;
-  background-color: #F4F7FA !important;
+  background-color: #f4f7fa !important;
 }
 
 .active-item {
   background-color: rgba(255, 255, 255, 0.15) !important;
-  border-left: 4px solid #FFC107;
+  border-left: 4px solid #ffc107;
 }
 
 .border-card {
   border: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Fixation pour s'assurer que Header et Sidebar ne bougent pas */
+/* Fixation pour s'assurer que Header et Sidebar ne bougent pas */m,
 header.v-app-bar.v-app-bar--fixed,
 nav.v-navigation-drawer--fixed {
   z-index: 1000 !important;

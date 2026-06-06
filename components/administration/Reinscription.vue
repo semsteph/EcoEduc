@@ -102,10 +102,11 @@
 
           <v-window-item value="detail">
             <div class="w-100">
-              <scolarite-detail
+              <reinscription-detail
                 v-if="selectedClassId"
                 :class-id="selectedClassId"
                 :annee-scolaire="anneeScolaire"
+                :etablissement-id="etablissementId"
                 :annee-scolaire-id="anneeScolaireId"
                 @back="clearSelection"
               />
@@ -120,11 +121,11 @@
 
 <script>
 import axios from 'axios'
-import ScolariteDetail from './ScolariteDetail.vue'
+import ReinscriptionDetail from './ReinscriptionDetail.vue'
 
 export default {
   name: 'Reinscription',
-  components: { ScolariteDetail },
+  components: { ReinscriptionDetail },
   props: {
     etablissementId: { type: Number, required: true },
     etablissementNom: { type: String, required: true },

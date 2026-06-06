@@ -104,7 +104,7 @@
                       <v-icon color="primary">mdi-message-text</v-icon>
                       <div>
                         <div class="mini-title">Communication</div>
-                        <div class="mini-sub">Parents ↔ Enseignants</div>
+                        <div class="mini-sub">Parents ↔ administrations scolaires</div>
                       </div>
                     </div>
                   </div>

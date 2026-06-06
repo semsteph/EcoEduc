@@ -58,15 +58,17 @@
               >
                 <div v-if="matiere[jour.value]" class="programme-chip">
                   <div class="time-text">{{ matiere[jour.value] }}</div>
+
                   <v-btn
                     icon
                     x-small
                     class="delete-icon"
                     @click="supprimerProgramme(matiere.id, jour.value)"
                   >
-                    <v-icon color="red darken-2" size="18">mdi-close-circle</v-icon>
+                    <v-icon size="14" color="red darken-2">mdi-close-circle</v-icon>
                   </v-btn>
                 </div>
+
                 <div v-else class="empty-cell">—</div>
               </td>
             </tr>
@@ -174,7 +176,6 @@ export default {
       this.snackbar = true;
     },
 
-    // Affiche proprement l’erreur API 400/500
     handleAxiosError(err, fallback = "Erreur serveur") {
       const apiMsg =
         err?.response?.data?.message ||
@@ -182,18 +183,14 @@ export default {
         err?.message;
 
       this.notify(apiMsg || fallback, "red darken-2");
-      // Debug utile
-      // eslint-disable-next-line no-console
       console.error("AXIOS ERROR:", err?.response || err);
     },
 
     async fetchData() {
       try {
-        // 1) Charger les matières
         const resMat = await axios.get(`${API}/matiere/${this.classId}`);
         this.matiereOptions = Array.isArray(resMat.data) ? resMat.data : [];
 
-        // 2) Charger programmes
         await this.fetchProgrammes();
       } catch (err) {
         this.handleAxiosError(err, "Impossible de charger les matières");
@@ -202,7 +199,6 @@ export default {
 
     async fetchProgrammes() {
       try {
-        // ✅ Beaucoup d’API exigent etablissementId/anneeScolaireId → on les envoie
         const res = await axios.get(`${API}/programmes/${this.classId}`, {
           params: {
             etablissementId: this.etablissementId,
@@ -228,7 +224,6 @@ export default {
         vendredi: "",
       }));
 
-      // mapping tolérant aux clés différentes renvoyées par l’API
       for (const p of programmes) {
         const matiereId =
           p.matiere_id ?? p["matière_id"] ?? p.matiereId ?? p.matiereID;
@@ -261,15 +256,12 @@ export default {
           return;
         }
 
-        // ✅ Payload robuste (camel + snake)
         const payload = {
           classId: this.classId,
           etablissementId: this.etablissementId,
           anneeScolaireId: this.anneeScolaireId,
-
           jour,
           horaire,
-
           matiereId,
           matiere_id: matiereId,
         };
@@ -291,7 +283,6 @@ export default {
             classId: this.classId,
             etablissementId: this.etablissementId,
             anneeScolaireId: this.anneeScolaireId,
-
             jour: (jour || "").toLowerCase(),
             matiereId,
             matiere_id: matiereId,
@@ -379,12 +370,13 @@ export default {
   background: #E8EAF6;
   border: 1px solid #C5CAE9;
   border-radius: 8px;
-  padding: 8px;
+  padding: 8px 24px 8px 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   transition: all 0.3s;
+  min-height: 38px;
 }
 
 .programme-chip:hover {
@@ -396,6 +388,9 @@ export default {
   color: #1A237E;
   font-weight: 700;
   font-size: 0.85rem;
+  line-height: 1.2;
+  text-align: center;
+  width: 100%;
 }
 
 .empty-cell {
@@ -405,9 +400,20 @@ export default {
 
 .delete-icon {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  background: white;
+  top: -6px;
+  right: -6px;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 50%;
+  z-index: 3;
+}
+
+.delete-icon::before {
+  display: none !important;
 }
 
 .v-data-table__wrapper {
@@ -415,7 +421,26 @@ export default {
 }
 
 @media (max-width: 600px) {
-  .time-text { font-size: 0.75rem; }
-  .table-header { font-size: 0.7rem !important; padding: 0 8px !important; }
+  .time-text {
+    font-size: 0.75rem;
+  }
+
+  .table-header {
+    font-size: 0.7rem !important;
+    padding: 0 8px !important;
+  }
+
+  .programme-chip {
+    padding: 6px 20px 6px 6px;
+    min-height: 34px;
+  }
+
+  .delete-icon {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    top: -5px;
+    right: -5px;
+  }
 }
 </style>

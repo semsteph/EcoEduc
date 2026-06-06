@@ -160,24 +160,89 @@ app.get('/api/annees-scolaires/:etablissementId', async (req, res) => {
   }
 });
 
+////////////////////////////////////////
+//Recuperation des annee scoalires pour constuerer une base de donnee dans bulletin
+
+app.get('/api/annees-scolaires/etablissement/:etablissementId', async (req, res) => {
+  const etablissementId = Number(req.params.etablissementId);
+
+  if (!etablissementId) {
+    return res.status(400).json({
+      message: "L'identifiant de l'établissement est requis."
+    });
+  }
+
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const [rows] = await connection.execute(
+      `
+      SELECT
+        id,
+        nom_annee,
+        statut
+      FROM annee_scolaire
+      WHERE etablissement_id = ?
+      ORDER BY
+        CASE
+          WHEN statut = 'En cours' THEN 0
+          ELSE 1
+        END,
+        id DESC
+      `,
+      [etablissementId]
+    );
+
+    return res.status(200).json({
+      message: "Années scolaires récupérées avec succès.",
+      anneesScolaires: rows
+    });
+  } catch (error) {
+    console.error("Erreur récupération des années scolaires :", error);
+    return res.status(500).json({
+      message: "Une erreur est survenue lors de la récupération des années scolaires."
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 app.get('/api/enseignements', async (req, res) => {
-  const { etablissementId, classeId } = req.query;
+  const { etablissementId, classeId, anneeScolaireId } = req.query;
 
   console.log('📥 Reçu dans API :', req.query);
 
-  if (!etablissementId || !classeId) {
-    console.warn('⚠️ Paramètres manquants :', { etablissementId, classeId });
-    return res.status(400).json({ error: 'ID établissement ou classe manquant' });
+  if (!etablissementId || !classeId || !anneeScolaireId) {
+    console.warn('⚠️ Paramètres manquants :', {
+      etablissementId,
+      classeId,
+      anneeScolaireId
+    });
+    return res.status(400).json({
+      error: 'ID établissement, classe ou année scolaire manquant'
+    });
   }
 
   try {
     const etabId = Number(etablissementId);
     const classId = Number(classeId);
+    const anneeId = Number(anneeScolaireId);
 
-    console.log('🔎 Requête SQL avec :', { etabId, classId });
+    console.log('🔎 Requête SQL avec :', {
+      etabId,
+      classId,
+      anneeId
+    });
 
     const [rows] = await db.query(`
       SELECT 
+        e.Enseignants_id,
+        e.Classes_id,
+        e.matiere_id,
+        e.coefficient_id,
+        e.Annee_scolaire_id,
         ens.nom AS nom,
         ens.prenom AS prenom,
         mat.nom AS matiere,
@@ -186,8 +251,10 @@ app.get('/api/enseignements', async (req, res) => {
       JOIN enseignants AS ens ON ens.id = e.Enseignants_id
       JOIN matieres AS mat ON mat.id = e.matiere_id
       JOIN coefficient AS coef ON coef.id = e.coefficient_id
-      WHERE e.etablissement_id = ? AND e.Classes_id = ?
-    `, [etabId, classId]);
+      WHERE e.etablissement_id = ?
+        AND e.Classes_id = ?
+        AND e.Annee_scolaire_id = ?
+    `, [etabId, classId, anneeId]);
 
     console.log('📤 Résultat SQL :', rows);
 
@@ -223,139 +290,1219 @@ app.post('/api/enseignements/delete', (req, res) => {
     return res.json({ success: true, message: 'Enseignement supprimé' });
   });
 });
+// ✅ API : Clôture d'année scolaire paramétrable
+// Paramètres manuels par établissement + rapport + validation finale
 
+const ordreClasses = ['6eme', '5eme', '4eme', '3eme', '2nd', '1ere', 'Tle'];
+const classesFinDeCycle = ['3eme', 'Tle'];
 
-""// ✅ API : Clôture d'année scolaire avec regroupement intelligent des classes
-app.post('/api/cloture-annee-scolaire', async (req, res) => {
-  const { etablissementId, anneeScolaireId } = req.body;
+/**
+ * -----------------------------
+ * PARAMÈTRES PAR DÉFAUT
+ * -----------------------------
+ */
+function getDefaultClotureParams() {
+  return {
+    effectifMaxParClasse: 50,
+    effectifMinNouvelleClasse: 10,
+    activerCreationAutoClasse: true,
+    activerRepartitionIntelligente: true,
+    noteInterne: ''
+  };
+}
 
-  if (!etablissementId || !anneeScolaireId) {
-    return res.status(400).json({ message: "Les IDs de l’établissement et de l’année scolaire sont requis." });
+/**
+ * -----------------------------
+ * OUTIL BOOLÉEN SÛR
+ * -----------------------------
+ */
+function parseBoolean(value, defaultValue = false) {
+  if (value === null || value === undefined) return defaultValue;
+
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+
+    if (['1', 'true', 'yes', 'oui', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'non', 'off', ''].includes(normalized)) return false;
   }
 
-  try {
-    const connection = await db.getConnection();
-    const ordreClasses = ['6eme', '5eme', '4eme', '3eme', '2nd', '1ere', 'Tle'];
-    const regexClasse = /^([0-9]{1,2}(?:eme|nd|ere|Tle))\s*([A-Z]*)\s*([0-9]*)$/;
+  return defaultValue;
+}
 
-    const [bulletins] = await connection.execute(
-      `SELECT b.moyAn, b.decision, e.id AS eleveId, e.nom AS eleveNom, e.prenom AS elevePrenom, 
-              c.id AS classeId, c.nom AS classeNom
-       FROM bulletin b
-       JOIN eleve e ON b.eleve_id = e.id
-       JOIN classes c ON e.classe_id = c.id
-       WHERE b.etablissement_id = ? AND b.Annee_scolaire_id = ?`,
-      [etablissementId, anneeScolaireId]
-    );
+/**
+ * -----------------------------
+ * OUTILS TEXTE / CLASSES
+ * -----------------------------
+ */
+function simplifyText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-    const [classes] = await connection.execute(
-      `SELECT id, nom FROM Classes WHERE etablissement_id = ?`,
-      [etablissementId]
-    );
+function normalizeNiveau(niveau) {
+  const n = simplifyText(niveau).toLowerCase();
 
-    const classesTriees = classes.sort((a, b) => {
-      const matchA = a.nom.match(regexClasse);
-      const matchB = b.nom.match(regexClasse);
-      if (!matchA || !matchB) return 0;
+  const map = {
+    '6eme': '6eme',
+    '6e': '6eme',
+    '5eme': '5eme',
+    '5e': '5eme',
+    '4eme': '4eme',
+    '4e': '4eme',
+    '3eme': '3eme',
+    '3e': '3eme',
+    '2nd': '2nd',
+    '2nde': '2nd',
+    'seconde': '2nd',
+    '1ere': '1ere',
+    '1er': '1ere',
+    'premiere': '1ere',
+    'tle': 'Tle',
+    'terminale': 'Tle'
+  };
 
-      const [_, radA, prefixA, sufA] = matchA;
-      const [__, radB, prefixB, sufB] = matchB;
+  return map[n] || null;
+}
 
-      const indexA = ordreClasses.indexOf(radA);
-      const indexB = ordreClasses.indexOf(radB);
-      if (indexA !== indexB) return indexA - indexB;
+function parseClasseNom(nom) {
+  if (!nom) return null;
 
-      if ((prefixA || '') !== (prefixB || '')) return (prefixA || '').localeCompare(prefixB || '');
-      return (sufA || '0').localeCompare(sufB || '0');
+  const raw = String(nom).trim().replace(/\s+/g, ' ');
+  const cleaned = simplifyText(raw);
+
+  const match = cleaned.match(
+    /^(6eme|6e|5eme|5e|4eme|4e|3eme|3e|2nd|2nde|seconde|1ere|1er|premiere|tle|terminale)(?:\s+([A-Za-z]+))?(?:\s+([0-9]+))?$/i
+  );
+
+  if (!match) return null;
+
+  const niveau = normalizeNiveau(match[1]);
+  if (!niveau) return null;
+
+  return {
+    niveau,
+    prefix: (match[2] || '').toUpperCase(),
+    suffix: parseInt(match[3] || '0', 10),
+    raw
+  };
+}
+
+function trierClasses(classes) {
+  return [...classes].sort((a, b) => {
+    const pa = parseClasseNom(a.nom);
+    const pb = parseClasseNom(b.nom);
+
+    if (!pa && !pb) return 0;
+    if (!pa) return 1;
+    if (!pb) return -1;
+
+    const ia = ordreClasses.indexOf(pa.niveau);
+    const ib = ordreClasses.indexOf(pb.niveau);
+
+    if (ia !== ib) return ia - ib;
+
+    if (pa.prefix !== pb.prefix) {
+      return pa.prefix.localeCompare(pb.prefix);
+    }
+
+    return pa.suffix - pb.suffix;
+  });
+}
+
+function determinerDestinationPrevue(classeNom) {
+  const parsed = parseClasseNom(classeNom);
+  const niveauActuel = parsed ? parsed.niveau : null;
+
+  if (!niveauActuel) return 'Non déterminé';
+
+  if (classesFinDeCycle.includes(niveauActuel)) {
+    return niveauActuel === '3eme' ? 'Fin de cycle 1' : 'Fin de cycle 2';
+  }
+
+  const index = ordreClasses.indexOf(niveauActuel);
+
+  if (index >= 0 && index < ordreClasses.length - 1) {
+    return ordreClasses[index + 1];
+  }
+
+  return 'Non déterminé';
+}
+
+/**
+ * -----------------------------
+ * OUTILS PARAMÈTRES
+ * -----------------------------
+ */
+async function fetchClotureParams(connection, etablissementId) {
+  const defaults = getDefaultClotureParams();
+
+  const [rows] = await connection.execute(
+    `
+    SELECT
+      effectif_max_par_classe,
+      effectif_min_nouvelle_classe,
+      activer_creation_auto_classe,
+      activer_repartition_intelligente,
+      note_interne
+    FROM cloture_parametres
+    WHERE etablissement_id = ?
+    LIMIT 1
+    `,
+    [etablissementId]
+  );
+
+  if (!rows.length) return defaults;
+
+  const row = rows[0];
+
+  return {
+    effectifMaxParClasse:
+      Number(row.effectif_max_par_classe) > 0
+        ? Number(row.effectif_max_par_classe)
+        : defaults.effectifMaxParClasse,
+
+    effectifMinNouvelleClasse:
+      Number(row.effectif_min_nouvelle_classe) > 0
+        ? Number(row.effectif_min_nouvelle_classe)
+        : defaults.effectifMinNouvelleClasse,
+
+    activerCreationAutoClasse: parseBoolean(
+      row.activer_creation_auto_classe,
+      defaults.activerCreationAutoClasse
+    ),
+
+    activerRepartitionIntelligente: parseBoolean(
+      row.activer_repartition_intelligente,
+      defaults.activerRepartitionIntelligente
+    ),
+
+    noteInterne: row.note_interne || ''
+  };
+}
+
+function sanitizeClotureParams(payload = {}) {
+  const defaults = getDefaultClotureParams();
+
+  const effectifMaxParClasse = Math.max(
+    1,
+    Number(payload.effectifMaxParClasse ?? defaults.effectifMaxParClasse) ||
+      defaults.effectifMaxParClasse
+  );
+
+  const effectifMinNouvelleClasse = Math.max(
+    1,
+    Number(payload.effectifMinNouvelleClasse ?? defaults.effectifMinNouvelleClasse) ||
+      defaults.effectifMinNouvelleClasse
+  );
+
+  return {
+    effectifMaxParClasse,
+    effectifMinNouvelleClasse,
+    activerCreationAutoClasse: parseBoolean(
+      payload.activerCreationAutoClasse,
+      defaults.activerCreationAutoClasse
+    ),
+    activerRepartitionIntelligente: parseBoolean(
+      payload.activerRepartitionIntelligente,
+      defaults.activerRepartitionIntelligente
+    ),
+    noteInterne: String(payload.noteInterne || '').trim()
+  };
+}
+
+/**
+ * -----------------------------
+ * OUTILS AFFECTATION
+ * -----------------------------
+ */
+function ajouterAffectation(affectationsParClasse, classeId, eleveIds) {
+  if (!affectationsParClasse[classeId]) {
+    affectationsParClasse[classeId] = [];
+  }
+
+  affectationsParClasse[classeId].push(...eleveIds);
+}
+
+async function affecterElevesAClasse(connection, classeId, eleveIds) {
+  if (!eleveIds || eleveIds.length === 0) return;
+
+  const idsUniques = [...new Set(eleveIds)];
+  const placeholders = idsUniques.map(() => '?').join(', ');
+
+  const sql = `UPDATE eleve SET classe_id = ? WHERE id IN (${placeholders})`;
+  await connection.execute(sql, [classeId, ...idsUniques]);
+}
+
+function repartirEquitablement(eleves, nbGroupes) {
+  if (nbGroupes <= 0) return [];
+
+  const total = eleves.length;
+  const base = Math.floor(total / nbGroupes);
+  const reste = total % nbGroupes;
+  const groupes = [];
+
+  let index = 0;
+
+  for (let i = 0; i < nbGroupes; i++) {
+    const size = base + (i < reste ? 1 : 0);
+    groupes.push(eleves.slice(index, index + size));
+    index += size;
+  }
+
+  return groupes;
+}
+
+function toutesTaillesRespectentMinimum(groupes, minimum) {
+  return groupes.every((g) => g.length >= minimum);
+}
+
+function getNextClassName(nextNiveau, prefix, classesTriees) {
+  const toutesLesClassesMemeNiveau = classesTriees.filter(c => {
+    const parsed = parseClasseNom(c.nom);
+    if (!parsed) return false;
+    return parsed.niveau === nextNiveau && parsed.prefix === (prefix || '');
+  });
+
+  const maxSuffix = toutesLesClassesMemeNiveau.reduce((max, c) => {
+    const parsed = parseClasseNom(c.nom);
+    return Math.max(max, parsed ? parsed.suffix : 0);
+  }, 0);
+
+  const nouveauSuffix = maxSuffix + 1;
+
+  return prefix
+    ? `${nextNiveau} ${prefix} ${nouveauSuffix}`
+    : `${nextNiveau} ${nouveauSuffix}`;
+}
+
+/**
+ * -----------------------------
+ * RÉSUMÉ UNIQUE PAR ÉLÈVE
+ * -----------------------------
+ */
+async function recupererResumeElevesPourCloture(connection, etablissementId, anneeScolaireId) {
+  const [rows] = await connection.execute(
+    `
+    SELECT
+      e.id AS eleveId,
+      e.nom AS eleveNom,
+      e.prenom AS elevePrenom,
+      c.id AS classeId,
+      c.nom AS classeNom,
+
+      COUNT(DISTINCT NULLIF(TRIM(b.decision), '')) AS nombreDecisionsDistinctes,
+      MIN(NULLIF(TRIM(b.decision), '')) AS decisionCandidate,
+      MAX(CASE WHEN b.moyAn IS NOT NULL THEN b.moyAn END) AS moyAnFinale
+
+    FROM eleve e
+    JOIN classes c
+      ON e.classe_id = c.id
+    LEFT JOIN bulletin b
+      ON b.eleve_id = e.id
+     AND b.etablissement_id = ?
+     AND b.Annee_scolaire_id = ?
+    WHERE e.etablissement_id = ?
+    GROUP BY e.id, e.nom, e.prenom, c.id, c.nom
+    ORDER BY c.nom ASC, e.nom ASC, e.prenom ASC
+    `,
+    [etablissementId, anneeScolaireId, etablissementId]
+  );
+
+  return rows.map((row) => {
+    let decisionFinale = null;
+
+    if (Number(row.nombreDecisionsDistinctes) === 1) {
+      decisionFinale = row.decisionCandidate || null;
+    } else if (Number(row.nombreDecisionsDistinctes) > 1) {
+      decisionFinale = '__INCOHERENTE__';
+    }
+
+    return {
+      eleveId: row.eleveId,
+      eleveNom: row.eleveNom,
+      elevePrenom: row.elevePrenom,
+      classeId: row.classeId,
+      classeNom: row.classeNom,
+      moyAn: row.moyAnFinale,
+      decision: decisionFinale
+    };
+  });
+}
+
+/**
+ * -----------------------------
+ * RAPPORT PAR CLASSE
+ * -----------------------------
+ */
+function construireRapportParClasse(resumesEleves) {
+  const map = new Map();
+
+  for (const eleve of resumesEleves) {
+    const classeId = eleve.classeId;
+    const classeNom = eleve.classeNom;
+
+    if (!map.has(classeId)) {
+      map.set(classeId, {
+        classeId,
+        classeNom,
+        totalEleves: 0,
+        nombreQuiPassent: 0,
+        nombreQuiEchouent: 0,
+        destinationPrevue: determinerDestinationPrevue(classeNom)
+      });
+    }
+
+    const item = map.get(classeId);
+    item.totalEleves += 1;
+
+    if (eleve.decision === 'Admis') {
+      item.nombreQuiPassent += 1;
+    } else {
+      item.nombreQuiEchouent += 1;
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.classeNom.localeCompare(b.classeNom));
+}
+
+/**
+ * -----------------------------
+ * LOGIQUE MÉTIER PARAMÉTRABLE
+ * -----------------------------
+ */
+function construirePlanPromotion(classesTriees, resumesEleves, params) {
+  const elevesParNiveau = {};
+  const anomaliesPromotion = [];
+  const detailsGroupes = [];
+  const affectationsParClasse = {};
+  const creationsDeClasses = [];
+
+  const effectifMax = Math.max(1, Number(params.effectifMaxParClasse) || 50);
+  const effectifMin = Math.max(1, Number(params.effectifMinNouvelleClasse) || 10);
+  const creationAuto = !!params.activerCreationAutoClasse;
+  const repartitionIntelligente = !!params.activerRepartitionIntelligente;
+
+  for (const eleve of resumesEleves) {
+    const { decision, classeNom, eleveId, eleveNom, elevePrenom } = eleve;
+
+    if (decision === '__INCOHERENTE__') {
+      anomaliesPromotion.push({
+        eleveId,
+        nom: eleveNom,
+        prenom: elevePrenom,
+        classeNom,
+        probleme: "Décisions de passage incohérentes pour cet élève dans les bulletins"
+      });
+      continue;
+    }
+
+    if (!decision) {
+      anomaliesPromotion.push({
+        eleveId,
+        nom: eleveNom,
+        prenom: elevePrenom,
+        classeNom,
+        probleme: "Décision de passage manquante"
+      });
+      continue;
+    }
+
+    if (decision !== 'Admis') continue;
+
+    const parsedClasse = parseClasseNom(classeNom);
+    if (!parsedClasse) {
+      anomaliesPromotion.push({
+        eleveId,
+        nom: eleveNom,
+        prenom: elevePrenom,
+        classeNom,
+        probleme: "Nom de classe non reconnu pour la promotion"
+      });
+      continue;
+    }
+
+    const { niveau, prefix } = parsedClasse;
+    const index = ordreClasses.indexOf(niveau);
+
+    if (index === -1) {
+      anomaliesPromotion.push({
+        eleveId,
+        nom: eleveNom,
+        prenom: elevePrenom,
+        classeNom,
+        probleme: "Niveau de classe introuvable dans l’ordre de promotion"
+      });
+      continue;
+    }
+
+    if (classesFinDeCycle.includes(niveau)) continue;
+    if (index >= ordreClasses.length - 1) continue;
+
+    const nextNiveau = ordreClasses[index + 1];
+    const cle = `${nextNiveau}||${prefix}`;
+
+    if (!elevesParNiveau[cle]) {
+      elevesParNiveau[cle] = [];
+    }
+
+    if (!elevesParNiveau[cle].some(e => e.eleveId === eleveId)) {
+      elevesParNiveau[cle].push({
+        eleveId,
+        nom: eleveNom,
+        prenom: elevePrenom,
+        classeActuelle: classeNom
+      });
+    }
+  }
+
+  for (const key in elevesParNiveau) {
+    const [nextNiveau, prefix] = key.split('||');
+    const eleves = elevesParNiveau[key];
+    const count = eleves.length;
+
+    const classesSuperieures = classesTriees.filter(c => {
+      const parsed = parseClasseNom(c.nom);
+      if (!parsed) return false;
+      return parsed.niveau === nextNiveau && parsed.prefix === (prefix || '');
     });
 
-    const elevesParNiveau = {};
-
-    for (const bulletin of bulletins) {
-      const { decision, classeNom, eleveId } = bulletin;
-
-      const matchClasse = classeNom.match(regexClasse);
-      if (!matchClasse) continue;
-
-      const [_, rad, prefix] = matchClasse;
-      const index = ordreClasses.indexOf(rad);
-      if (index === -1 || rad === 'Tle' || index >= ordreClasses.length - 1) continue;
-
-      if (decision === 'Admis') {
-        const nextRad = ordreClasses[index + 1];
-        const cle = `${nextRad}-${prefix}`;
-        if (!elevesParNiveau[cle]) elevesParNiveau[cle] = [];
-        elevesParNiveau[cle].push(eleveId);
-      }
+    if (!classesSuperieures.length) {
+      anomaliesPromotion.push({
+        groupe: `${nextNiveau}${prefix ? ' ' + prefix : ''}`,
+        probleme: "Aucune classe de destination trouvée pour ce groupe d’élèves admis",
+        eleves: eleves.map(e => ({
+          eleveId: e.eleveId,
+          nom: e.nom,
+          prenom: e.prenom,
+          classeActuelle: e.classeActuelle
+        }))
+      });
+      continue;
     }
 
-    for (const key in elevesParNiveau) {
-      const [nextRad, prefix] = key.split('-');
-      const eleves = elevesParNiveau[key];
-      const count = eleves.length;
+    if (!repartitionIntelligente) {
+      ajouterAffectation(
+        affectationsParClasse,
+        classesSuperieures[0].id,
+        eleves.map(e => e.eleveId)
+      );
 
-      const classesSuperieures = classes.filter(c => {
-        const match = c.nom.match(regexClasse);
-        return match && match[1] === nextRad && (match[2] || '') === (prefix || '');
+      detailsGroupes.push({
+        groupeDestination: classesSuperieures[0].nom,
+        nombreEleves: count,
+        type: 'groupe_unique',
+        eleves
       });
 
-      if (classesSuperieures.length === 0) continue;
+      continue;
+    }
 
-      const minimum = 20;
+    const existingCount = classesSuperieures.length;
+    const classesNecessaires = Math.max(1, Math.ceil(count / effectifMax));
 
-      if (count < minimum) {
-        // Cas 1 : Moins de 20 élèves → tous dans la première classe
-        for (const eleveId of eleves) {
-          await connection.execute(`UPDATE eleve SET classe_id = ? WHERE id = ?`, [classesSuperieures[0].id, eleveId]);
-        }
-      } else if (classesSuperieures.length === 1) {
-        if (count >= 60) {
-          // Cas 4 : Une seule classe et ≥60 élèves → on crée une nouvelle classe
-          const half = Math.floor(count / 2);
-          const elevesClasse1 = eleves.slice(0, half);
-          const elevesClasse2 = eleves.slice(half);
+    if (existingCount >= classesNecessaires) {
+      const classesAUtiliser = classesSuperieures.slice(0, classesNecessaires);
+      const groupes = repartirEquitablement(eleves, classesAUtiliser.length);
 
-          const nouveauNom = `${nextRad} ${prefix} ${classesSuperieures.length + 1}`;
-          const [result] = await connection.execute(
-            `INSERT INTO classes (nom, etablissement_id) VALUES (?, ?)`,
-            [nouveauNom, etablissementId]
-          );
-          const newClasseId = result.insertId;
+      if (classesAUtiliser.length > 1 && !toutesTaillesRespectentMinimum(groupes, effectifMin)) {
+        ajouterAffectation(
+          affectationsParClasse,
+          classesSuperieures[0].id,
+          eleves.map(e => e.eleveId)
+        );
 
-          for (const eleveId of elevesClasse1) {
-            await connection.execute(`UPDATE eleve SET classe_id = ? WHERE id = ?`, [classesSuperieures[0].id, eleveId]);
-          }
-          for (const eleveId of elevesClasse2) {
-            await connection.execute(`UPDATE eleve SET classe_id = ? WHERE id = ?`, [newClasseId, eleveId]);
-          }
-        } else {
-          // Cas 2 : Une seule classe et moins de 60 élèves
-          for (const eleveId of eleves) {
-            await connection.execute(`UPDATE eleve SET classe_id = ? WHERE id = ?`, [classesSuperieures[0].id, eleveId]);
-          }
-        }
-      } else {
-        // Cas 3 : Répartition dans plusieurs classes existantes par tranche de 20
-        const nombreClasses = Math.floor(count / minimum);
-        const classesAUtiliser = classesSuperieures.slice(0, nombreClasses);
-        for (let i = 0; i < eleves.length; i++) {
-          const classe = classesAUtiliser[i % classesAUtiliser.length];
-          await connection.execute(`UPDATE eleve SET classe_id = ? WHERE id = ?`, [classe.id, eleves[i]]);
-        }
+        detailsGroupes.push({
+          groupeDestination: classesSuperieures[0].nom,
+          nombreEleves: count,
+          type: 'groupe_unique',
+          eleves
+        });
+
+        continue;
+      }
+
+      classesAUtiliser.forEach((classe, idx) => {
+        const groupe = groupes[idx] || [];
+        ajouterAffectation(
+          affectationsParClasse,
+          classe.id,
+          groupe.map(e => e.eleveId)
+        );
+
+        detailsGroupes.push({
+          groupeDestination: classe.nom,
+          nombreEleves: groupe.length,
+          type: classesAUtiliser.length > 1 ? 'repartition_multi_classes' : 'affectation_existante',
+          eleves: groupe
+        });
+      });
+
+      continue;
+    }
+
+    if (!creationAuto) {
+      anomaliesPromotion.push({
+        groupe: `${nextNiveau}${prefix ? ' ' + prefix : ''}`,
+        probleme: "Les classes existantes ne suffisent pas et la création automatique est désactivée",
+        eleves: eleves.map(e => ({
+          eleveId: e.eleveId,
+          nom: e.nom,
+          prenom: e.prenom,
+          classeActuelle: e.classeActuelle
+        }))
+      });
+      continue;
+    }
+
+    const nbClassesManquantes = classesNecessaires - existingCount;
+    const nbClassesTotalCible = existingCount + nbClassesManquantes;
+    const groupesEquilibres = repartirEquitablement(eleves, nbClassesTotalCible);
+
+    if (toutesTaillesRespectentMinimum(groupesEquilibres, effectifMin)) {
+      classesSuperieures.forEach((classe, idx) => {
+        const groupe = groupesEquilibres[idx] || [];
+        ajouterAffectation(
+          affectationsParClasse,
+          classe.id,
+          groupe.map(e => e.eleveId)
+        );
+
+        detailsGroupes.push({
+          groupeDestination: classe.nom,
+          nombreEleves: groupe.length,
+          type: nbClassesTotalCible > 1 ? 'division_equilibree' : 'affectation_existante',
+          eleves: groupe
+        });
+      });
+
+      for (let i = existingCount; i < nbClassesTotalCible; i++) {
+        const groupe = groupesEquilibres[i] || [];
+        const nouveauNom = getNextClassName(nextNiveau, prefix, classesTriees);
+
+        creationsDeClasses.push({
+          nom: nouveauNom,
+          eleveIds: groupe.map(e => e.eleveId),
+          eleves: groupe
+        });
+
+        classesTriees.push({ id: `temp-${nextNiveau}-${prefix}-${i}`, nom: nouveauNom });
+        classesTriees.splice(0, classesTriees.length, ...trierClasses(classesTriees));
+
+        detailsGroupes.push({
+          groupeDestination: nouveauNom,
+          nombreEleves: groupe.length,
+          type: 'creation_nouvelle_classe',
+          eleves: groupe
+        });
+      }
+
+      continue;
+    }
+
+    if (existingCount === 1) {
+      const surplus = count - effectifMax;
+
+      if (surplus >= effectifMin) {
+        const groupe1 = eleves.slice(0, effectifMax);
+        const groupe2 = eleves.slice(effectifMax);
+        const classeExistante = classesSuperieures[0];
+        const nouveauNom = getNextClassName(nextNiveau, prefix, classesTriees);
+
+        ajouterAffectation(
+          affectationsParClasse,
+          classeExistante.id,
+          groupe1.map(e => e.eleveId)
+        );
+
+        creationsDeClasses.push({
+          nom: nouveauNom,
+          eleveIds: groupe2.map(e => e.eleveId),
+          eleves: groupe2
+        });
+
+        detailsGroupes.push({
+          groupeDestination: classeExistante.nom,
+          nombreEleves: groupe1.length,
+          type: 'affectation_existante',
+          eleves: groupe1
+        });
+
+        detailsGroupes.push({
+          groupeDestination: nouveauNom,
+          nombreEleves: groupe2.length,
+          type: 'creation_nouvelle_classe',
+          eleves: groupe2
+        });
+
+        continue;
+      }
+
+      const groupes2 = repartirEquitablement(eleves, 2);
+
+      if (toutesTaillesRespectentMinimum(groupes2, effectifMin)) {
+        const classeExistante = classesSuperieures[0];
+        const nouveauNom = getNextClassName(nextNiveau, prefix, classesTriees);
+
+        ajouterAffectation(
+          affectationsParClasse,
+          classeExistante.id,
+          groupes2[0].map(e => e.eleveId)
+        );
+
+        creationsDeClasses.push({
+          nom: nouveauNom,
+          eleveIds: groupes2[1].map(e => e.eleveId),
+          eleves: groupes2[1]
+        });
+
+        detailsGroupes.push({
+          groupeDestination: classeExistante.nom,
+          nombreEleves: groupes2[0].length,
+          type: 'division_equilibree',
+          eleves: groupes2[0]
+        });
+
+        detailsGroupes.push({
+          groupeDestination: nouveauNom,
+          nombreEleves: groupes2[1].length,
+          type: 'division_equilibree',
+          eleves: groupes2[1]
+        });
+
+        continue;
+      }
+
+      ajouterAffectation(
+        affectationsParClasse,
+        classesSuperieures[0].id,
+        eleves.map(e => e.eleveId)
+      );
+
+      detailsGroupes.push({
+        groupeDestination: classesSuperieures[0].nom,
+        nombreEleves: count,
+        type: 'groupe_unique',
+        eleves
+      });
+
+      continue;
+    }
+
+    ajouterAffectation(
+      affectationsParClasse,
+      classesSuperieures[0].id,
+      eleves.map(e => e.eleveId)
+    );
+
+    detailsGroupes.push({
+      groupeDestination: classesSuperieures[0].nom,
+      nombreEleves: count,
+      type: 'groupe_unique',
+      eleves
+    });
+  }
+
+  return {
+    anomaliesPromotion,
+    affectationsParClasse,
+    creationsDeClasses,
+    detailsGroupes
+  };
+}
+
+/**
+ * -----------------------------
+ * ANALYSE GLOBALE
+ * -----------------------------
+ */
+async function analyserClotureAnnee(connection, etablissementId, anneeScolaireId) {
+  const params = await fetchClotureParams(connection, etablissementId);
+
+  const [annees] = await connection.execute(
+    `SELECT id, statut FROM annee_scolaire WHERE id = ?`,
+    [anneeScolaireId]
+  );
+
+  if (annees.length === 0) {
+    return {
+      ok: false,
+      status: 404,
+      message: "Année scolaire introuvable."
+    };
+  }
+
+  if (annees[0].statut === 'Clôturée') {
+    return {
+      ok: false,
+      status: 400,
+      message: "Cette année scolaire est déjà clôturée."
+    };
+  }
+
+  const [periodes] = await connection.execute(
+    `SELECT id, nom
+     FROM semestre
+     WHERE etablissement_id = ?
+     ORDER BY id ASC`,
+    [etablissementId]
+  );
+
+  if (periodes.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Impossible de clôturer : aucune période n’est définie pour cet établissement."
+    };
+  }
+
+  const [classesCheck] = await connection.execute(
+    `SELECT id
+     FROM classes
+     WHERE etablissement_id = ?
+     LIMIT 1`,
+    [etablissementId]
+  );
+
+  if (classesCheck.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Impossible de clôturer : aucune classe n’est définie pour cet établissement."
+    };
+  }
+
+  const [elevesCheck] = await connection.execute(
+    `SELECT id
+     FROM eleve
+     WHERE etablissement_id = ?
+     LIMIT 1`,
+    [etablissementId]
+  );
+
+  if (elevesCheck.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Impossible de clôturer : aucun élève n’est enregistré pour cet établissement."
+    };
+  }
+
+  const [bulletinsCheck] = await connection.execute(
+    `SELECT bulletin_id
+     FROM bulletin
+     WHERE etablissement_id = ?
+       AND Annee_scolaire_id = ?
+     LIMIT 1`,
+    [etablissementId, anneeScolaireId]
+  );
+
+  if (bulletinsCheck.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Impossible de clôturer : aucun bulletin n’a encore été généré pour cette année scolaire."
+    };
+  }
+
+  const [eleves] = await connection.execute(
+    `SELECT
+        e.id AS eleveId,
+        e.nom,
+        e.prenom,
+        c.nom AS classeNom
+     FROM eleve e
+     JOIN classes c ON e.classe_id = c.id
+     WHERE e.etablissement_id = ?
+     ORDER BY c.nom ASC, e.nom ASC, e.prenom ASC`,
+    [etablissementId]
+  );
+
+  const rapportMoyennesManquantes = [];
+
+  for (const eleve of eleves) {
+    const problemes = [];
+
+    for (const periode of periodes) {
+      const [moyennePeriode] = await connection.execute(
+        `SELECT 1
+         FROM bulletin
+         WHERE eleve_id = ?
+           AND etablissement_id = ?
+           AND Annee_scolaire_id = ?
+           AND semestre_id = ?
+           AND moySem IS NOT NULL
+         LIMIT 1`,
+        [eleve.eleveId, etablissementId, anneeScolaireId, periode.id]
+      );
+
+      if (moyennePeriode.length === 0) {
+        problemes.push(`Moyenne ${periode.nom} manquante`);
       }
     }
 
-    await connection.execute(`UPDATE annee_scolaire SET statut = 'Clôturée' WHERE id = ?`, [anneeScolaireId]);
-    await connection.execute(`DELETE FROM enseigner WHERE etablissement_id = ?`, [etablissementId]);
+    const [moyenneAnnuelle] = await connection.execute(
+      `SELECT 1
+       FROM bulletin
+       WHERE eleve_id = ?
+         AND etablissement_id = ?
+         AND Annee_scolaire_id = ?
+         AND moyAn IS NOT NULL
+       LIMIT 1`,
+      [eleve.eleveId, etablissementId, anneeScolaireId]
+    );
 
-    connection.release();
-    res.status(200).json({ message: "Année scolaire clôturée avec succès." });
+    if (moyenneAnnuelle.length === 0) {
+      problemes.push('Moyenne annuelle manquante');
+    }
+
+    if (problemes.length > 0) {
+      rapportMoyennesManquantes.push({
+        eleveId: eleve.eleveId,
+        nom: eleve.nom,
+        prenom: eleve.prenom,
+        classeNom: eleve.classeNom,
+        probleme: problemes.join(' | ')
+      });
+    }
+  }
+
+  const resumesEleves = await recupererResumeElevesPourCloture(
+    connection,
+    etablissementId,
+    anneeScolaireId
+  );
+
+  const rapportParClasse = construireRapportParClasse(resumesEleves);
+
+  if (rapportMoyennesManquantes.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      message:
+        "Clôture impossible : certains élèves n’ont pas encore toutes les moyennes requises. Corrigez d’abord ces anomalies avant toute validation finale.",
+      rapportInterface: {
+        rapportParClasse,
+        rapportMoyennesManquantes,
+        anomaliesPromotion: [],
+        detailsGroupes: [],
+        totalClasses: rapportParClasse.length,
+        totalElevesConcernes: rapportMoyennesManquantes.length,
+        parametresUtilises: params
+      }
+    };
+  }
+
+  const [classes] = await connection.execute(
+    `SELECT id, nom
+     FROM classes
+     WHERE etablissement_id = ?`,
+    [etablissementId]
+  );
+
+  const classesTriees = trierClasses(classes);
+  const plan = construirePlanPromotion(classesTriees, resumesEleves, params);
+
+  if (plan.anomaliesPromotion.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      message:
+        "Clôture impossible : certaines promotions ne peuvent pas être préparées correctement. Vérifiez les décisions, les noms de classes et les classes de destination.",
+      rapportInterface: {
+        rapportParClasse,
+        rapportMoyennesManquantes: [],
+        anomaliesPromotion: plan.anomaliesPromotion,
+        detailsGroupes: plan.detailsGroupes,
+        totalClasses: rapportParClasse.length,
+        totalAnomaliesPromotion: plan.anomaliesPromotion.length,
+        parametresUtilises: params
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    status: 200,
+    message:
+      "Rapport de clôture généré avec succès. Aucun changement n’a encore été appliqué. Veuillez valider pour lancer définitivement les changements.",
+    rapportInterface: {
+      rapportParClasse,
+      rapportMoyennesManquantes: [],
+      anomaliesPromotion: [],
+      detailsGroupes: plan.detailsGroupes,
+      totalClasses: rapportParClasse.length,
+      totalAffectationsExistantes: Object.keys(plan.affectationsParClasse).length,
+      totalCreationsDeClasses: plan.creationsDeClasses.length,
+      parametresUtilises: params
+    },
+    planExecution: {
+      affectationsParClasse: plan.affectationsParClasse,
+      creationsDeClasses: plan.creationsDeClasses
+    }
+  };
+}
+
+/**
+ * -----------------------------
+ * EXÉCUTION PLAN
+ * -----------------------------
+ */
+async function executerPlanCloture(connection, etablissementId, planExecution) {
+  const { affectationsParClasse, creationsDeClasses } = planExecution;
+
+  for (const classeId in affectationsParClasse) {
+    await affecterElevesAClasse(
+      connection,
+      Number(classeId),
+      affectationsParClasse[classeId]
+    );
+  }
+
+  for (const creation of creationsDeClasses) {
+    const [result] = await connection.execute(
+      `INSERT INTO classes (nom, etablissement_id)
+       VALUES (?, ?)`,
+      [creation.nom, etablissementId]
+    );
+
+    const nouvelleClasseId = result.insertId;
+
+    await affecterElevesAClasse(
+      connection,
+      nouvelleClasseId,
+      creation.eleveIds
+    );
+  }
+}
+
+/**
+ * -----------------------------
+ * ROUTES PARAMÈTRES
+ * -----------------------------
+ */
+app.get('/api/cloture-parametres/:etablissementId', async (req, res) => {
+  const etablissementId = Number(req.params.etablissementId);
+
+  if (!etablissementId) {
+    return res.status(400).json({
+      message: "L’identifiant de l’établissement est requis."
+    });
+  }
+
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+    const parametres = await fetchClotureParams(connection, etablissementId);
+
+    return res.status(200).json({ parametres });
   } catch (error) {
-    console.error("Erreur de clôture :", error);
-    res.status(500).json({ message: "Une erreur est survenue." });
+    console.error("Erreur lecture paramètres clôture :", error);
+    return res.status(500).json({
+      message: "Une erreur est survenue lors de la lecture des paramètres."
+    });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
+app.post('/api/cloture-parametres', async (req, res) => {
+  const { etablissementId } = req.body;
+
+  if (!etablissementId) {
+    return res.status(400).json({
+      message: "L’identifiant de l’établissement est requis."
+    });
+  }
+
+  const params = sanitizeClotureParams(req.body);
+
+  if (params.effectifMinNouvelleClasse > params.effectifMaxParClasse) {
+    return res.status(400).json({
+      message: "L’effectif minimal d’une nouvelle classe ne peut pas dépasser l’effectif maximal."
+    });
+  }
+
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const [exists] = await connection.execute(
+      `SELECT id FROM cloture_parametres WHERE etablissement_id = ? LIMIT 1`,
+      [etablissementId]
+    );
+
+    if (exists.length) {
+      await connection.execute(
+        `
+        UPDATE cloture_parametres
+        SET
+          effectif_max_par_classe = ?,
+          effectif_min_nouvelle_classe = ?,
+          activer_creation_auto_classe = ?,
+          activer_repartition_intelligente = ?,
+          note_interne = ?,
+          updated_at = NOW()
+        WHERE etablissement_id = ?
+        `,
+        [
+          params.effectifMaxParClasse,
+          params.effectifMinNouvelleClasse,
+          params.activerCreationAutoClasse ? 1 : 0,
+          params.activerRepartitionIntelligente ? 1 : 0,
+          params.noteInterne,
+          etablissementId
+        ]
+      );
+    } else {
+      await connection.execute(
+        `
+        INSERT INTO cloture_parametres
+        (
+          etablissement_id,
+          effectif_max_par_classe,
+          effectif_min_nouvelle_classe,
+          activer_creation_auto_classe,
+          activer_repartition_intelligente,
+          note_interne,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+        `,
+        [
+          etablissementId,
+          params.effectifMaxParClasse,
+          params.effectifMinNouvelleClasse,
+          params.activerCreationAutoClasse ? 1 : 0,
+          params.activerRepartitionIntelligente ? 1 : 0,
+          params.noteInterne
+        ]
+      );
+    }
+
+    const parametres = await fetchClotureParams(connection, etablissementId);
+
+    return res.status(200).json({
+      message: "Paramètres de clôture enregistrés avec succès.",
+      parametres
+    });
+  } catch (error) {
+    console.error("Erreur enregistrement paramètres clôture :", error);
+    return res.status(500).json({
+      message: "Une erreur est survenue lors de l’enregistrement des paramètres."
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+/**
+ * -----------------------------
+ * ROUTE CLÔTURE
+ * -----------------------------
+ */
+app.post('/api/cloture-annee-scolaire', async (req, res) => {
+  const {
+    etablissementId,
+    anneeScolaireId,
+    confirmation = false
+  } = req.body;
+
+  if (!etablissementId || !anneeScolaireId) {
+    return res.status(400).json({
+      message: "Les IDs de l’établissement et de l’année scolaire sont requis."
+    });
+  }
+
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    if (!confirmation) {
+      const analyse = await analyserClotureAnnee(
+        connection,
+        etablissementId,
+        anneeScolaireId
+      );
+
+      return res.status(analyse.status).json({
+        confirmationRequise: analyse.ok,
+        clotureExecutee: false,
+        message: analyse.message,
+        ...(analyse.rapportInterface ? { rapport: analyse.rapportInterface } : {})
+      });
+    }
+
+    await connection.beginTransaction();
+
+    const analyse = await analyserClotureAnnee(
+      connection,
+      etablissementId,
+      anneeScolaireId
+    );
+
+    if (!analyse.ok) {
+      await connection.rollback();
+      return res.status(analyse.status).json({
+        confirmationRequise: false,
+        clotureExecutee: false,
+        message: analyse.message,
+        ...(analyse.rapportInterface ? { rapport: analyse.rapportInterface } : {})
+      });
+    }
+
+    await executerPlanCloture(
+      connection,
+      etablissementId,
+      analyse.planExecution
+    );
+
+    await connection.execute(
+      `UPDATE annee_scolaire
+       SET statut = 'Clôturée'
+       WHERE id = ?`,
+      [anneeScolaireId]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      confirmationRequise: false,
+      clotureExecutee: true,
+      message:
+        "Année scolaire clôturée avec succès. Tous les changements ont été validés et appliqués définitivement.",
+      rapport: analyse.rapportInterface
+    });
+  } catch (error) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error("Erreur rollback :", rollbackError);
+      }
+    }
+
+    console.error("Erreur de clôture :", error);
+    return res.status(500).json({
+      confirmationRequise: false,
+      clotureExecutee: false,
+      message: "Une erreur est survenue lors de la clôture de l’année scolaire."
+    });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
 ///////////////////////////////////////////////////////notification vrai
 app.get('/api/notifications/unread/:etablissementId/:anneeScolaireId', async (req, res) => {
   const { etablissementId, anneeScolaireId } = req.params;
@@ -1020,37 +2167,72 @@ app.put('/api/notificationprof/mark-read-bulk', async (req, res) => {
   }
 });
 
-
 app.post('/api/Parents', async (req, res) => {
-  const { name, firstName, contact, email, username, password,etablissementId } = req.body;
+  const {
+    name,
+    firstName,
+    contact,
+    email,
+    username,
+    password,
+    etablissementId,
+    anneeScolaireId, // ✅ ajouté côté front
+  } = req.body;
 
-  if (!name || !firstName || !contact || !email || !username || !password || !etablissementId) {
-    return res.status(400).json({ error: 'Tous les champs sont requis' });
+  // ✅ validation
+  if (
+    !name ||
+    !firstName ||
+    !contact ||
+    !email ||
+    !username ||
+    !password ||
+    !etablissementId ||
+    !anneeScolaireId
+  ) {
+    return res.status(400).json({ error: 'Tous les champs sont requis (y compris anneeScolaireId).' });
   }
 
   try {
     // Hash du mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insertion du parent dans la base de données
+    // ✅ Insertion du parent (avec Annee_scolaire_id)
     const [result] = await req.db.query(
-      'INSERT INTO parents (nom, prenom, contact, email, nom_utilisateur, mot_de_passe, etablissement_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, firstName, contact, email, username, hashedPassword, etablissementId]
+      `INSERT INTO parents
+        (nom, prenom, contact, email, nom_utilisateur, mot_de_passe, etablissement_id, Annee_scolaire_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, firstName, contact, email, username, hashedPassword, etablissementId, anneeScolaireId]
     );
 
-    // Récupération des informations du parent ajouté
+    // ✅ Récupération des infos du parent ajouté (table = parents en minuscule)
     const [rows] = await req.db.query(
-      'SELECT id, nom AS name, prenom AS firstName, contact AS phone, email FROM Parents WHERE id = ?',
-      [result.insertId] // Utilisez l'ID de l'insertion pour récupérer les données
+      `SELECT
+         id,
+         nom AS name,
+         prenom AS firstName,
+         contact AS phone,
+         email,
+         etablissement_id AS etablissementId,
+         Annee_scolaire_id AS anneeScolaireId
+       FROM parents
+       WHERE id = ?`,
+      [result.insertId]
     );
 
-    // Renvoyer les données du parent sauf le nom d'utilisateur et le mot de passe
-    res.status(201).json(rows[0]);
+    return res.status(201).json(rows[0]);
   } catch (error) {
-    console.error('Erreur lors de l\'ajout du parent:', error);
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    console.error("Erreur lors de l'ajout du parent:", error);
+
+    // ✅ message plus clair si doublon username/email (optionnel)
+    if (error?.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: "Nom d'utilisateur ou email déjà utilisé." });
+    }
+
+    return res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
+
 
 // Route pour récupérer les parents d'un établissement
 app.get('/api/Parents/:etablissementId', async (req, res) => {
@@ -3594,7 +4776,104 @@ app.get('/api/classe/:etablissementId', async (req, res) => {
     res.status(500).json({ error: 'Erreur lors de la récupération des classes' });
   }
 });
+/////////////////////////////Migration manulle  des eleves pour une crasse superieure dans reinscription 
+app.post('/api/eleves/migrer', async (req, res) => {
+  const { eleveIds, destinationClasseId } = req.body;
 
+  console.log('[API][MIGRATION] body reçu =', req.body);
+
+  if (!Array.isArray(eleveIds) || eleveIds.length === 0) {
+    return res.status(400).json({
+      message: "Aucun élève sélectionné pour la migration."
+    });
+  }
+
+  if (!destinationClasseId) {
+    return res.status(400).json({
+      message: "La classe de destination est requise."
+    });
+  }
+
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const idsUniques = [...new Set(eleveIds.map(id => Number(id)).filter(Boolean))];
+    const classeId = Number(destinationClasseId);
+
+    if (idsUniques.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        message: "Les identifiants des élèves sont invalides."
+      });
+    }
+
+    if (!classeId) {
+      await connection.rollback();
+      return res.status(400).json({
+        message: "L'identifiant de la classe de destination est invalide."
+      });
+    }
+
+    const placeholders = idsUniques.map(() => '?').join(', ');
+
+    const [classeRows] = await connection.query(
+      'SELECT id, nom FROM classes WHERE id = ? LIMIT 1',
+      [classeId]
+    );
+
+    if (classeRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        message: "La classe de destination est introuvable."
+      });
+    }
+
+    const [elevesRows] = await connection.query(
+      `SELECT id, nom, prenom, classe_id FROM eleve WHERE id IN (${placeholders})`,
+      idsUniques
+    );
+
+    if (elevesRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        message: "Aucun élève trouvé pour la migration."
+      });
+    }
+
+    await connection.query(
+      `UPDATE eleve SET classe_id = ? WHERE id IN (${placeholders})`,
+      [classeId, ...idsUniques]
+    );
+
+    await connection.commit();
+
+    console.log('[API][MIGRATION] migration réussie vers classe =', classeRows[0]);
+
+    return res.status(200).json({
+      message: "Les élèves sélectionnés ont été migrés avec succès.",
+      destinationClasse: classeRows[0],
+      nombreElevesMigres: elevesRows.length
+    });
+  } catch (error) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error('[API][MIGRATION] erreur rollback =', rollbackError);
+      }
+    }
+
+    console.error('[API][MIGRATION] erreur =', error);
+    return res.status(500).json({
+      message: "Une erreur est survenue lors de la migration des élèves."
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+});
 //api pour notification administration dashbord
 app.get('/api/eleve/:studentId', async (req, res) => {
   const studentId = parseInt(req.params.studentId);

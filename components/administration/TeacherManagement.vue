@@ -189,7 +189,8 @@
             <br />
             ✅ Si tu choisis <strong>1 seule matière</strong>, elle sera appliquée à <strong>toutes</strong> les classes.
             <br />
-            ✅ Les coefficients doivent être choisis <strong>un par classe</strong> (même nombre que les classes), appliqués par ordre.
+            ✅ Les coefficients peuvent être :
+            <strong>1 seul</strong> (appliqué à toutes les classes) <strong>OU</strong> <strong>un par classe</strong> (même nombre que les classes), appliqués par ordre.
           </v-alert>
 
           <v-autocomplete
@@ -218,12 +219,13 @@
             class="mb-3"
           />
 
+          <!-- ✅ ICI: coefficient accepte 1 OU N (=classes) -->
           <v-select
             v-model="selectedCoefficients"
             :items="coefficient"
             item-title="valeur"
             item-value="id"
-            label="Coefficients (doit = nombre de classes)"
+            label="Coefficients (1 pour toutes, ou N = nombre de classes)"
             outlined
             multiple
             chips
@@ -441,6 +443,7 @@ export default {
   },
 
   computed: {
+    // ✅ MODIF: coefficients acceptent 1 OU N (=classes)
     canSubmitAffectation() {
       const c = this.selectedClasses.length;
       const s = this.selectedSubjects.length;
@@ -449,13 +452,15 @@ export default {
       if (!this.selectedTeacher) return false;
       if (c === 0) return false;
       if (s === 0) return false;
+      if (k === 0) return false;
 
       const subjectsOk = s === 1 || s === c;
-      const coefOk = k === c;
+      const coefOk = k === 1 || k === c;
 
       return subjectsOk && coefOk;
     },
 
+    // ✅ MODIF: hint prend en compte 1 coeff pour toutes les classes
     selectionHint() {
       const c = this.selectedClasses.length;
       const s = this.selectedSubjects.length;
@@ -464,12 +469,22 @@ export default {
       if (!this.selectedTeacher) return "Sélectionne un enseignant.";
       if (c === 0) return "Sélectionne au moins une classe.";
       if (s === 0) return "Sélectionne au moins une matière.";
+      if (k === 0) return "Sélectionne au moins un coefficient.";
 
-      if (k !== c) return "Coefficients invalides : tu dois choisir exactement un coefficient par classe.";
+      const subjectsOk = s === 1 || s === c;
+      const coefOk = k === 1 || k === c;
 
-      if (s === 1) return "✅ 1 matière sera appliquée à toutes les classes. Coefficients par ordre.";
-      if (s === c) return "✅ Matières et coefficients appliqués par ordre.";
-      return "Matières invalides : choisis 1 matière (pour toutes) ou une matière par classe.";
+      if (!subjectsOk) {
+        return "Matières invalides : choisis 1 matière (pour toutes) ou une matière par classe.";
+      }
+      if (!coefOk) {
+        return "Coefficients invalides : choisis 1 coefficient (pour toutes) ou un coefficient par classe.";
+      }
+
+      if (s === 1 && k === 1) return "✅ 1 matière + 1 coefficient seront appliqués à toutes les classes.";
+      if (s === 1 && k === c) return "✅ 1 matière pour toutes les classes. Coefficients appliqués par ordre.";
+      if (s === c && k === 1) return "✅ Matières appliquées par ordre. 1 coefficient pour toutes les classes.";
+      return "✅ Matières et coefficients appliqués par ordre.";
     },
   },
 
@@ -541,14 +556,19 @@ export default {
       }
     },
 
-    // payload (affectation)
+    // ✅ MODIF: si 1 coeff choisi => appliqué à toutes les classes (comme les matières)
     buildAffectationPayload(flags = {}) {
       const classes = [...this.selectedClasses];
+
       const subjects =
         this.selectedSubjects.length === 1
           ? Array(classes.length).fill(this.selectedSubjects[0])
           : [...this.selectedSubjects];
-      const coefficients = [...this.selectedCoefficients];
+
+      const coefficients =
+        this.selectedCoefficients.length === 1
+          ? Array(classes.length).fill(this.selectedCoefficients[0])
+          : [...this.selectedCoefficients];
 
       return {
         teacherId: this.selectedTeacher,
@@ -702,9 +722,15 @@ export default {
 </script>
 
 <style scoped>
-.primary-dark--text { color: #1A237E !important; }
-.shadow-soft { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important; }
-.shadow-btn { box-shadow: 0 4px 10px rgba(26, 35, 126, 0.2) !important; }
+.primary-dark--text {
+  color: #1a237e !important;
+}
+.shadow-soft {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+}
+.shadow-btn {
+  box-shadow: 0 4px 10px rgba(26, 35, 126, 0.2) !important;
+}
 
 .nav-card {
   transition: all 0.3s ease;
@@ -715,14 +741,29 @@ export default {
   transform: translateY(-8px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1) !important;
 }
-.border-l-blue { border-left: 6px solid #1A237E !important; }
-
-@media (max-width: 600px) {
-  .text-h4 { font-size: 1.5rem !important; }
-  .nav-card { padding: 16px !important; }
+.border-l-blue {
+  border-left: 6px solid #1a237e !important;
 }
 
-.affect-dialog { max-height: 80vh !important; }
-.affect-card { display: flex !important; flex-direction: column !important; max-height: 80vh !important; }
-.affect-body { flex: 1 1 auto !important; overflow-y: auto !important; }
+@media (max-width: 600px) {
+  .text-h4 {
+    font-size: 1.5rem !important;
+  }
+  .nav-card {
+    padding: 16px !important;
+  }
+}
+
+.affect-dialog {
+  max-height: 80vh !important;
+}
+.affect-card {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 80vh !important;
+}
+.affect-body {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+}
 </style>

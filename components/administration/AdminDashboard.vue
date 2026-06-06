@@ -69,8 +69,7 @@ const props = defineProps({
 const stats = ref([
   { title: 'Élèves', value: '1,240', icon: 'mdi-account-group', color: 'primary' },
   { title: 'Enseignants', value: '45', icon: 'mdi-teach', color: 'success' },
-  { title: 'Classes', value: '28', icon: 'mdi-school', color: 'info' },
-  { title: 'Absences', value: '12', icon: 'mdi-alert-circle', color: 'error' },
+
 ]);
 </script>
 
