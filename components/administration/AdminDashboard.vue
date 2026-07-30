@@ -18,7 +18,7 @@
 
     <v-row class="mt-6">
       <v-col cols="12" md="8">
-        <v-card class="rounded-xl pa-6" height="400" elevation="2">
+        <v-card class="rounded-xl pa-2 pa-sm-6" height="400" elevation="2">
           <v-card-title class="pa-0 mb-4 font-weight-bold">
             Aperçu des Présences
             <v-spacer></v-spacer>
@@ -34,7 +34,7 @@
       </v-col>
 
       <v-col cols="12" md="4">
-        <v-card class="rounded-xl pa-6" height="400" elevation="2">
+        <v-card class="rounded-xl pa-2 pa-sm-6" height="400" elevation="2">
           <v-card-title class="pa-0 mb-4 font-weight-bold">Dernières Actions</v-card-title>
           <v-timeline dense align-top>
             <v-timeline-item color="primary" small>

@@ -14,7 +14,7 @@
     <v-row justify="center" align="center" class="fill-height ma-0">
       <v-col cols="12" sm="10" md="6" lg="4" class="pa-0">
         <!-- Header -->
-        <div class="text-center mb-5 px-5">
+        <div class="text-center mb-5 px-2 px-sm-5">
           <div class="brand-badge mx-auto mb-3">
             <v-icon size="22">mdi-school-outline</v-icon>
           </div>
@@ -263,7 +263,7 @@
         </v-card>
 
         <!-- Footer -->
-        <div class="text-center mt-4 footer-note px-6">
+        <div class="text-center mt-4 footer-note px-2 px-sm-6">
           © {{ new Date().getFullYear() }} — Plateforme scolaire
         </div>
       </v-col>
@@ -275,7 +275,7 @@
 import axios from "axios";
 import "/assets/css/styles.css";
 
-const API_BASE = "http://localhost:8080";
+const API_BASE = "";
 
 export default {
   data() {
@@ -296,7 +296,7 @@ export default {
       confirmPassword: "",
       resetCodeSent: false,
       validCode: false,
-      enseignantId: null,
+      resetToken: null,
       resetEtablissement: "",
       resetError: "",
       resetSuccess: "",
@@ -386,7 +386,7 @@ export default {
       this.confirmPassword = "";
       this.resetCodeSent = false;
       this.validCode = false;
-      this.enseignantId = null;
+      this.resetToken = null;
       this.resetEtablissement = "";
       this.resetError = "";
       this.resetSuccess = "";
@@ -411,7 +411,7 @@ export default {
             code: this.code,
             etablissement: this.resetEtablissement,
           });
-          this.enseignantId = res.data.enseignantId;
+          this.resetToken = res.data.resetToken;
           this.validCode = true;
         } else {
           if (this.newPassword !== this.confirmPassword) {
@@ -420,7 +420,7 @@ export default {
           }
 
           await axios.post(`${API_BASE}/api/update-password`, {
-            enseignantId: this.enseignantId,
+            resetToken: this.resetToken,
             newPassword: this.newPassword,
           });
 

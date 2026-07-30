@@ -34,7 +34,7 @@
 
       <v-window v-model="tabIndex">
         <v-window-item v-for="s in semestre" :key="s.nom" :value="s.nom">
-          <div v-if="loading" class="text-center pa-10">
+          <div v-if="loading" class="text-center pa-3 pa-sm-10">
             <v-progress-circular indeterminate color="primary"></v-progress-circular>
             <div class="mt-2 text-caption font-weight-bold text-grey">Récupération des données...</div>
           </div>
@@ -63,7 +63,7 @@
             </template>
 
             <template v-slot:no-data>
-              <div class="pa-10 text-center">
+              <div class="pa-3 pa-sm-10 text-center">
                 <v-icon size="64" color="grey-lighten-2">mdi-account-check-outline</v-icon>
                 <div class="text-grey mt-2">Aucune donnée de présence pour ce semestre</div>
               </div>
@@ -103,7 +103,7 @@ export default {
   methods: {
     async fetchSemesters() {
       try {
-        const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
+        const response = await axios.get(`/api/semesters/${this.etablissementId}`);
         this.semestre = response.data.map(sem => ({
           nom: sem.nom,
           data: []
@@ -123,7 +123,7 @@ export default {
     async fetchSemestreData(semestreNom) {
       this.loading = true;
       try {
-        const response = await axios.get(`http://localhost:8080/api/presence/${this.studentId}/${semestreNom}/${this.anneeScolaireId}`);
+        const response = await axios.get(`/api/presence/${this.studentId}/${semestreNom}/${this.anneeScolaireId}`);
         const sem = this.semestre.find(s => s.nom === semestreNom);
         if (sem) {
           sem.data = response.data;

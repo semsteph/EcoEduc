@@ -43,6 +43,18 @@
             variant="text"
             color="white"
             class="text-caption font-weight-bold"
+            @click="toggleAfficherPartis"
+          >
+            <v-icon start size="18">
+              {{ afficherPartis ? 'mdi-eye-off-outline' : 'mdi-account-off-outline' }}
+            </v-icon>
+            {{ afficherPartis ? 'Masquer les partis' : 'Voir les élèves partis' }}
+          </v-btn>
+
+          <v-btn
+            variant="text"
+            color="white"
+            class="text-caption font-weight-bold"
             @click="toggleSelectAll"
           >
             <v-icon start size="18">
@@ -70,7 +82,7 @@
               flat
               border
               class="student-card rounded-lg transition-swing mb-1"
-              :class="{ 'selected-student': selectedIds.includes(eleve.id) }"
+              :class="{ 'selected-student': selectedIds.includes(eleve.id), 'student-parti': eleve.statut === 'parti' }"
               @click="selectStudent(eleve.id)"
             >
               <v-card-text class="pa-3 d-flex align-center">
@@ -82,6 +94,9 @@
                   <div class="text-body-2 font-weight-bold text-black text-truncate">
                     {{ eleve.prenom }} {{ eleve.nom }}
                   </div>
+                  <v-chip v-if="eleve.statut === 'parti'" size="x-small" color="grey-darken-1" text-color="white" class="mt-1">
+                    Parti
+                  </v-chip>
                 </div>
 
                 <v-checkbox
@@ -110,7 +125,8 @@
 
         <div class="d-flex flex-wrap align-center ga-2 action-buttons-wrap">
           <v-btn
-            class="px-6 rounded-lg migrate-btn"
+            v-if="!afficherPartis"
+            class="px-2 px-sm-6 rounded-lg migrate-btn"
             elevation="3"
             :disabled="selectedIds.length === 0"
             @click="ouvrirDialogMigration"
@@ -120,13 +136,40 @@
           </v-btn>
 
           <v-btn
-            class="px-6 rounded-lg reinscription-btn"
+            v-if="!afficherPartis"
+            class="px-2 px-sm-6 rounded-lg reinscription-btn"
             elevation="3"
             :disabled="selectedIds.length === 0"
             @click="reinscrireEleves"
           >
             <v-icon start>mdi-check-circle</v-icon>
             Réinscrire
+          </v-btn>
+
+          <v-btn
+            v-if="!afficherPartis"
+            class="px-2 px-sm-6 rounded-lg parti-btn"
+            elevation="3"
+            :disabled="selectedIds.length === 0"
+            :loading="isMarquantParti"
+            @click="marquerPartis"
+          >
+            <v-icon start>mdi-account-off</v-icon>
+            Marquer comme parti
+          </v-btn>
+
+          <v-btn
+            v-if="afficherPartis"
+            class="px-2 px-sm-6 rounded-lg"
+            color="grey-darken-1"
+            variant="elevated"
+            elevation="3"
+            :disabled="selectedIds.length === 0"
+            :loading="isMarquantParti"
+            @click="annulerDeparts"
+          >
+            <v-icon start>mdi-account-reactivate</v-icon>
+            Annuler le départ
           </v-btn>
         </div>
       </v-card-actions>
@@ -135,7 +178,7 @@
     <!-- Dialog succès réinscription -->
     <v-dialog v-model="dialog" max-width="400" transition="dialog-bottom-transition">
       <v-card class="rounded-xl overflow-hidden">
-        <v-sheet class="pa-6 text-center" color="white">
+        <v-sheet class="pa-2 pa-sm-6 text-center" color="white">
           <v-icon size="64" color="green-darken-1" class="mb-4">mdi-check-circle</v-icon>
           <h3 class="text-h6 font-weight-black text-indigo-darken-4 mb-2">
             Réinscription réussie
@@ -164,7 +207,7 @@
           <span class="font-weight-bold">Migration des élèves</span>
         </v-toolbar>
 
-        <v-card-text class="pa-5">
+        <v-card-text class="pa-2 pa-sm-5">
           <v-alert
             type="info"
             variant="tonal"
@@ -177,6 +220,18 @@
           <div class="text-body-2 font-weight-medium text-indigo-darken-4 mb-3">
             {{ selectedIds.length }} élève(s) seront migré(s)
           </div>
+
+          <v-alert
+            v-if="migrationError"
+            type="error"
+            variant="tonal"
+            rounded="lg"
+            class="mb-4"
+            closable
+            @click:close="migrationError = ''"
+          >
+            {{ migrationError }}
+          </v-alert>
 
           <v-select
             v-model="destinationClasseId"
@@ -233,7 +288,7 @@
     <!-- Dialog succès migration -->
     <v-dialog v-model="migrationSuccessDialog" max-width="420" transition="dialog-bottom-transition">
       <v-card class="rounded-xl overflow-hidden">
-        <v-sheet class="pa-6 text-center" color="white">
+        <v-sheet class="pa-2 pa-sm-6 text-center" color="white">
           <v-icon size="64" color="deep-purple-darken-2" class="mb-4">
             mdi-swap-horizontal-circle
           </v-icon>
@@ -283,6 +338,10 @@ export default {
       classesEtablissement: [],
       loadingClassesEtablissement: false,
       isMigrating: false,
+      migrationError: '',
+
+      afficherPartis: false,
+      isMarquantParti: false,
     };
   },
   computed: {
@@ -291,16 +350,71 @@ export default {
     },
   },
   methods: {
-    fetchStudents() {
-      console.log('[FRONT] fetchStudents classId =', this.classId);
+    authHeaders() {
+      const token = localStorage.getItem('token');
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    },
 
-      axios.get(`http://localhost:8080/api/classes/${this.classId}/eleves`)
+    fetchStudents() {
+      console.log('[FRONT] fetchStudents classId =', this.classId, 'afficherPartis =', this.afficherPartis);
+
+      axios.get(`/api/classes/${this.classId}/eleves`, {
+        params: this.afficherPartis ? { inclurePartis: true } : {}
+      })
         .then(response => {
           console.log('[FRONT] élèves récupérés =', response.data);
-          this.eleves = response.data;
+          this.eleves = this.afficherPartis
+            ? response.data.filter(e => e.statut === 'parti')
+            : response.data;
         })
         .catch(error => {
           console.error('Erreur lors de la récupération des élèves:', error);
+        });
+    },
+
+    toggleAfficherPartis() {
+      this.afficherPartis = !this.afficherPartis;
+      this.selectedIds = [];
+      this.fetchStudents();
+    },
+
+    marquerPartis() {
+      if (this.selectedIds.length === 0) return;
+
+      this.isMarquantParti = true;
+
+      axios.post('/api/eleves/marquer-parti', {
+        eleveIds: this.selectedIds
+      }, { headers: this.authHeaders() })
+        .then(() => {
+          this.selectedIds = [];
+          this.fetchStudents();
+        })
+        .catch(error => {
+          console.error('Erreur lors du marquage des élèves partis :', error);
+        })
+        .finally(() => {
+          this.isMarquantParti = false;
+        });
+    },
+
+    annulerDeparts() {
+      if (this.selectedIds.length === 0) return;
+
+      this.isMarquantParti = true;
+
+      axios.post('/api/eleves/annuler-depart', {
+        eleveIds: this.selectedIds
+      }, { headers: this.authHeaders() })
+        .then(() => {
+          this.selectedIds = [];
+          this.fetchStudents();
+        })
+        .catch(error => {
+          console.error("Erreur lors de l'annulation du départ :", error);
+        })
+        .finally(() => {
+          this.isMarquantParti = false;
         });
     },
 
@@ -314,7 +428,7 @@ export default {
 
       console.log('[FRONT] chargement classes établissement =', this.etablissementId);
 
-      axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
+      axios.get(`/api/classe/${this.etablissementId}`)
         .then(response => {
           console.log('[FRONT] classes établissement récupérées =', response.data);
 
@@ -366,10 +480,10 @@ export default {
       console.log('[FRONT] réinscription eleveIds =', this.selectedIds);
       console.log('[FRONT] anneeScolaireId =', this.anneeScolaireId);
 
-      axios.post('http://localhost:8080/api/eleves/reinscription', {
+      axios.post('/api/eleves/reinscription', {
         eleveIds: this.selectedIds,
         anneeScolaireId: this.anneeScolaireId,
-      })
+      }, { headers: this.authHeaders() })
         .then(() => {
           this.dialog = true;
           this.selectedIds = [];
@@ -386,6 +500,7 @@ export default {
       console.log('[FRONT] ouverture dialog migration, selectedIds =', this.selectedIds);
 
       this.destinationClasseId = null;
+      this.migrationError = '';
       this.migrationDialog = true;
       this.fetchClassesEtablissement();
     },
@@ -393,6 +508,7 @@ export default {
     fermerDialogMigration() {
       this.migrationDialog = false;
       this.destinationClasseId = null;
+      this.migrationError = '';
     },
 
     migrerEleves() {
@@ -400,6 +516,7 @@ export default {
       if (!this.destinationClasseId) return;
 
       this.isMigrating = true;
+      this.migrationError = '';
 
       const payload = {
         eleveIds: this.selectedIds,
@@ -408,7 +525,7 @@ export default {
 
       console.log('[FRONT] migration payload =', payload);
 
-      axios.post('http://localhost:8080/api/eleves/migrer', payload)
+      axios.post('/api/eleves/migrer', payload, { headers: this.authHeaders() })
         .then((response) => {
           console.log('[FRONT] migration réussie =', response.data);
 
@@ -421,6 +538,9 @@ export default {
         .catch((error) => {
           console.error('Erreur lors de la migration :', error);
           console.error('[FRONT] error.response =', error?.response);
+          this.migrationError =
+            error?.response?.data?.message ||
+            "Une erreur est survenue lors de la migration des élèves.";
         })
         .finally(() => {
           this.isMigrating = false;
@@ -462,6 +582,10 @@ export default {
   background-color: #F5F7FF !important;
 }
 
+.student-parti {
+  opacity: 0.6;
+}
+
 .sticky-footer {
   border-top: 1px solid #EEE !important;
 }
@@ -490,6 +614,17 @@ export default {
 }
 
 .migrate-btn .v-icon {
+  color: #ffffff !important;
+}
+
+.parti-btn {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border: none !important;
+}
+
+.parti-btn .v-icon {
   color: #ffffff !important;
 }
 

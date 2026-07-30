@@ -8,7 +8,7 @@
     <v-row justify="center" align="center" class="fill-height ma-0 pa-2">
       <v-col cols="12" sm="10" md="7" lg="5" xl="4" class="pa-0">
         <!-- Header -->
-        <div class="text-center mb-5 px-5">
+        <div class="text-center mb-5 px-2 px-sm-5">
           <div class="brand-badge mx-auto mb-3">
             <v-icon size="22">mdi-school-outline</v-icon>
           </div>
@@ -281,7 +281,7 @@
         </v-card>
 
         <!-- Footer -->
-        <div class="text-center mt-4 footer-note px-6">
+        <div class="text-center mt-4 footer-note px-2 px-sm-6">
           © {{ new Date().getFullYear() }} — EchoEducation
         </div>
       </v-col>
@@ -317,7 +317,7 @@
 <script>
 import axios from "axios";
 
-const API_BASE = "http://localhost:8080";
+const API_BASE = "";
 
 export default {
   data() {
@@ -339,7 +339,7 @@ export default {
       resetError: "",
       resetSuccess: "",
       resetLoading: false,
-      parentId: null,
+      resetToken: null,
 
       showLoginPassword: false,
       showNewPassword: false,
@@ -459,7 +459,7 @@ export default {
       this.validCode = false;
       this.resetError = "";
       this.resetSuccess = "";
-      this.parentId = null;
+      this.resetToken = null;
       this.resetLoading = false;
     },
 
@@ -491,8 +491,8 @@ export default {
             etablissement: this.resetEtablissement,
           });
 
-          if (res.data?.success && res.data?.parentId) {
-            this.parentId = res.data.parentId;
+          if (res.data?.success && res.data?.resetToken) {
+            this.resetToken = res.data.resetToken;
             this.validCode = true;
             this.resetSuccess = "Code validé. Choisissez un nouveau mot de passe.";
           } else {
@@ -507,9 +507,8 @@ export default {
         }
 
         const response = await axios.post(`${API_BASE}/api/parent-update-password`, {
-          parentId: this.parentId,
+          resetToken: this.resetToken,
           newPassword: this.newPassword,
-          etablissement: this.resetEtablissement,
         });
 
         if (response.data?.success) {

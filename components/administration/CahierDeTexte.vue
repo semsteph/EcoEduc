@@ -78,7 +78,7 @@ export default {
   },
   methods: {
     fetchClasses() {
-      axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
+      axios.get(`/api/classe/${this.etablissementId}`)
         .then(response => {
           this.classes = response.data;
         })

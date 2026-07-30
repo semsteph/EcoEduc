@@ -44,6 +44,16 @@
             <div class="drawer-section">Menu principal</div>
 
             <v-list-item
+              :active="currentComponent === 'DashboardHome'"
+              @click="showComponent('DashboardHome')"
+              class="drawer-item"
+              rounded="lg"
+            >
+              <template #prepend><v-icon>mdi-view-dashboard-outline</v-icon></template>
+              <v-list-item-title>Tableau de bord</v-list-item-title>
+            </v-list-item>
+
+            <v-list-item
               :active="currentComponent === 'Acceuil'"
               @click="showComponent('Acceuil')"
               class="drawer-item"
@@ -134,6 +144,7 @@ import { EventBus } from "@/event-bus";
 import ToolbarComponent from "@/components/parents/ToolbarComponent.vue";
 import ChildrenList from "@/components/parents/ChildrenList.vue";
 import Acceuil from "@/components/parents/Acceuil.vue";
+import DashboardHome from "@/components/parents/DashboardHome.vue";
 import LogoutDialog from "@/components/parents/LogoutDialog.vue";
 import NotificationsComponent from "@/components/parents/NotificationsComponent.vue";
 
@@ -142,6 +153,7 @@ export default {
     ToolbarComponent,
     ChildrenList,
     Acceuil,
+    DashboardHome,
     LogoutDialog,
     NotificationsComponent,
   },
@@ -149,11 +161,11 @@ export default {
     const router = useRouter();
     const route = useRoute();
 
-    const API_BASE = "http://localhost:8080";
+    const API_BASE = "";
 
     const drawer = ref(false);
     const logoutDialogVisible = ref(false);
-    const currentComponent = ref("Acceuil");
+    const currentComponent = ref("DashboardHome");
 
     const etablissementId = ref(null);
     const anneeScolaireId = ref(null);

@@ -339,7 +339,7 @@ export default {
       this.loading = true;
       try {
         const response = await axios.get(
-          `http://localhost:8080/api/permissions/${this.etablissementId}/${this.anneeScolaireId}`
+          `/api/permissions/${this.etablissementId}/${this.anneeScolaireId}`
         );
 
         const raw = Array.isArray(response.data) ? response.data : [];
@@ -363,7 +363,7 @@ export default {
       await Promise.all(
         unread.map(async (message) => {
           try {
-            await axios.put(`http://localhost:8080/api/permissions/${message.id}`, {
+            await axios.put(`/api/permissions/${message.id}`, {
               is_read: true,
             });
             message.is_read = true;
@@ -392,7 +392,7 @@ export default {
       const permissionsWithDetails = await Promise.all(
         this.filteredPermissions.map(async (permission) => {
           try {
-            const res = await axios.get(`http://localhost:8080/api/students/${permission.eleve_id}`);
+            const res = await axios.get(`/api/students/${permission.eleve_id}`);
             const { eleveNom, elevePrenom, classeNom } = res.data;
 
             return {
@@ -420,7 +420,7 @@ export default {
 
       if (!message.is_read) {
         try {
-          await axios.put(`http://localhost:8080/api/permissions/${message.id}`, { is_read: true });
+          await axios.put(`/api/permissions/${message.id}`, { is_read: true });
           message.is_read = true;
 
           // ✅ cohérence de liste
@@ -442,7 +442,7 @@ export default {
 
       this.savingStatus = true;
       try {
-        await axios.put(`http://localhost:8080/api/permissions/${this.selectedMessage.id}`, {
+        await axios.put(`/api/permissions/${this.selectedMessage.id}`, {
           statut: this.selectedStatus,
         });
 

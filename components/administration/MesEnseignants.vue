@@ -147,7 +147,7 @@ export default {
   methods: {
     async fetchEnseignants() {
       try {
-        const response = await axios.get(`http://localhost:8080/api/EnseignantAdmin/${this.etablissementId}`);
+        const response = await axios.get(`/api/EnseignantAdmin/${this.etablissementId}`);
         this.enseignants = response.data;
         console.log(response.data);
         console.log(this.etablissementId);
@@ -159,11 +159,15 @@ export default {
       this.selectedEnseignant = { ...enseignant };
       this.dialog = true;
     },
+    authHeaders() {
+      const token = localStorage.getItem('token');
+      return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    },
     async updateEnseignant() {
       const { id, nom, prenom, email, telephone, nom_utilisateur, mot_de_passe } = this.selectedEnseignant;
       const data = { name: nom, firstName: prenom, email, phone: telephone, username: nom_utilisateur, password: mot_de_passe };
       try {
-        await axios.put(`http://localhost:8080/api/Enseignants/${id}`, data);
+        await axios.put(`/api/Enseignants/${id}`, data, this.authHeaders());
         this.dialog = false;
         this.fetchEnseignants();
       } catch (error) {
@@ -172,7 +176,7 @@ export default {
     },
     async deleteEnseignant(id) {
       try {
-        await axios.delete(`http://localhost:8080/api/Enseignants/${id}`);
+        await axios.delete(`/api/Enseignants/${id}`, this.authHeaders());
         this.fetchEnseignants();
       } catch (error) {
         console.error("Erreur lors de la suppression de l'enseignant", error);

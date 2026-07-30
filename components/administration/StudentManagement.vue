@@ -2,7 +2,7 @@
   <v-container class="scrollable-container px-4 py-6" fluid>
     <v-row justify="center">
       <v-col
-        v-for="(label, index) in labels"
+        v-for="(label, index) in visibleLabels"
         :key="index"
         cols="12"
         sm="6"
@@ -46,11 +46,14 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
+
 const props = defineProps({
   etablissementId: Number,
   etablissementNom: String,
   anneeScolaire: String,
-  anneeScolaireId: Number
+  anneeScolaireId: Number,
+  modulesAutorises: { type: Array, default: null }
 });
 
 const emit = defineEmits(['component-selected', 'back']);
@@ -111,6 +114,15 @@ const labels = [
     gradient: 'linear-gradient(135deg, #4CAF50, #1B5E20)'
   }
 ];
+
+// Le dashboard remappe la route 'Scolarite' vers le composant 'ScolariteManager' :
+// on filtre sur la même clé pour que les droits accordés correspondent aux tuiles affichées.
+const permissionKeyForRoute = (route) => (route === 'Scolarite' ? 'ScolariteManager' : route);
+
+const visibleLabels = computed(() => {
+  if (!props.modulesAutorises) return labels;
+  return labels.filter((label) => props.modulesAutorises.includes(permissionKeyForRoute(label.route)));
+});
 
 const navigateTo = (route) => {
   emit('component-selected', route);

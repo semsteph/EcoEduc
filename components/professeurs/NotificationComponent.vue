@@ -184,11 +184,16 @@ export default {
       error.value = null;
 
       try {
-        await axios.put("http://localhost:8080/api/notificationprof/mark-read-bulk", {
-          notificationIds: toMark,
-          enseignantId: props.enseignantId,
-          etablissementId: props.etablissementId,
-        });
+        const token = localStorage.getItem("token");
+        await axios.put(
+          "/api/notificationprof/mark-read-bulk",
+          {
+            notificationIds: toMark,
+            enseignantId: props.enseignantId,
+            etablissementId: props.etablissementId,
+          },
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+        );
 
         localNotifications.value = localNotifications.value.map((n) =>
           toMark.includes(n.notificationId) ? { ...n, isRead: true } : n

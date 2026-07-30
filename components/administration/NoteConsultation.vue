@@ -138,7 +138,7 @@ export default {
     async fetchClasses() {
       this.loading = true
       try {
-        const res = await axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
+        const res = await axios.get(`/api/classe/${this.etablissementId}`)
         this.classes = res.data
       } catch (err) {
         console.error('Erreur classes:', err)

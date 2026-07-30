@@ -25,7 +25,7 @@ export async function checkNotifications(parentId, etablissementId, anneeScolair
 
   try {
     const res = await axios.get(
-      `http://localhost:8080/api/notificationed/${parentId}/${etablissementId}/${anneeScolaireId}`,
+      `/api/notificationed/${parentId}/${etablissementId}/${anneeScolaireId}`,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       }

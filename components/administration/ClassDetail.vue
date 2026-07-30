@@ -162,7 +162,7 @@ export default {
   methods: {
     fetchStudents() {
       axios
-        .get(`http://localhost:8080/api/eleves/${this.classId}/${this.anneeScolaireId}`)
+        .get(`/api/eleves/${this.classId}/${this.anneeScolaireId}`)
         .then((response) => {
           this.eleves = response.data;
         })

@@ -114,7 +114,7 @@ export default {
   },
   methods: {
     fetchPermissions() {
-      axios.get(`http://localhost:8080/api/permissions/${this.childId}/${this.etablissementId}/${this.anneeScolaireId}`)
+      axios.get(`/api/permissions/${this.childId}/${this.etablissementId}/${this.anneeScolaireId}`)
         .then(response => {
           this.permissions = response.data;
         })
@@ -130,7 +130,7 @@ export default {
   
     addPermission() {
       
-      axios.post(`http://localhost:8080/api/permissions/${this.childId}`, {
+      axios.post(`/api/permissions/${this.childId}`, {
         date: this.newPermission.date,
         motif: this.newPermission.motif,
         duree: this.newPermission.duree,
@@ -161,7 +161,7 @@ export default {
  
     },
     deletePermission(permissionId) {
-      axios.delete(`http://localhost:8080/api/permissions/${permissionId}`)
+      axios.delete(`/api/permissions/${permissionId}`)
         .then(() => {
           this.permissions = this.permissions.filter(permission => permission.id !== permissionId);
           this.showSnackbar('Permission supprimée avec succès', 'error');

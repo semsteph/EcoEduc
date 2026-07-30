@@ -118,7 +118,7 @@ export default {
     async fetchData() {
   try {
     const response = await axios.get(
-      `http://localhost:8080/api/bulletined/${this.childId}/${this.anneeScolaireId}`
+      `/api/bulletined/${this.childId}/${this.anneeScolaireId}`
     );
     const data = response.data;
 

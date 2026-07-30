@@ -1,8 +1,17 @@
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 
 export default defineNuxtConfig({
-  
+
   devtools: { enabled: true },
+
+  app: {
+    head: {
+      meta: [
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=5' },
+      ],
+    },
+  },
+
 css: [
     '@/assets/css/styles.css' // ➕ Ajout de ton fichier Tailwind CSS
   ],
@@ -25,6 +34,14 @@ css: [
     vue: {
       template: {
         transformAssetUrls,
+      },
+    },
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
       },
     },
   },

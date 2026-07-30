@@ -268,7 +268,7 @@ import Bulletin from "./Bulletin.vue";
 import Assistances from "./Assistances.vue";
 import axios from "axios";
 
-const API_URL = "http://localhost:8080/api/parent/children";
+const API_URL = "/api/parent/children";
 
 export default {
   components: {

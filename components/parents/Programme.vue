@@ -222,7 +222,7 @@ export default {
       this.error = null;
 
       try {
-        const res = await fetch(`http://localhost:8080/api/programme/${this.childId}`);
+        const res = await fetch(`/api/programme/${this.childId}`);
         if (!res.ok) throw new Error(`Erreur API (${res.status})`);
         const data = await res.json();
 

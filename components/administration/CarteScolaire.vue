@@ -17,7 +17,7 @@
         </v-toolbar-title>
       </v-toolbar>
 
-      <v-card-text class="bg-grey-lighten-4 pa-6">
+      <v-card-text class="bg-grey-lighten-4 pa-2 pa-sm-6">
         <p class="mb-6 text-subtitle-1 grey--text text--darken-2">
           Sélectionnez une classe pour générer les cartes scolaires.
         </p>
@@ -79,7 +79,7 @@ export default {
   methods: {
     async fetchClasses() {
       try {
-        const response = await axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
+        const response = await axios.get(`/api/classe/${this.etablissementId}`)
         this.classes = response.data
       } catch (error) {
         console.error('Erreur classes:', error)

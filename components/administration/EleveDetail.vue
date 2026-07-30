@@ -22,7 +22,7 @@
           { label: 'Consulté Présence' },
           { label: 'Consulté Note' },
           { label: 'Gestion Bulletin' },
-          { label: 'Gestion Scolarité' }
+          { label: 'Scolarité' }
         ]
       };
     },

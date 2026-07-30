@@ -137,7 +137,7 @@ export default {
 
     async fetchNotifications() {
       try {
-        const url = `http://localhost:8080/api/notifications/${this.etablissementId}/${this.anneeScolaireId}`;
+        const url = `/api/notifications/${this.etablissementId}/${this.anneeScolaireId}`;
         const res = await axios.get(url);
 
         const rawData = res.data || [];
@@ -148,10 +148,10 @@ export default {
 
         // Formater chaque notification
         const formatted = await Promise.all(rawData.map(async notif => {
-          const studentRes = await axios.get(`http://localhost:8080/api/eleve/${notif.eleve_id}`);
+          const studentRes = await axios.get(`/api/eleve/${notif.eleve_id}`);
           const studentData = studentRes.data;
 
-          const classRes = await axios.get(`http://localhost:8080/api/classes/${studentData.classe_id}`);
+          const classRes = await axios.get(`/api/classes/${studentData.classe_id}`);
           const classData = classRes.data;
 
           return {
@@ -177,7 +177,7 @@ export default {
 
     async markNotificationsAsRead() {
       try {
-        const url = `http://localhost:8080/api/notifications/mark-read/${this.etablissementId}/${this.anneeScolaireId}`;
+        const url = `/api/notifications/mark-read/${this.etablissementId}/${this.anneeScolaireId}`;
         await axios.put(url);
       } catch (err) {
         console.error('❌ Erreur lors du marquage des notifications comme lues:', err);
@@ -186,9 +186,9 @@ export default {
 
     async contactParent(studentId) {
       try {
-        const studentRes = await axios.get(`http://localhost:8080/api/eleve/${studentId}`);
+        const studentRes = await axios.get(`/api/eleve/${studentId}`);
         const parentId = studentRes.data.Parents_id;
-        const parentRes = await axios.get(`http://localhost:8080/api/parentid/${parentId}`);
+        const parentRes = await axios.get(`/api/parentid/${parentId}`);
         this.parentInfo = parentRes.data;
         this.dialog = true;
       } catch (error) {

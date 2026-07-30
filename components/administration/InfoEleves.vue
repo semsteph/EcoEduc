@@ -21,12 +21,13 @@ export default {
         { name: 'Gestion de Punition', route: 'PunitionManager', color: 'yellow' },
         { name: 'Consulter Note', route: 'CahierDeTexteManager', color: 'blue' },
         { name: 'Gestion Bulletin', route: 'BulletinManager', color: 'green' },
-        { name: 'Gestion Scolarité', route: 'ScolariteManager', color: 'purple' }
+        { name: 'Scolarité', route: 'ScolariteManager', color: 'purple' }
       ]
     }
   },
   methods: {
     navigateTo(route) {
+       console.log("MENU ACTUEL", route)
       this.$emit('navigate', route);
     }
   }

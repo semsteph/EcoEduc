@@ -1,20 +1,20 @@
 <template>
   <v-container class="pa-2 pa-sm-4 pa-md-8 page-bg" fluid>
     <v-row justify="center">
-      <v-col cols="12" lg="11" xl="10">
+      <v-col cols="12" xl="11">
         <v-card class="mx-auto rounded-xl elevation-4 overflow-hidden main-card">
           <v-toolbar flat color="primary" dark class="toolbar-custom px-2 px-sm-4">
             <div class="d-flex align-center min-w-0">
               <div class="toolbar-icon-box mr-3">
-                <v-icon dark>mdi-school-outline</v-icon>
+                <v-icon dark>mdi-cog-outline</v-icon>
               </div>
 
               <div class="min-w-0">
                 <v-toolbar-title class="font-weight-bold text-h6 text-sm-h5 text-truncate">
-                  Gestion des années scolaires
+                  Paramètres de l'établissement
                 </v-toolbar-title>
                 <div class="toolbar-subtitle text-caption text-sm-body-2">
-                  Paramétrage, rapport de clôture et validation finale
+                  Année scolaire, clôture, frais de scolarité et collaborateurs
                 </div>
               </div>
             </div>
@@ -28,35 +28,78 @@
             </div>
           </v-toolbar>
 
-          <v-card-text class="pa-4 pa-sm-6">
-            <v-card flat class="year-card rounded-xl mb-5">
-              <v-card-text class="pa-4 pa-sm-5">
-                <div class="d-flex flex-column flex-sm-row align-sm-center justify-space-between">
+          <div class="settings-shell">
+            <nav class="settings-nav">
+              <button
+                v-for="section in visibleSections"
+                :key="section.key"
+                type="button"
+                class="settings-nav__item"
+                :class="{ 'settings-nav__item--active': activeSection === section.key }"
+                :disabled="isSubmitting"
+                @click="selectSection(section.key)"
+              >
+                <v-icon
+                  size="20"
+                  class="settings-nav__icon"
+                  :color="activeSection === section.key ? 'primary' : '#64748b'"
+                >
+                  {{ section.icon }}
+                </v-icon>
+                <span>{{ section.label }}</span>
+                <v-icon
+                  v-if="activeSection === section.key"
+                  size="18"
+                  color="primary"
+                  class="settings-nav__chevron"
+                >
+                  mdi-chevron-right
+                </v-icon>
+              </button>
+            </nav>
+
+            <div class="settings-content">
+              <!-- ================================================================= -->
+              <!-- PANNEAU : ANNÉE SCOLAIRE                                           -->
+              <!-- ================================================================= -->
+              <div v-if="activeSection === 'annee'" class="settings-panel">
+                <div class="section-head mb-4">
+                  <div class="section-icon primary-soft">
+                    <v-icon color="primary">mdi-calendar-range</v-icon>
+                  </div>
                   <div>
-                    <div class="year-label mb-1">Année scolaire en cours</div>
-                    <div class="year-value">
-                      {{ currentAnneeScolaire || "Non définie" }}
+                    <div class="section-title-text">Année scolaire</div>
+                    <div class="section-subtitle-text">
+                      Année active de l'établissement et création de nouvelles années
                     </div>
                   </div>
-
-                  <div class="mt-3 mt-sm-0">
-                    <v-chip
-                      :color="currentAnneeScolaireId ? 'success' : 'grey'"
-                      dark
-                      class="font-weight-bold"
-                    >
-                      {{ currentAnneeScolaireId ? "Année active" : "Aucune année" }}
-                    </v-chip>
-                  </div>
                 </div>
-              </v-card-text>
-            </v-card>
 
-            <v-row dense class="mb-2">
-              <v-col cols="12" md="4">
+                <v-card flat class="year-card rounded-xl mb-5">
+                  <v-card-text class="pa-4 pa-sm-5">
+                    <div class="d-flex flex-column flex-sm-row align-sm-center justify-space-between">
+                      <div>
+                        <div class="year-label mb-1">Année scolaire en cours</div>
+                        <div class="year-value">
+                          {{ currentAnneeScolaire || "Non définie" }}
+                        </div>
+                      </div>
+
+                      <div class="mt-3 mt-sm-0">
+                        <v-chip
+                          :color="currentAnneeScolaireId ? 'success' : 'grey'"
+                          dark
+                          class="font-weight-bold"
+                        >
+                          {{ currentAnneeScolaireId ? "Année active" : "Aucune année" }}
+                        </v-chip>
+                      </div>
+                    </div>
+                  </v-card-text>
+                </v-card>
+
                 <v-btn
                   color="primary"
-                  block
                   large
                   elevation="2"
                   class="rounded-xl text-none font-weight-bold btn-main"
@@ -66,118 +109,71 @@
                   <v-icon left>{{ showAddForm ? "mdi-minus" : "mdi-plus" }}</v-icon>
                   {{ showAddForm ? "Masquer le formulaire" : "Ajouter une année" }}
                 </v-btn>
-              </v-col>
 
-              <v-col cols="12" md="4">
-                <v-btn
-                  color="indigo"
-                  dark
-                  block
-                  large
-                  elevation="2"
-                  class="rounded-xl text-none font-weight-bold btn-main"
-                  :disabled="isSubmitting"
-                  @click="showSettings = !showSettings"
-                >
-                  <v-icon left>{{ showSettings ? "mdi-tune-vertical-off" : "mdi-tune-vertical" }}</v-icon>
-                  {{ showSettings ? "Masquer les paramètres" : "Paramètres de clôture" }}
-                </v-btn>
-              </v-col>
+                <v-expand-transition>
+                  <div v-if="showAddForm">
+                    <v-sheet class="pa-4 pa-sm-5 rounded-xl add-form-box mt-4">
+                      <v-row dense align="center">
+                        <v-col cols="12" md="8">
+                          <v-text-field
+                            v-model.trim="nouvelleAnnee"
+                            label="Libellé (ex : 2025-2026)"
+                            placeholder="Saisissez l'année scolaire"
+                            outlined
+                            dense
+                            hide-details="auto"
+                            prepend-inner-icon="mdi-calendar-range"
+                            class="custom-input"
+                            :disabled="isSubmitting"
+                            @keyup.enter="ajouterAnneeScolaire"
+                          />
+                        </v-col>
 
-              <v-col cols="12" md="4">
-                <v-btn
-                  color="error"
-                  block
-                  large
-                  elevation="2"
-                  class="rounded-xl text-none font-weight-bold btn-main"
-                  :loading="isPreparingReport || isClosing"
-                  :disabled="isSubmitting || !currentAnneeScolaireId"
-                  @click="ouvrirRapportCloture"
-                >
-                  <v-icon left>mdi-lock-check-outline</v-icon>
-                  Clôturer l’année
-                </v-btn>
-              </v-col>
-            </v-row>
+                        <v-col cols="12" md="4">
+                          <div class="d-flex gap-2 actions-mobile">
+                            <v-btn
+                              color="success"
+                              class="flex-grow-1 text-none font-weight-bold rounded-lg"
+                              :loading="isAdding"
+                              :disabled="isSubmitting"
+                              @click="ajouterAnneeScolaire"
+                            >
+                              Enregistrer
+                            </v-btn>
 
-            <v-expand-transition>
-              <div v-if="showAddForm">
-                <v-divider class="my-5"></v-divider>
+                            <v-btn
+                              color="grey lighten-3"
+                              class="text-none black--text font-weight-medium rounded-lg"
+                              :disabled="isSubmitting"
+                              @click="resetAddForm"
+                            >
+                              Annuler
+                            </v-btn>
+                          </div>
+                        </v-col>
+                      </v-row>
+                    </v-sheet>
+                  </div>
+                </v-expand-transition>
+              </div>
 
-                <v-sheet class="pa-4 pa-sm-5 rounded-xl add-form-box">
-                  <div class="section-head mb-4">
-                    <div class="section-icon primary-soft">
-                      <v-icon color="primary">mdi-calendar-plus</v-icon>
-                    </div>
-                    <div>
-                      <div class="section-title-text">Nouvelle année scolaire</div>
-                      <div class="section-subtitle-text">
-                        Ajoutez une nouvelle année sans recharger la page
-                      </div>
+              <!-- ================================================================= -->
+              <!-- PANNEAU : PARAMÈTRES DE CLÔTURE                                    -->
+              <!-- ================================================================= -->
+              <div v-else-if="activeSection === 'cloture'" class="settings-panel">
+                <div class="section-head mb-4">
+                  <div class="section-icon indigo-soft">
+                    <v-icon color="indigo">mdi-tune-vertical</v-icon>
+                  </div>
+                  <div>
+                    <div class="section-title-text">Paramètres de clôture</div>
+                    <div class="section-subtitle-text">
+                      Définissez manuellement les règles d’affectation des élèves promus
                     </div>
                   </div>
-
-                  <v-row dense align="center">
-                    <v-col cols="12" md="8">
-                      <v-text-field
-                        v-model.trim="nouvelleAnnee"
-                        label="Libellé (ex : 2025-2026)"
-                        placeholder="Saisissez l'année scolaire"
-                        outlined
-                        dense
-                        hide-details="auto"
-                        prepend-inner-icon="mdi-calendar-range"
-                        class="custom-input"
-                        :disabled="isSubmitting"
-                        @keyup.enter="ajouterAnneeScolaire"
-                      />
-                    </v-col>
-
-                    <v-col cols="12" md="4">
-                      <div class="d-flex gap-2 actions-mobile">
-                        <v-btn
-                          color="success"
-                          class="flex-grow-1 text-none font-weight-bold rounded-lg"
-                          :loading="isAdding"
-                          :disabled="isSubmitting"
-                          @click="ajouterAnneeScolaire"
-                        >
-                          Enregistrer
-                        </v-btn>
-
-                        <v-btn
-                          color="grey lighten-3"
-                          class="text-none black--text font-weight-medium rounded-lg"
-                          :disabled="isSubmitting"
-                          @click="resetAddForm"
-                        >
-                          Annuler
-                        </v-btn>
-                      </div>
-                    </v-col>
-                  </v-row>
-                </v-sheet>
-              </div>
-            </v-expand-transition>
-
-            <v-expand-transition>
-              <div v-if="showSettings">
-                <v-divider class="my-5"></v-divider>
+                </div>
 
                 <v-sheet class="pa-4 pa-sm-5 rounded-xl settings-box">
-                  <div class="section-head mb-4">
-                    <div class="section-icon indigo-soft">
-                      <v-icon color="indigo">mdi-cog-outline</v-icon>
-                    </div>
-                    <div>
-                      <div class="section-title-text">Paramètres de clôture</div>
-                      <div class="section-subtitle-text">
-                        Définissez manuellement les règles d’affectation des élèves promus
-                      </div>
-                    </div>
-                  </div>
-
                   <v-row dense>
                     <v-col cols="12" lg="7">
                       <v-row dense>
@@ -306,11 +302,201 @@
                     </v-btn>
                   </div>
                 </v-sheet>
+
+                <v-card flat class="rounded-xl cloture-cta mt-5">
+                  <v-card-text class="pa-4 pa-sm-5 d-flex flex-column flex-sm-row align-sm-center justify-space-between gap-3">
+                    <div class="mb-3 mb-sm-0">
+                      <div class="section-title-text mb-1">Clôturer l’année</div>
+                      <div class="section-subtitle-text">
+                        Génère un rapport de simulation à valider avant toute application définitive.
+                      </div>
+                    </div>
+
+                    <v-btn
+                      color="error"
+                      elevation="2"
+                      class="rounded-xl text-none font-weight-bold btn-main flex-shrink-0"
+                      :loading="isPreparingReport || isClosing"
+                      :disabled="isSubmitting || !currentAnneeScolaireId"
+                      @click="ouvrirRapportCloture"
+                    >
+                      <v-icon left>mdi-lock-check-outline</v-icon>
+                      Clôturer l’année
+                    </v-btn>
+                  </v-card-text>
+                </v-card>
               </div>
-            </v-expand-transition>
 
-            <v-divider class="my-6"></v-divider>
+              <!-- ================================================================= -->
+              <!-- PANNEAU : FRAIS DE SCOLARITÉ PAR CLASSE                            -->
+              <!-- ================================================================= -->
+              <div v-else-if="activeSection === 'frais'" class="settings-panel">
+                <div class="section-head mb-4">
+                  <div class="section-icon success-soft">
+                    <v-icon color="success">mdi-cash-multiple</v-icon>
+                  </div>
+                  <div>
+                    <div class="section-title-text">Frais de scolarité par promotion</div>
+                    <div class="section-subtitle-text">
+                      Montant total dû par élève pour
+                      « {{ currentAnneeScolaire || "année non définie" }} »
+                    </div>
+                  </div>
+                </div>
 
+                <v-sheet class="pa-4 pa-sm-5 rounded-xl frais-box">
+                  <!-- Pas d'année active -->
+                  <v-alert
+                    v-if="!currentAnneeScolaireId"
+                    type="warning"
+                    outlined
+                    class="rounded-xl mb-0"
+                  >
+                    Veuillez d’abord définir une année scolaire active avant de paramétrer les frais.
+                  </v-alert>
+
+                  <template v-else>
+                    <!-- Chargement des promotions -->
+                    <div v-if="isLoadingPromotions" class="d-flex justify-center py-6">
+                      <v-progress-circular indeterminate color="success" />
+                    </div>
+
+                    <template v-else>
+                      <v-alert
+                        v-if="promotionsFrais.length === 0"
+                        type="info"
+                        outlined
+                        class="rounded-xl mb-0"
+                      >
+                        Aucune classe trouvée pour cet établissement.
+                      </v-alert>
+
+                      <div v-else>
+                        <v-row dense align="center" class="mb-2 frais-global">
+                          <v-col cols="12" sm="5" md="4">
+                            <v-text-field
+                              v-model.number="fraisMontant"
+                              type="number"
+                              min="0"
+                              label="Montant de la scolarité (FCFA)"
+                              outlined
+                              dense
+                              hide-details
+                              class="custom-input"
+                              :disabled="isSavingFrais"
+                            />
+                          </v-col>
+
+                          <v-col cols="12" sm="5" md="4">
+                            <v-select
+                              v-model="fraisPromotionId"
+                              :items="promotionsFrais"
+                              item-title="nom"
+                              item-value="id"
+                              label="Promotion (ex : 6ème)"
+                              outlined
+                              dense
+                              hide-details
+                              class="custom-input"
+                              :disabled="isSavingFrais"
+                            />
+                          </v-col>
+
+                          <v-col cols="12" sm="auto">
+                            <v-btn
+                              color="success"
+                              dark
+                              class="text-none font-weight-bold rounded-lg"
+                              :loading="isSavingFrais"
+                              :disabled="isSavingFrais"
+                              @click="appliquerFraisPromotion"
+                            >
+                              Appliquer
+                            </v-btn>
+                          </v-col>
+                        </v-row>
+
+                        <div class="text-caption grey--text">
+                          Le montant saisi sera appliqué à tous les élèves de toutes les classes de la promotion sélectionnée.
+                        </div>
+                      </div>
+                    </template>
+                  </template>
+                </v-sheet>
+              </div>
+
+              <!-- ================================================================= -->
+              <!-- PANNEAU : COLLABORATEURS                                           -->
+              <!-- ================================================================= -->
+              <div v-else-if="activeSection === 'collaborateurs' && isFounder" class="settings-panel">
+                <div class="section-head mb-4">
+                  <div class="section-icon deep-purple-soft">
+                    <v-icon color="deep-purple">mdi-account-multiple-plus-outline</v-icon>
+                  </div>
+                  <div>
+                    <div class="section-title-text">Collaborateurs</div>
+                    <div class="section-subtitle-text">
+                      Comptes secondaires (comptable, secrétaire…) et leurs accès
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-flex justify-end mb-3">
+                  <v-btn
+                    color="deep-purple"
+                    dark
+                    class="rounded-xl text-none font-weight-bold"
+                    @click="openCollaborateurDialog()"
+                  >
+                    <v-icon left>mdi-plus</v-icon>
+                    Ajouter un collaborateur
+                  </v-btn>
+                </div>
+
+                <v-data-table
+                  :headers="collaborateurHeaders"
+                  :items="collaborateurs"
+                  :loading="isLoadingCollaborateurs"
+                  class="elevation-0 rounded-xl custom-table"
+                  no-data-text="Aucun collaborateur pour le moment"
+                  mobile-breakpoint="768"
+                >
+                  <template v-slot:item.poste="{ item }">
+                    <v-chip small color="deep-purple" dark>{{ item.poste }}</v-chip>
+                  </template>
+
+                  <template v-slot:item.modules_autorises="{ item }">
+                    <v-chip
+                      v-for="key in item.modules_autorises"
+                      :key="key"
+                      x-small
+                      class="mr-1 mb-1"
+                      color="grey lighten-3"
+                    >
+                      {{ moduleLabel(key) }}
+                    </v-chip>
+                    <span v-if="!item.modules_autorises || !item.modules_autorises.length" class="text-caption grey--text">
+                      Aucun accès
+                    </span>
+                  </template>
+
+                  <template v-slot:item.actions="{ item }">
+                    <v-btn icon small @click="openCollaborateurDialog(item)" title="Modifier">
+                      <v-icon small>mdi-pencil</v-icon>
+                    </v-btn>
+                    <v-btn icon small @click="resetCollaborateurPassword(item)" title="Réinitialiser le mot de passe">
+                      <v-icon small>mdi-lock-reset</v-icon>
+                    </v-btn>
+                    <v-btn icon small @click="confirmDeleteCollaborateur(item)" title="Supprimer">
+                      <v-icon small color="error">mdi-delete-outline</v-icon>
+                    </v-btn>
+                  </template>
+                </v-data-table>
+              </div>
+            </div>
+          </div>
+
+          <v-card-text class="pa-4 pa-sm-6 pt-0">
             <v-card flat class="rounded-xl info-box pa-3 pa-sm-4">
               <div class="d-flex align-start">
                 <v-icon color="primary" class="mr-3 mt-1">mdi-information-outline</v-icon>
@@ -648,6 +834,44 @@
               </v-col>
             </v-row>
           </div>
+
+          <div class="section-block" v-if="reportAlertesCapacite.length > 0">
+            <div class="section-title">
+              <v-icon color="warning darken-2" class="mr-2">mdi-alert-outline</v-icon>
+              Classes qui dépasseront l’effectif maximum
+            </div>
+
+            <v-row dense>
+              <v-col
+                v-for="(alerte, index) in reportAlertesCapacite"
+                :key="`alerte-capacite-${index}`"
+                cols="12"
+                md="6"
+              >
+                <v-card flat class="rounded-xl anomaly-card">
+                  <v-card-text class="pa-4">
+                    <div class="d-flex justify-space-between align-start flex-wrap gap-2 mb-2">
+                      <div class="font-weight-bold text-subtitle-2">
+                        {{ alerte.classeNom }}
+                      </div>
+
+                      <v-chip small color="warning darken-2" dark>À vérifier</v-chip>
+                    </div>
+
+                    <div class="problem-cell mb-2">
+                      {{ alerte.probleme }}
+                    </div>
+
+                    <div class="text-caption grey--text">
+                      {{ alerte.effectifNouveaux }} nouvel(le)s admis
+                      + {{ alerte.effectifExistant }} redoublant(s) déjà présent(s)
+                      = {{ alerte.effectifFinal }} (maximum paramétré : {{ alerte.effectifMax }})
+                    </div>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+            </v-row>
+          </div>
         </v-card-text>
 
         <v-divider></v-divider>
@@ -713,6 +937,148 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="collaborateurDialog" max-width="700" persistent>
+      <v-card class="rounded-xl">
+        <v-card-title class="headline d-flex align-center">
+          <v-icon color="deep-purple" left>mdi-account-cog-outline</v-icon>
+          {{ collaborateurForm.id ? "Modifier le collaborateur" : "Ajouter un collaborateur" }}
+        </v-card-title>
+
+        <v-card-text class="pt-2">
+          <v-row dense>
+            <v-col cols="12" sm="6">
+              <v-text-field v-model="collaborateurForm.nom" label="Nom" outlined dense></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field v-model="collaborateurForm.prenom" label="Prénom" outlined dense></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-combobox
+                v-model="collaborateurForm.poste"
+                :items="posteSuggestions"
+                label="Rôle / Poste"
+                outlined
+                dense
+                hint="Ex: Comptable, Secrétaire, Surveillant général…"
+                persistent-hint
+              ></v-combobox>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field v-model="collaborateurForm.telephone" label="Téléphone" outlined dense></v-text-field>
+            </v-col>
+            <v-col cols="12">
+              <v-text-field v-model="collaborateurForm.email" label="Email" outlined dense type="email"></v-text-field>
+            </v-col>
+          </v-row>
+
+          <v-divider class="my-3"></v-divider>
+
+          <div class="font-weight-bold mb-2">Accès autorisés</div>
+          <div class="text-caption grey--text mb-3">
+            Cochez uniquement les modules et onglets que ce collaborateur doit voir en se connectant.
+          </div>
+
+          <div v-for="mod in moduleCatalog" :key="mod.key" class="mb-3">
+            <v-checkbox
+              v-if="mod.children.length"
+              :model-value="isModuleChecked(mod.key)"
+              :indeterminate="isModuleIndeterminate(mod.key)"
+              :label="mod.label"
+              hide-details
+              density="compact"
+              class="font-weight-bold"
+              @update:model-value="toggleModule(mod)"
+            ></v-checkbox>
+
+            <v-checkbox
+              v-else
+              :model-value="isModuleChecked(mod.key)"
+              :label="mod.label"
+              hide-details
+              density="compact"
+              class="font-weight-bold"
+              @update:model-value="toggleSimpleModule(mod.key)"
+            ></v-checkbox>
+
+            <div v-if="mod.children.length" class="pl-8">
+              <v-checkbox
+                v-for="child in mod.children"
+                :key="child.key"
+                :model-value="collaborateurForm.modules.includes(child.key)"
+                :label="child.label"
+                hide-details
+                density="compact"
+                @update:model-value="toggleChild(mod, child)"
+              ></v-checkbox>
+            </div>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="pa-4">
+          <v-spacer></v-spacer>
+          <v-btn text :disabled="isSavingCollaborateur" @click="collaborateurDialog = false">Annuler</v-btn>
+          <v-btn
+            color="deep-purple"
+            dark
+            class="rounded-lg text-none font-weight-bold"
+            :loading="isSavingCollaborateur"
+            @click="saveCollaborateur"
+          >
+            Enregistrer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="generatedPasswordDialog" max-width="480" persistent>
+      <v-card class="rounded-xl">
+        <v-card-title class="headline d-flex align-center">
+          <v-icon color="success" left>mdi-check-circle-outline</v-icon>
+          Mot de passe généré
+        </v-card-title>
+        <v-card-text>
+          <p>Communiquez ces identifiants au collaborateur. Ce mot de passe ne sera plus affiché ensuite.</p>
+          <v-sheet color="#f8f9fa" class="pa-4 rounded-lg text-left border">
+            <div class="mb-2"><strong>Email :</strong> {{ generatedCredentials.email }}</div>
+            <div><strong>Mot de passe :</strong> <span class="font-weight-bold">{{ generatedCredentials.password }}</span></div>
+          </v-sheet>
+        </v-card-text>
+        <v-card-actions class="pa-4">
+          <v-spacer></v-spacer>
+          <v-btn color="primary" dark class="rounded-lg text-none font-weight-bold" @click="generatedPasswordDialog = false">
+            C'est noté
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="deleteCollaborateurDialog" max-width="480" persistent>
+      <v-card class="rounded-xl">
+        <v-card-title class="headline error--text d-flex align-center">
+          <v-icon color="error" left>mdi-alert-circle-outline</v-icon>
+          Supprimer ce collaborateur ?
+        </v-card-title>
+        <v-card-text>
+          Cette action est définitive.
+          <strong>{{ collaborateurToDelete?.prenom }} {{ collaborateurToDelete?.nom }}</strong>
+          perdra immédiatement l'accès à l'espace administration.
+        </v-card-text>
+        <v-card-actions class="pa-4">
+          <v-spacer></v-spacer>
+          <v-btn text :disabled="isSavingCollaborateur" @click="deleteCollaborateurDialog = false">Annuler</v-btn>
+          <v-btn
+            color="error"
+            dark
+            class="rounded-lg text-none font-weight-bold"
+            :loading="isSavingCollaborateur"
+            @click="deleteCollaborateur"
+          >
+            Supprimer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar
       v-model="snackbar"
       :color="snackColor"
@@ -734,7 +1100,7 @@
 <script>
 import axios from "axios";
 
-const API_BASE = "http://localhost:8080/api";
+const API_BASE = "/api";
 
 function parseBoolean(value, defaultValue = false) {
   if (value === null || value === undefined) return defaultValue;
@@ -763,9 +1129,74 @@ export default {
 
   data() {
     return {
+      activeSection: "annee",
+      sections: [
+        { key: "annee", label: "Année scolaire", icon: "mdi-calendar-range" },
+        { key: "cloture", label: "Clôture", icon: "mdi-tune-vertical" },
+        { key: "frais", label: "Frais de scolarité", icon: "mdi-cash-multiple" },
+        { key: "collaborateurs", label: "Collaborateurs", icon: "mdi-account-multiple-plus-outline", founderOnly: true },
+      ],
+
       showAddForm: false,
-      showSettings: true,
       nouvelleAnnee: "",
+
+      // --- Collaborateurs (comptable, secrétaire, etc.) ---
+      isLoadingCollaborateurs: false,
+      isSavingCollaborateur: false,
+      collaborateurs: [],
+      collaborateurDialog: false,
+      generatedPasswordDialog: false,
+      deleteCollaborateurDialog: false,
+      collaborateurToDelete: null,
+      generatedCredentials: { email: "", password: "" },
+      collaborateurForm: {
+        id: null,
+        nom: "",
+        prenom: "",
+        poste: "",
+        telephone: "",
+        email: "",
+        modules: [],
+      },
+      posteSuggestions: ["Comptable", "Secrétaire", "Surveillant général", "Censeur", "Économe"],
+      collaborateurHeaders: [
+        { text: "Nom", value: "nom" },
+        { text: "Prénom", value: "prenom" },
+        { text: "Poste", value: "poste" },
+        { text: "Email", value: "email" },
+        { text: "Accès", value: "modules_autorises", sortable: false },
+        { text: "Actions", value: "actions", sortable: false, width: 140 },
+      ],
+      moduleCatalog: [
+        { key: "ClassManagement", label: "Classes", children: [] },
+        {
+          key: "StudentManagement",
+          label: "Élèves",
+          children: [
+            { key: "Inscription", label: "Inscription" },
+            { key: "MesEleves", label: "Nos Élèves" },
+            { key: "PresenceManagement", label: "Gestion Présence" },
+            { key: "PunishmentManagement", label: "Gestion Punition" },
+            { key: "NoteConsultation", label: "Consulter Note" },
+            { key: "BulletinManagement", label: "Gestion Bulletin" },
+            { key: "Reinscription", label: "Réinscription" },
+            { key: "CarteScolaire", label: "Carte Scolaire" },
+            { key: "ScolariteManager", label: "Scolarité" },
+          ],
+        },
+        {
+          key: "TeacherManagement",
+          label: "Enseignants",
+          children: [
+            { key: "CahierDeTexte", label: "Cahiers de Texte" },
+            { key: "MesEnseignants", label: "Mes Enseignants" },
+            { key: "EnseignantParclasse", label: "Répartition Enseignants/Classes" },
+            { key: "subjectsManager", label: "Matières" },
+          ],
+        },
+        { key: "ParentManagement", label: "Parents", children: [] },
+        { key: "Parametre", label: "Paramètres", children: [] },
+      ],
 
       snackbar: false,
       snackText: "",
@@ -779,6 +1210,13 @@ export default {
       isClosing: false,
       isSavingSettings: false,
       isLoadingSettings: false,
+
+      // --- Frais de scolarité par promotion ---
+      isLoadingPromotions: false,
+      isSavingFrais: false,
+      promotionsFrais: [],
+      fraisPromotionId: null,
+      fraisMontant: null,
 
       currentAnneeScolaire: this.anneeScolaire || "",
       currentAnneeScolaireId: this.anneeScolaireId || null,
@@ -812,6 +1250,7 @@ export default {
         rapportParClasse: [],
         rapportMoyennesManquantes: [],
         anomaliesPromotion: [],
+        alertesCapacite: [],
         detailsGroupes: [],
         totalClasses: 0,
         totalElevesConcernes: 0,
@@ -833,6 +1272,15 @@ export default {
   },
 
   computed: {
+    isFounder() {
+      if (typeof window === "undefined") return true;
+      return localStorage.getItem("user_type") !== "administration";
+    },
+
+    visibleSections() {
+      return this.sections.filter((section) => !section.founderOnly || this.isFounder);
+    },
+
     isSubmitting() {
       return (
         this.isAdding ||
@@ -884,6 +1332,10 @@ export default {
 
     reportAnomaliesPromotion() {
       return this.reportData?.anomaliesPromotion || [];
+    },
+
+    reportAlertesCapacite() {
+      return this.reportData?.alertesCapacite || [];
     },
 
     reportDetailsGroupes() {
@@ -979,6 +1431,251 @@ export default {
       this.snackbar = true;
     },
 
+    // ================================================================
+    //  COLLABORATEURS (comptable, secrétaire, etc.)
+    // ================================================================
+    authHeaders() {
+      const token = localStorage.getItem("token");
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    },
+
+    moduleLabel(key) {
+      for (const mod of this.moduleCatalog) {
+        if (mod.key === key) return mod.label;
+        const child = mod.children.find((c) => c.key === key);
+        if (child) return child.label;
+      }
+      return key;
+    },
+
+    isModuleChecked(key) {
+      return this.collaborateurForm.modules.includes(key);
+    },
+
+    isModuleIndeterminate(key) {
+      const mod = this.moduleCatalog.find((m) => m.key === key);
+      if (!mod || !mod.children.length) return false;
+      const checkedCount = mod.children.filter((c) => this.collaborateurForm.modules.includes(c.key)).length;
+      return checkedCount > 0 && checkedCount < mod.children.length;
+    },
+
+    toggleSimpleModule(key) {
+      const modules = this.collaborateurForm.modules;
+      this.collaborateurForm.modules = modules.includes(key)
+        ? modules.filter((k) => k !== key)
+        : [...modules, key];
+    },
+
+    toggleModule(mod) {
+      const modules = this.collaborateurForm.modules;
+      const childKeys = mod.children.map((c) => c.key);
+      const currentlyChecked = modules.includes(mod.key);
+      this.collaborateurForm.modules = currentlyChecked
+        ? modules.filter((k) => k !== mod.key && !childKeys.includes(k))
+        : [...new Set([...modules, mod.key, ...childKeys])];
+    },
+
+    toggleChild(mod, child) {
+      const modules = this.collaborateurForm.modules;
+      let next = modules.includes(child.key)
+        ? modules.filter((k) => k !== child.key)
+        : [...modules, child.key];
+
+      const anyChildChecked = mod.children.some((c) => next.includes(c.key));
+      this.collaborateurForm.modules = anyChildChecked
+        ? [...new Set([...next, mod.key])]
+        : next.filter((k) => k !== mod.key);
+    },
+
+    selectSection(key) {
+      this.activeSection = key;
+      if (key === "frais" && this.promotionsFrais.length === 0) {
+        this.fetchPromotionsFrais();
+      }
+      if (key === "collaborateurs" && this.collaborateurs.length === 0) {
+        this.fetchCollaborateurs();
+      }
+    },
+
+    async fetchCollaborateurs() {
+      this.isLoadingCollaborateurs = true;
+      try {
+        const { data } = await axios.get(`${API_BASE}/administration/collaborateurs`, {
+          headers: this.authHeaders(),
+        });
+        this.collaborateurs = data;
+      } catch (error) {
+        this.showNotify(
+          error.response?.data?.message || "Erreur lors du chargement des collaborateurs.",
+          "error"
+        );
+      } finally {
+        this.isLoadingCollaborateurs = false;
+      }
+    },
+
+    openCollaborateurDialog(item = null) {
+      this.collaborateurForm = item
+        ? {
+            id: item.id,
+            nom: item.nom,
+            prenom: item.prenom,
+            poste: item.poste,
+            telephone: item.telephone || "",
+            email: item.email,
+            modules: [...(item.modules_autorises || [])],
+          }
+        : { id: null, nom: "", prenom: "", poste: "", telephone: "", email: "", modules: [] };
+      this.collaborateurDialog = true;
+    },
+
+    async saveCollaborateur() {
+      const form = this.collaborateurForm;
+      if (!form.nom || !form.prenom || !form.poste || !form.email) {
+        this.showNotify("Nom, prénom, poste et email sont requis.", "error");
+        return;
+      }
+
+      this.isSavingCollaborateur = true;
+      try {
+        const payload = {
+          nom: form.nom,
+          prenom: form.prenom,
+          poste: form.poste,
+          telephone: form.telephone,
+          email: form.email,
+          modules_autorises: form.modules,
+        };
+
+        if (form.id) {
+          await axios.put(`${API_BASE}/administration/collaborateurs/${form.id}`, payload, {
+            headers: this.authHeaders(),
+          });
+          this.showNotify("Collaborateur mis à jour.");
+        } else {
+          const { data } = await axios.post(`${API_BASE}/administration/collaborateurs`, payload, {
+            headers: this.authHeaders(),
+          });
+          this.generatedCredentials = { email: form.email, password: data.mot_de_passe_temporaire };
+          this.generatedPasswordDialog = true;
+          this.showNotify("Collaborateur créé.");
+        }
+
+        this.collaborateurDialog = false;
+        await this.fetchCollaborateurs();
+      } catch (error) {
+        this.showNotify(error.response?.data?.message || "Erreur lors de l'enregistrement.", "error");
+      } finally {
+        this.isSavingCollaborateur = false;
+      }
+    },
+
+    async resetCollaborateurPassword(item) {
+      try {
+        const { data } = await axios.post(
+          `${API_BASE}/administration/collaborateurs/${item.id}/reset-password`,
+          {},
+          { headers: this.authHeaders() }
+        );
+        this.generatedCredentials = { email: item.email, password: data.mot_de_passe_temporaire };
+        this.generatedPasswordDialog = true;
+      } catch (error) {
+        this.showNotify(error.response?.data?.message || "Erreur lors de la réinitialisation.", "error");
+      }
+    },
+
+    confirmDeleteCollaborateur(item) {
+      this.collaborateurToDelete = item;
+      this.deleteCollaborateurDialog = true;
+    },
+
+    async deleteCollaborateur() {
+      if (!this.collaborateurToDelete) return;
+      this.isSavingCollaborateur = true;
+      try {
+        await axios.delete(`${API_BASE}/administration/collaborateurs/${this.collaborateurToDelete.id}`, {
+          headers: this.authHeaders(),
+        });
+        this.showNotify("Collaborateur supprimé.");
+        this.deleteCollaborateurDialog = false;
+        this.collaborateurToDelete = null;
+        await this.fetchCollaborateurs();
+      } catch (error) {
+        this.showNotify(error.response?.data?.message || "Erreur lors de la suppression.", "error");
+      } finally {
+        this.isSavingCollaborateur = false;
+      }
+    },
+
+    // ================================================================
+    //  FRAIS DE SCOLARITÉ PAR PROMOTION
+    // ================================================================
+    async fetchPromotionsFrais() {
+      if (!this.etablissementId) return;
+
+      this.isLoadingPromotions = true;
+
+      try {
+        const response = await axios.get(
+          `${API_BASE}/scolarite/promotions/${this.etablissementId}`,
+          { headers: this.authHeaders() }
+        );
+
+        this.promotionsFrais = response?.data || [];
+      } catch (error) {
+        console.error("Erreur chargement promotions :", error);
+        this.showNotify("Erreur lors du chargement des promotions.", "error");
+        this.promotionsFrais = [];
+      } finally {
+        this.isLoadingPromotions = false;
+      }
+    },
+
+    async appliquerFraisPromotion() {
+      if (!this.currentAnneeScolaireId) {
+        this.showNotify("Aucune année scolaire active.", "error");
+        return;
+      }
+
+      const montant = Number(this.fraisMontant);
+      if (!montant || montant <= 0) {
+        this.showNotify("Saisissez un montant valide.", "error");
+        return;
+      }
+
+      if (!this.fraisPromotionId) {
+        this.showNotify("Sélectionnez une promotion.", "error");
+        return;
+      }
+
+      this.isSavingFrais = true;
+
+      try {
+        const response = await axios.post(
+          `${API_BASE}/scolarite/promotion`,
+          {
+            promotionId: this.fraisPromotionId,
+            anneeScolaireId: this.currentAnneeScolaireId,
+            etablissementId: this.etablissementId,
+            montantTotal: montant,
+          },
+          { headers: this.authHeaders() }
+        );
+
+        this.showNotify(response?.data?.message || "Frais appliqués.", "success");
+      } catch (error) {
+        console.error("Erreur enregistrement frais :", error);
+        const message =
+          error?.response?.data?.message ||
+          "Erreur lors de l’enregistrement des frais.";
+        this.showNotify(message, "error");
+      } finally {
+        this.isSavingFrais = false;
+      }
+    },
+
+    // ================================================================
+
     normalizeSettingsPayload() {
       return {
         effectifMaxParClasse: Math.max(1, Number(this.settings.effectifMaxParClasse) || 1),
@@ -1018,6 +1715,7 @@ export default {
         rapportParClasse: [],
         rapportMoyennesManquantes: [],
         anomaliesPromotion: [],
+        alertesCapacite: [],
         detailsGroupes: [],
         totalClasses: 0,
         totalElevesConcernes: 0,
@@ -1069,7 +1767,8 @@ export default {
 
       try {
         const response = await axios.get(
-          `${API_BASE}/cloture-parametres/${this.etablissementId}`
+          `${API_BASE}/cloture-parametres/${this.etablissementId}`,
+          { headers: this.authHeaders() }
         );
 
         const params = response?.data?.parametres || response?.data || {};
@@ -1117,7 +1816,8 @@ export default {
           {
             etablissementId: this.etablissementId,
             ...payload,
-          }
+          },
+          { headers: this.authHeaders() }
         );
 
         if (reloadAfterSave) {
@@ -1228,7 +1928,8 @@ export default {
           {
             etablissementId: this.etablissementId,
             anneeScolaireId: this.currentAnneeScolaireId,
-          }
+          },
+          { headers: this.authHeaders() }
         );
 
         const data = response?.data || {};
@@ -1283,7 +1984,8 @@ export default {
             etablissementId: this.etablissementId,
             anneeScolaireId: this.currentAnneeScolaireId,
             confirmation: true,
-          }
+          },
+          { headers: this.authHeaders() }
         );
 
         const data = response?.data || {};
@@ -1380,6 +2082,126 @@ export default {
   min-width: 0;
 }
 
+/* ----- Layout paramètres (sidebar + contenu) ----- */
+.settings-shell {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.settings-nav {
+  flex: 0 0 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 12px;
+  background: #fbfcfe;
+  border-right: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.settings-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #475569;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-nav__icon {
+  flex-shrink: 0;
+}
+
+.settings-nav__chevron {
+  margin-left: auto;
+}
+
+.settings-nav__item:hover:not(:disabled) {
+  background: rgba(25, 118, 210, 0.06);
+  color: #1976d2;
+}
+
+.settings-nav__item--active {
+  background: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+}
+
+.settings-nav__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 24px 24px 4px;
+}
+
+.settings-panel {
+  animation: settings-panel-in 0.15s ease;
+}
+
+@keyframes settings-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cloture-cta {
+  background: linear-gradient(180deg, #fff6f6 0%, #fff0f0 100%) !important;
+  border: 1px solid #ffd9d9 !important;
+}
+
+.gap-3 {
+  gap: 12px;
+}
+
+.deep-purple-soft {
+  background: #f1e9fb;
+}
+
+@media (max-width: 900px) {
+  .settings-shell {
+    flex-direction: column;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    flex: 0 0 auto;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 12px;
+    border-right: none;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  }
+
+  .settings-nav__item {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .settings-nav__chevron {
+    display: none;
+  }
+
+  .settings-content {
+    padding: 18px 16px 4px;
+  }
+}
+
 .year-card {
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   border: 1px solid #dbe8f6;
@@ -1434,6 +2256,10 @@ export default {
   background: #eef2ff;
 }
 
+.success-soft {
+  background: #e6f7ec;
+}
+
 .section-title-text {
   font-size: 1.02rem;
   font-weight: 800;
@@ -1478,6 +2304,42 @@ export default {
   color: #1f2937 !important;
   opacity: 1 !important;
   font-weight: 600;
+}
+
+/* ----- Frais de scolarité ----- */
+.frais-box {
+  border: 1px solid #d3edd9 !important;
+  background: linear-gradient(180deg, #fbfffc 0%, #f4fbf6 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.frais-global {
+  background: #ffffff;
+  border: 1px solid #e5edf6;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.frais-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #e5edf6;
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+
+.frais-row__name {
+  flex: 0 0 96px;
+  font-weight: 700;
+  color: #1f2937;
+  word-break: break-word;
+}
+
+.frais-row__input {
+  flex: 1 1 auto;
 }
 
 .info-box {
@@ -1741,6 +2603,14 @@ export default {
 
   .action-bar .v-btn {
     width: 100%;
+  }
+
+  .frais-row {
+    flex-wrap: wrap;
+  }
+
+  .frais-row__name {
+    flex: 1 1 100%;
   }
 }
 </style>

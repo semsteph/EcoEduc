@@ -341,7 +341,7 @@ export default {
     // Récupération des étudiants et tri par ordre alphabétique
     async getStudents() {
       try {
-        const response = await axios.get(`http://localhost:8080/api/classes/${this.classeId}/eleves`);
+        const response = await axios.get(`/api/classes/${this.classeId}/eleves`);
         this.students = response.data || [];
 
         this.students.sort((a, b) => {
@@ -359,7 +359,7 @@ export default {
 
     async fetchSemesters() {
       try {
-        const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
+        const response = await axios.get(`/api/semesters/${this.etablissementId}`);
         this.semesters = response.data || [];
 
         if (this.semesters.length > 0) {
@@ -398,7 +398,7 @@ export default {
       const semesterId = this.getSemesterId(this.currentSemester);
 
       try {
-        const response = await fetch("http://localhost:8080/api/deleteNote", {
+        const response = await fetch("/api/deleteNote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -455,7 +455,7 @@ export default {
       formData.append("anneeScolaireId", this.anneeScolaireId);
 
       try {
-        const response = await axios.post(`http://localhost:8080/api/upload/excel`, formData, {
+        const response = await axios.post(`/api/upload/excel`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 
@@ -508,7 +508,7 @@ export default {
       try {
         const semesterId = this.getSemesterId(this.currentSemester);
         const response = await axios.get(
-          `http://localhost:8080/api/notes/${this.classeId}/${this.subjectId}/${semesterId}/${this.anneeScolaireId}`
+          `/api/notes/${this.classeId}/${this.subjectId}/${semesterId}/${this.anneeScolaireId}`
         );
         const notesData = response.data || [];
 
@@ -564,7 +564,7 @@ export default {
           })),
         };
 
-        await axios.post(`http://localhost:8080/api/notes/save`, payload);
+        await axios.post(`/api/notes/save`, payload);
 
         this.showSnack("✅ Notes sauvegardées avec succès !", "success");
       } catch (error) {
@@ -576,7 +576,7 @@ export default {
     async generateExcelFile() {
       try {
         const response = await axios({
-          url: `http://localhost:8080/api/export/excel/${this.classeId}`,
+          url: `/api/export/excel/${this.classeId}`,
           method: "POST",
           responseType: "blob",
         });

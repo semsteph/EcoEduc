@@ -21,10 +21,10 @@
         <v-spacer></v-spacer>
 
         <div class="mt-3 mt-sm-0">
-          <v-btn color="#1A237E" dark depressed class="rounded-pill mr-2 px-6" @click="dialog = true">
+          <v-btn color="#1A237E" dark depressed class="rounded-pill mr-2 px-2 px-sm-6" @click="dialog = true">
             <v-icon left>mdi-plus</v-icon> Ajouter
           </v-btn>
-          <v-btn color="success" dark depressed class="rounded-pill px-6" @click="telechargerProgrammePDF">
+          <v-btn color="success" dark depressed class="rounded-pill px-2 px-sm-6" @click="telechargerProgrammePDF">
             <v-icon left>mdi-file-pdf-box</v-icon> PDF
           </v-btn>
         </div>
@@ -83,7 +83,7 @@
           <v-toolbar-title>Nouveau créneau</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <v-select
             label="Jour"
             v-model="nouveauProgramme.jour"
@@ -116,8 +116,8 @@
 
         <v-card-actions class="pa-4">
           <v-spacer />
-          <v-btn text @click="fermerDialog" class="px-6">Annuler</v-btn>
-          <v-btn color="#1A237E" dark depressed @click="ajouterProgramme" class="px-6">
+          <v-btn text @click="fermerDialog" class="px-2 px-sm-6">Annuler</v-btn>
+          <v-btn color="#1A237E" dark depressed @click="ajouterProgramme" class="px-2 px-sm-6">
             Valider
           </v-btn>
         </v-card-actions>
@@ -135,7 +135,7 @@ import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-const API = "http://localhost:8080/api";
+const API = "/api";
 
 export default {
   name: "ProgrammeDetail",

@@ -61,10 +61,10 @@
       <v-divider class="mb-10"></v-divider>
 
       <v-row>
-        <v-col v-for="(card, index) in navCards" :key="index" cols="12" md="4">
+        <v-col v-for="(card, index) in visibleNavCards" :key="index" cols="12" md="4">
           <v-card
             @click="navigateTo(card.component)"
-            class="nav-card pa-6 rounded-xl border-l-blue shadow-soft"
+            class="nav-card pa-2 pa-sm-6 rounded-xl border-l-blue shadow-soft"
             hover
           >
             <div class="d-flex align-center flex-column text-center">
@@ -93,7 +93,7 @@
         <SubjectsManager
           v-if="currentComponent === 'subjectsManager'"
           :etablissement-id="etablissementId"
-          api-base-url="http://localhost:8080"
+          api-base-url=""
           @close="currentComponent = 'default'"
           @changed="fetchData"
           @error="showError"
@@ -107,6 +107,7 @@
           :annee-scolaire-id="anneeScolaireId"
           :etablissement-id="etablissementId"
           @component-selected="currentComponent = $event"
+          @back="currentComponent = 'default'"
         />
       </v-fade-transition>
     </div>
@@ -117,7 +118,7 @@
         <v-toolbar color="primary" dark flat>
           <v-toolbar-title class="font-weight-bold">Ajouter une Matière</v-toolbar-title>
         </v-toolbar>
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <v-form @submit.prevent="handleAddSubject">
             <v-text-field
               v-model="newSubject.name"
@@ -142,7 +143,7 @@
         <v-toolbar color="#1A237E" dark flat>
           <v-toolbar-title class="font-weight-bold">Inscription Enseignant</v-toolbar-title>
         </v-toolbar>
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <v-form @submit.prevent="handleInscription">
             <v-row dense>
               <v-col cols="12" sm="6">
@@ -173,7 +174,7 @@
           <v-toolbar-title class="font-weight-bold text-h6">Affectation de Cours</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-6 affect-body">
+        <v-card-text class="pa-2 pa-sm-6 affect-body">
           <v-autocomplete
             v-model="selectedTeacher"
             :items="teachers"
@@ -248,7 +249,7 @@
             @click="handleAdd"
             color="secondary"
             depressed
-            class="px-8 rounded-lg"
+            class="px-2 px-sm-8 rounded-lg"
             :disabled="!canSubmitAffectation || isSubmitting"
             :loading="isSubmitting"
           >
@@ -265,7 +266,7 @@
           <v-toolbar-title class="font-weight-bold">Avertissement</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <v-alert type="warning" outlined class="mb-4">
             {{ conflictMessage || "Cet enseignant a déjà une matière dans cette classe." }}
           </v-alert>
@@ -283,10 +284,10 @@
         <v-card-actions class="pa-4">
           <v-btn text @click="cancelTeacherHasSubject">Annuler</v-btn>
           <v-spacer />
-          <v-btn color="warning" outlined class="rounded-lg px-6" @click="confirmAllowMultiple">
+          <v-btn color="warning" outlined class="rounded-lg px-2 px-sm-6" @click="confirmAllowMultiple">
             Autoriser
           </v-btn>
-          <v-btn color="warning" dark class="rounded-lg px-6" @click="confirmReplaceTeacherSubject">
+          <v-btn color="warning" dark class="rounded-lg px-2 px-sm-6" @click="confirmReplaceTeacherSubject">
             Remplacer
           </v-btn>
         </v-card-actions>
@@ -300,7 +301,7 @@
           <v-toolbar-title class="font-weight-bold">Affectation existante</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <v-alert type="warning" outlined class="mb-4">
             {{ conflictMessage || "Cette matière est déjà affectée dans cette classe pour cette année." }}
           </v-alert>
@@ -314,7 +315,7 @@
         <v-card-actions class="pa-4">
           <v-btn text @click="cancelConfirmReplace">Annuler</v-btn>
           <v-spacer />
-          <v-btn color="deep-orange" dark class="rounded-lg px-6" @click="confirmReplaceOtherTeacher">
+          <v-btn color="deep-orange" dark class="rounded-lg px-2 px-sm-6" @click="confirmReplaceOtherTeacher">
             Oui, remplacer
           </v-btn>
         </v-card-actions>
@@ -373,6 +374,7 @@ export default {
     etablissementNom: String,
     anneeScolaire: String,
     anneeScolaireId: Number,
+    modulesAutorises: { type: Array, default: null },
   },
   data() {
     return {
@@ -443,6 +445,11 @@ export default {
   },
 
   computed: {
+    visibleNavCards() {
+      if (!this.modulesAutorises) return this.navCards;
+      return this.navCards.filter((card) => this.modulesAutorises.includes(card.component));
+    },
+
     // ✅ MODIF: coefficients acceptent 1 OU N (=classes)
     canSubmitAffectation() {
       const c = this.selectedClasses.length;
@@ -496,10 +503,10 @@ export default {
     async fetchData() {
       try {
         const [teachersRes, classesRes, subjectsRes, coefficientRes] = await Promise.all([
-          axios.get(`http://localhost:8080/api/Enseignants/${this.etablissementId}`),
-          axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`),
-          axios.get(`http://localhost:8080/api/Matieres/${this.etablissementId}`),
-          axios.get("http://localhost:8080/api/Coefficient"),
+          axios.get(`/api/Enseignants/${this.etablissementId}`),
+          axios.get(`/api/classe/${this.etablissementId}`),
+          axios.get(`/api/Matieres/${this.etablissementId}`),
+          axios.get("/api/Coefficient"),
         ]);
 
         this.teachers = (teachersRes.data || []).map((t) => ({
@@ -521,7 +528,7 @@ export default {
     async handleAddSubject() {
       if (!this.newSubject.name) return;
       try {
-        await axios.post("http://localhost:8080/api/Matieres", {
+        await axios.post("/api/Matieres", {
           name: this.newSubject.name,
           etablissementId: this.etablissementId,
         });
@@ -538,12 +545,13 @@ export default {
         const username = this.generateUsername(this.newTeacher.name, this.newTeacher.firstName);
         const password = this.generatePassword();
 
-        await axios.post("http://localhost:8080/api/Enseignants", {
+        const token = localStorage.getItem("token");
+        await axios.post("/api/Enseignants", {
           ...this.newTeacher,
           username,
           password,
           etablissementId: this.etablissementId,
-        });
+        }, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
 
         this.generatedInfo = { username, password };
         this.showGeneratedInfo = true;
@@ -615,7 +623,7 @@ export default {
     async trySubmitAffectation(payload) {
       this.isSubmitting = true;
       try {
-        await axios.post("http://localhost:8080/api/Enseignants/add", payload);
+        await axios.post("/api/Enseignants/add", payload);
         this.resetAddForm();
       } catch (error) {
         const conflictType = this.detectConflictType(error);

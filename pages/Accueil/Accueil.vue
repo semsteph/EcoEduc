@@ -256,7 +256,7 @@
             </v-row>
           </v-card-text>
 
-          <v-card-actions class="px-6 pb-5">
+          <v-card-actions class="px-2 px-sm-6 pb-5">
             <v-spacer />
             <v-btn variant="text" @click="loginDialog = false">
               Fermer

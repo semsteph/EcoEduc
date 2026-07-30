@@ -43,10 +43,10 @@
             size="small"
             variant="tonal"
             color="white"
-            v-if="notifications?.length"
+            v-if="unreadCount > 0"
           >
             <v-icon start size="16">mdi-bell</v-icon>
-            {{ notifications.length }}
+            {{ unreadCount }}
           </v-chip>
         </div>
       </div>
@@ -202,7 +202,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import axios from "axios";
 import { useRouter } from "nuxt/app";
 import { useDisplay } from "vuetify";
@@ -254,7 +254,12 @@ const uniqueSubjects = computed(() => {
 });
 
 // API
-const API_BASE = "http://localhost:8080";
+const API_BASE = "";
+
+const authHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 const fetchAnneeScolaire = async () => {
   try {
@@ -277,15 +282,26 @@ const fetchAnneeScolaire = async () => {
   }
 };
 
+// Nombre de notifications non lues — la seule source de vérité pour tous les badges
+// (drawer + cloche), pour éviter d'afficher deux chiffres différents pour la même notion.
+const unreadCount = computed(() =>
+  notifications.value.filter(
+    (n) => n?.isRead === 0 || n?.isRead === false || n?.isRead === null || n?.isRead === undefined
+  ).length
+);
+
 // Sync + fetch notifications
 const syncAndFetchNotifications = async () => {
   try {
     await axios.post(
-      `${API_BASE}/api/notificationprof/sync/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`
+      `${API_BASE}/api/notificationprof/sync/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`,
+      {},
+      { headers: authHeaders() }
     );
 
     const { data } = await axios.get(
-      `${API_BASE}/api/notificationprof/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`
+      `${API_BASE}/api/notificationprof/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`,
+      { headers: authHeaders() }
     );
 
     notifications.value = Array.isArray(data) ? data : [];
@@ -320,7 +336,9 @@ const showNotifications = async () => {
   if (showNotificationsComponent.value && notifications.value.length > 0) {
     try {
       await axios.put(
-        `${API_BASE}/api/notificationprof/mark-read/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`
+        `${API_BASE}/api/notificationprof/mark-read/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`,
+        {},
+        { headers: authHeaders() }
       );
       notifications.value = notifications.value.map((n) => ({ ...n, isRead: 1 }));
     } catch (error) {
@@ -343,6 +361,7 @@ const logout = () => {
 };
 
 // Init
+let notificationsPollId = null;
 onMounted(async () => {
   const token = localStorage.getItem("token");
   if (!token) return;
@@ -372,10 +391,18 @@ onMounted(async () => {
 
     if (anneeScolaireId.value) {
       await syncAndFetchNotifications();
+      // Rafraîchit les notifications périodiquement : sans ça, un enseignant qui
+      // reste sur le dashboard ne voit jamais une nouvelle permission autorisée
+      // sans recharger toute la page.
+      notificationsPollId = setInterval(syncAndFetchNotifications, 60000);
     }
   } catch (error) {
     console.error("Erreur récupération données enseignant :", error);
   }
+});
+
+onUnmounted(() => {
+  if (notificationsPollId) clearInterval(notificationsPollId);
 });
 </script>
 

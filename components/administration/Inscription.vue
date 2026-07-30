@@ -12,7 +12,7 @@
           <v-btn
             prepend-icon="mdi-account-plus"
             color="primary"
-            class="rounded-pill px-6"
+            class="rounded-pill px-2 px-sm-6"
             @click="toggleSingleForm"
             :variant="showForm ? 'flat' : 'outlined'"
           >
@@ -21,7 +21,7 @@
           <v-btn
             prepend-icon="mdi-file-excel"
             color="secondary"
-            class="rounded-pill px-6 ml-sm-2 mt-2 mt-sm-0"
+            class="rounded-pill px-2 px-sm-6 ml-sm-2 mt-2 mt-sm-0"
             @click="toggleBulkForm"
             :variant="showBulkForm ? 'flat' : 'outlined'"
           >
@@ -148,7 +148,7 @@
               color="success"
               type="submit"
               variant="elevated"
-              class="px-8 rounded-lg font-weight-bold"
+              class="px-2 px-sm-8 rounded-lg font-weight-bold"
               :loading="loading"
             >
               Valider l'Inscription
@@ -211,7 +211,7 @@
           <v-btn
             color="success"
             variant="elevated"
-            class="px-8 rounded-lg font-weight-bold"
+            class="px-2 px-sm-8 rounded-lg font-weight-bold"
             @click="submitBulkForm"
             :loading="loading"
           >
@@ -258,6 +258,64 @@
       </v-card>
     </v-dialog>
 
+    <!-- ✅ RAPPORT D'IMPORTATION EN MASSE -->
+    <v-dialog v-model="bulkReportDialog" max-width="700" scrollable>
+      <v-card class="rounded-xl overflow-hidden">
+        <v-card-title class="d-flex align-center">
+          <v-icon class="mr-2" :color="bulkReport?.nombreErreurs ? 'warning' : 'success'">
+            {{ bulkReport?.nombreErreurs ? 'mdi-alert-circle-outline' : 'mdi-check-circle-outline' }}
+          </v-icon>
+          <span class="font-weight-bold">Rapport d'importation</span>
+        </v-card-title>
+
+        <v-divider></v-divider>
+
+        <v-card-text v-if="bulkReport" class="pa-4">
+          <v-row dense class="mb-2">
+            <v-col cols="6" sm="3">
+              <div class="text-caption grey--text">Lignes traitées</div>
+              <div class="text-h6">{{ bulkReport.totalLignes }}</div>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <div class="text-caption grey--text">Inscrits</div>
+              <div class="text-h6 text-success">{{ bulkReport.insertionsReussies }}</div>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <div class="text-caption grey--text">Erreurs</div>
+              <div class="text-h6" :class="bulkReport.nombreErreurs ? 'text-error' : ''">
+                {{ bulkReport.nombreErreurs }}
+              </div>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <div class="text-caption grey--text">Effectif classe</div>
+              <div class="text-h6">
+                {{ bulkReport.effectifClasseApres }} / {{ bulkReport.effectifMaxParClasse }}
+              </div>
+            </v-col>
+          </v-row>
+
+          <v-divider class="my-3" v-if="bulkReport.erreurs?.length"></v-divider>
+
+          <div v-if="bulkReport.erreurs?.length">
+            <div class="text-subtitle-2 font-weight-bold mb-2">Détail des lignes en erreur</div>
+            <v-list density="compact" class="rounded-lg" style="max-height: 300px; overflow-y: auto;">
+              <v-list-item v-for="(err, idx) in bulkReport.erreurs" :key="idx">
+                <v-list-item-title>
+                  Ligne {{ err.ligne }} : {{ err.error }}
+                </v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="justify-end pa-4">
+          <v-btn color="primary" variant="elevated" @click="bulkReportDialog = false">
+            Fermer
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- ✅ petit snack -->
     <v-snackbar v-model="snack.show" :timeout="2500">
       {{ snack.text }}
@@ -296,6 +354,10 @@ const parents = ref([]);
 const parentDialog = ref(false);
 const parentMgmtRef = ref(null);
 
+/** ✅ Rapport d'importation en masse */
+const bulkReportDialog = ref(false);
+const bulkReport = ref(null);
+
 const snack = ref({ show: false, text: '' });
 
 const toast = (text) => {
@@ -315,7 +377,7 @@ const toggleBulkForm = () => {
 
 const fetchClasses = async () => {
   try {
-    const res = await axios.get(`http://localhost:8080/api/classe/${props.etablissementId}`);
+    const res = await axios.get(`/api/classe/${props.etablissementId}`);
     classes.value = res.data || [];
   } catch (e) {
     console.error("Erreur classes:", e);
@@ -324,7 +386,7 @@ const fetchClasses = async () => {
 
 const fetchParents = async () => {
   try {
-    const res = await axios.get(`http://localhost:8080/api/Parents/${props.etablissementId}`);
+    const res = await axios.get(`/api/Parents/${props.etablissementId}`);
     const raw = res.data || [];
     parents.value = raw.map(p => ({
       id: p.id,
@@ -380,7 +442,7 @@ const onParentDeleted = async () => {
 const submitForm = async () => {
   loading.value = true;
   try {
-    await axios.post('http://localhost:8080/api/inscription', {
+    await axios.post('/api/inscription', {
       ...form.value,
       etablissementId: props.etablissementId,
       anneeScolaireId: props.anneeScolaireId
@@ -390,7 +452,7 @@ const submitForm = async () => {
     showForm.value = false;
   } catch (e) {
     console.error(e);
-    alert("Erreur lors de l'inscription.");
+    alert(e?.response?.data?.error || "Erreur lors de l'inscription.");
   } finally {
     loading.value = false;
   }
@@ -436,14 +498,21 @@ const submitBulkForm = async () => {
   formData.append('anneeScolaireId', props.anneeScolaireId);
 
   try {
-    await axios.post('http://localhost:8080/api/import-eleves', formData, {
+    const res = await axios.post('/api/import-eleves', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
-    alert("Importation réussie !");
+    bulkReport.value = res.data?.rapport || null;
+    bulkReportDialog.value = true;
     showBulkForm.value = false;
   } catch (e) {
     console.error("Erreur:", e);
-    alert("Erreur lors de l'importation.");
+    const rapport = e?.response?.data?.rapport;
+    if (rapport) {
+      bulkReport.value = rapport;
+      bulkReportDialog.value = true;
+    } else {
+      alert(e?.response?.data?.message || "Erreur lors de l'importation.");
+    }
   } finally {
     loading.value = false;
   }

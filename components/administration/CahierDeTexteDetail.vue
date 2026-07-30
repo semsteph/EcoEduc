@@ -1,5 +1,12 @@
 <template>
   <div class="container">
+    <div class="detail-topbar">
+      <v-btn icon class="detail-back-btn" @click="$emit('back')" aria-label="Retour">
+        <v-icon>mdi-arrow-left</v-icon>
+      </v-btn>
+      <div class="detail-topbar-title">Cahier de texte</div>
+    </div>
+
     <!-- Message si aucune matière -->
     <div v-if="matieres.length === 0" class="no-data-container">
       <v-icon color="error" class="mb-2">mdi-alert-circle-outline</v-icon>
@@ -75,6 +82,7 @@
 import axios from 'axios';
 
 export default {
+  emits: ['back'],
   props: {
     classId: {
       type: Number,
@@ -116,7 +124,7 @@ export default {
   },
   methods: {
     fetchDetails() {
-      axios.get(`http://localhost:8080/api/classes/${this.classId}/${this.anneeScolaireId}/details`)
+      axios.get(`/api/classes/${this.classId}/${this.anneeScolaireId}/details`)
         .then(response => {
           this.matieres = response.data.matieres;
         })
@@ -163,6 +171,24 @@ export default {
   padding: 24px;
   max-width: 900px;
   margin: auto;
+}
+
+.detail-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.detail-back-btn {
+  background-color: #2196F3 !important;
+  color: #ffffff !important;
+}
+
+.detail-topbar-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1f2937;
 }
 
 .matiere-card {

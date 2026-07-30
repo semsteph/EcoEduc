@@ -89,7 +89,7 @@ export default {
     async fetchTestsForStudent() {
       try {
         const response = await axios.get(
-          `http://localhost:8080/api/tests/${this.childId}`
+          `/api/tests/${this.childId}`
         );
         this.tests = response.data;
       } catch (error) {

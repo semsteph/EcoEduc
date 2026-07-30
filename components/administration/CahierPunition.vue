@@ -45,7 +45,7 @@
           </v-card-text>
         </v-card>
 
-        <v-card v-if="loadingData" class="rounded-xl pa-10 text-center" border>
+        <v-card v-if="loadingData" class="rounded-xl pa-3 pa-sm-10 text-center" border>
           <v-progress-circular indeterminate color="error"></v-progress-circular>
           <div class="mt-2 text-grey">Chargement des punitions...</div>
         </v-card>
@@ -94,7 +94,7 @@
                 </v-card-text>
               </v-card>
             </v-col>
-            <v-col v-if="punishmentData.length === 0" cols="12" class="text-center pa-10">
+            <v-col v-if="punishmentData.length === 0" cols="12" class="text-center pa-3 pa-sm-10">
               <v-icon size="64" color="grey-lighten-2">mdi-shield-check</v-icon>
               <div class="text-grey mt-2">Aucun incident enregistré</div>
             </v-col>
@@ -110,7 +110,7 @@
           <v-toolbar-title class="font-weight-bold">Saisie d'un incident</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <v-form ref="form" v-model="isFormValid">
             <v-text-field v-model="newPunishment.auteur" label="Auteur" variant="outlined" density="comfortable" required />
             <v-row dense>
@@ -186,7 +186,7 @@ export default {
   methods: {
     async fetchSemesters() {
       try {
-        const response = await axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`);
+        const response = await axios.get(`/api/semesters/${this.etablissementId}`);
         this.semestres = response.data.map(sem => ({ nom: sem.nom }));
         if (this.semestres.length > 0) {
           this.currentSemestre = this.semestres[0].nom;
@@ -200,7 +200,7 @@ export default {
 
       this.loadingData = true;
       try {
-        const response = await axios.get(`http://localhost:8080/api/incident`, {
+        const response = await axios.get(`/api/incident`, {
           params: {
             studentId: this.studentId, 
             semestre: this.currentSemestre,
@@ -219,7 +219,7 @@ export default {
     },
     async addPunishment() {
       try {
-        await axios.post(`http://localhost:8080/api/incidents`, {
+        await axios.post(`/api/incidents`, {
           eleveId: this.studentId,
           semestre: this.currentSemestre,
           auteur: this.newPunishment.auteur,

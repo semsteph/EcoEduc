@@ -222,7 +222,7 @@ export default {
       this.error = null;
 
       try {
-        const url = `http://localhost:8080/api/enseignements?etablissementId=${this.etablissementId}&classeId=${this.classId}&anneeScolaireId=${this.anneeScolaireId}`;
+        const url = `/api/enseignements?etablissementId=${this.etablissementId}&classeId=${this.classId}&anneeScolaireId=${this.anneeScolaireId}`;
 
         console.log("📤 Appel API enseignements :", {
           etablissementId: this.etablissementId,
@@ -271,7 +271,7 @@ export default {
       this.dialog = false;
 
       try {
-        const res = await fetch(`http://localhost:8080/api/enseignements/delete`, {
+        const res = await fetch(`/api/enseignements/delete`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

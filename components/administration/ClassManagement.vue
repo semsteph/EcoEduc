@@ -29,7 +29,7 @@
             <v-card
               v-bind="props"
               :elevation="isHovering ? 8 : 2"
-              class="mx-auto rounded-xl text-center pa-6 transition-swing cursor-pointer border"
+              class="mx-auto rounded-xl text-center pa-2 pa-sm-6 transition-swing cursor-pointer border"
               @click="item.action"
             >
               <v-avatar :color="item.color + '-lighten-4'" size="80" class="mb-4">
@@ -51,7 +51,7 @@
           <v-btn icon @click="closeClassDialog"><v-icon>mdi-close</v-icon></v-btn>
         </v-toolbar>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <v-form @submit.prevent="submitForm">
             <v-row dense>
               <v-col cols="12">
@@ -220,7 +220,7 @@
                   variant="elevated"
                   color="red-darken-1"
                   prepend-icon="mdi-delete-outline"
-                  class="font-weight-bold px-6"
+                  class="font-weight-bold px-2 px-sm-6"
                   @click="confirmDeleteClass(classe)"
                   rounded="lg"
                 >
@@ -235,7 +235,7 @@
 
     <v-dialog v-model="notifyDialog.show" max-width="450" persistent>
       <v-card class="rounded-xl pa-2">
-        <v-card-text class="text-center pa-6">
+        <v-card-text class="text-center pa-2 pa-sm-6">
           <v-avatar :color="notifyDialog.color" size="70" class="mb-4">
             <v-icon color="white" size="40">{{ notifyDialog.icon }}</v-icon>
           </v-avatar>
@@ -248,7 +248,7 @@
             v-if="notifyDialog.isConfirm"
             color="grey-darken-1"
             variant="text"
-            class="font-weight-bold px-6"
+            class="font-weight-bold px-2 px-sm-6"
             @click="notifyDialog.show = false"
           >
             Annuler
@@ -257,7 +257,7 @@
             :color="notifyDialog.color"
             variant="elevated"
             rounded="pill"
-            class="font-weight-bold px-8 text-white"
+            class="font-weight-bold px-2 px-sm-8 text-white"
             @click="handleDialogAction"
           >
             {{ notifyDialog.confirmText }}
@@ -413,7 +413,7 @@ export default {
         return;
       }
 
-      axios.post('http://localhost:8080/api/Classes/multiple', {
+      axios.post('/api/Classes/multiple', {
         promotion_id: this.selectedPromotionId,
         cycle: this.selectedCycle,
         nombre: this.numberOfClasses,
@@ -445,7 +445,7 @@ export default {
         anneeScolaireId: this.anneeScolaireId
       });
 
-      axios.post('http://localhost:8080/api/conduite', {
+      axios.post('/api/conduite', {
         note_conduite: this.conductNote,
         classe_ids: this.selectedClassIds,
         semestre_id: this.selectedSemestreId,
@@ -463,7 +463,7 @@ export default {
     },
 
     fetchPromotions() {
-      axios.get('http://localhost:8080/api/Promotions')
+      axios.get('/api/Promotions')
         .then((res) => {
           this.promotions = res.data;
         })
@@ -475,7 +475,7 @@ export default {
     fetchSemestre() {
       if (!this.etablissementId) return;
 
-      axios.get(`http://localhost:8080/api/semesters/${this.etablissementId}`)
+      axios.get(`/api/semesters/${this.etablissementId}`)
         .then((res) => {
           this.semestresOptions = res.data.map((s) => ({
             id: s.id,
@@ -488,7 +488,7 @@ export default {
     },
 
     fetchClasses() {
-      axios.get(`http://localhost:8080/api/classetablissement/${this.etablissementId}`)
+      axios.get(`/api/classetablissement/${this.etablissementId}`)
         .then((res) => {
           console.log('[Classes] Réponse brute API classetablissement :', res.data);
 
@@ -522,7 +522,7 @@ export default {
     },
 
     deleteClass(id) {
-      axios.delete(`http://localhost:8080/api/Classes/${id}`, {
+      axios.delete(`/api/Classes/${id}`, {
         data: { etablissement_id: this.etablissementId }
       })
       .then(() => {

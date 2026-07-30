@@ -294,7 +294,7 @@ export default {
       this.loading = true;
       try {
         const res = await axios.get(
-          `http://localhost:8080/api/notificationed/${this.parentId}/${this.etablissementId}/${this.anneeScolaireId}`,
+          `/api/notificationed/${this.parentId}/${this.etablissementId}/${this.anneeScolaireId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -354,7 +354,7 @@ export default {
       this.motifSubmitting = true;
       try {
         await axios.post(
-          `http://localhost:8080/api/presence/${encodeURIComponent(presenceId)}/motif`,
+          `/api/presence/${encodeURIComponent(presenceId)}/motif`,
           { motif },
           { headers: { Authorization: `Bearer ${token}` } }
         );

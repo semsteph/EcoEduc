@@ -38,7 +38,7 @@
         <v-divider class="my-3"></v-divider>
 
         <v-list-item
-          v-for="item in menuItems"
+          v-for="item in visibleMenuItems"
           :key="item.title"
           @click="changeComponent(item.component)"
           :class="{ 'active-item': currentComponent === item.component }"
@@ -99,29 +99,14 @@
     </v-app-bar>
 
     <v-main class="main-scroll-area bg-grey-lighten-4">
-      <v-container fluid class="pa-6 main-content">
+      <v-container fluid class="pa-2 pa-sm-6 main-content">
         <div v-if="currentComponent === 'Dashboard'">
-          <h2 class="text-h5 font-weight-bold text-primary mb-6">Tableau de bord</h2>
-
-          <v-row>
-            <v-col cols="12" sm="6" md="3" v-for="(stat, i) in dashStats" :key="i">
-              <v-card class="rounded-lg pa-4 elevation-2 border-card">
-                <div class="d-flex align-center">
-                  <v-avatar :color="stat.color" variant="tonal" size="48" class="mr-4">
-                    <v-icon :color="stat.color">{{ stat.icon }}</v-icon>
-                  </v-avatar>
-
-                  <div>
-                    <div class="text-caption text-grey font-weight-bold">{{ stat.title }}</div>
-                    <div class="text-h6 font-weight-black">
-                      <span v-if="dashLoading">...</span>
-                      <span v-else>{{ stat.value }}</span>
-                    </div>
-                  </div>
-                </div>
-              </v-card>
-            </v-col>
-          </v-row>
+          <DashboardHome
+            v-if="etablissementId && anneeScolaireId"
+            :etablissement-id="etablissementId"
+            :etablissement-nom="etablissementNom"
+            :annee-scolaire-id="anneeScolaireId"
+          />
         </div>
 
         <div v-else>
@@ -132,6 +117,7 @@
             :annee-scolaire-id="anneeScolaireId"
             :annee-scolaire="anneeScolaireNom"
             :permissions="filteredPermissions"
+            :modules-autorises="modulesAutorises"
             @component-selected="selectComponent"
             @back="currentComponent = previousComponent || 'Dashboard'"
             @update-notification-count="fetchNotificationCount"
@@ -142,19 +128,11 @@
     </v-main>
 
     <logout-dialog ref="logoutDialogComp" @confirm-logout="logout" />
-
-    <!-- ✅ Snack erreur dashboard -->
-    <v-snackbar v-model="dashErrorDialog" color="red darken-2" rounded="pill" elevation="10">
-      {{ dashErrorMessage }}
-      <template v-slot:actions>
-        <v-btn text @click="dashErrorDialog = false">Fermer</v-btn>
-      </template>
-    </v-snackbar>
   </v-app>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import { useDisplay } from "vuetify";
 import { useRoute, useRouter } from "vue-router";
 import axios from "axios";
@@ -176,8 +154,11 @@ import Parametre from "@/components/administration/Parametre.vue";
 import Reinscription from "@/components/administration/Reinscription.vue";
 import MesEleves from "@/components/administration/MesEleves.vue";
 import CarteScolaire from "~/components/administration/CarteScolaire.vue";
+import ScolariteManager from "~/components/administration/ScolariteManager.vue";
+import MonProfil from "@/components/administration/MonProfil.vue";
+import DashboardHome from "@/components/administration/DashboardHome.vue";
 
-const API_BASE = "http://localhost:8080";
+const API_BASE = "";
 
 const { mdAndUp } = useDisplay();
 const drawer = ref(null);
@@ -196,15 +177,6 @@ const notificationCount = ref(0);
 const filteredPermissions = ref([]);
 const logoutDialogComp = ref(null);
 
-// ✅ Dashboard counts (réels via API)
-const dashLoading = ref(false);
-const dashErrorDialog = ref(false);
-const dashErrorMessage = ref("");
-
-const nbClasses = ref(0);
-const nbEleves = ref(0);
-const nbEnseignants = ref(0);
-
 // MAP DE TOUS LES COMPOSANTS POUR LE RENDU DYNAMIQUE
 const componentsMap = {
   ParentManagement,
@@ -222,14 +194,9 @@ const componentsMap = {
   Parametre,
   MesEleves,
   CarteScolaire,
+  ScolariteManager,
+  MonProfil,
 };
-
-// ✅✅✅ Tableau de bord SANS "Alertes" + valeurs issues des API
-const dashStats = computed(() => [
-  { title: "Classes", value: nbClasses.value, icon: "mdi-school", color: "blue" },
-  { title: "Elèves", value: nbEleves.value, icon: "mdi-account-group", color: "success" },
-  { title: "Enseignants", value: nbEnseignants.value, icon: "mdi-teach", color: "purple" },
-]);
 
 const menuItems = [
   { title: "Tableau de bord", component: "Dashboard", icon: "mdi-view-dashboard" },
@@ -240,21 +207,40 @@ const menuItems = [
   { title: "Paramètres", component: "Parametre", icon: "mdi-cog-outline" },
 ];
 
+// ✅ Contrôle d'accès collaborateurs : un compte "administration" (comptable, secrétaire...)
+// ne voit que les modules qui lui ont été attribués par le fondateur/directeur.
+const userType = ref("etablissement");
+const modulesAutorises = ref(null);
+
+const visibleMenuItems = computed(() => {
+  if (userType.value !== "administration" || !Array.isArray(modulesAutorises.value)) {
+    return menuItems;
+  }
+  const filtered = menuItems.filter(
+    (item) => item.component === "Dashboard" || modulesAutorises.value.includes(item.component)
+  );
+  filtered.push({ title: "Mon profil", component: "MonProfil", icon: "mdi-account-cog-outline" });
+  return filtered;
+});
+
 const changeComponent = (component) => {
   previousComponent.value = currentComponent.value;
   currentComponent.value = component;
   if (!mdAndUp.value) drawer.value = false;
-
-  // ✅ si on revient au dashboard, refresh counts
-  if (component === "Dashboard") fetchDashboardCounts();
 };
 
 const selectComponent = (component) => {
+        console.log("Reçu :", component)
+
+  if (component === "Scolarite") {
+    component = "ScolariteManager"
+  }
+
+
   previousComponent.value = currentComponent.value;
   currentComponent.value = component;
 
-  // ✅ si on revient au dashboard, refresh counts
-  if (component === "Dashboard") fetchDashboardCounts();
+  console.log("Component trouvé :", componentsMap[component])
 };
 
 const showMessages = () => changeComponent("MessageComponent");
@@ -327,66 +313,29 @@ const syncNotifications = async () => {
   await fetchNotificationCount();
 };
 
-// ✅✅✅ Récupérer les vrais nombres via TES API
-const showDashError = (msg) => {
-  dashErrorMessage.value = msg || "Erreur lors du chargement du tableau de bord.";
-  dashErrorDialog.value = true;
-};
-
-const fetchDashboardCounts = async () => {
-  if (!etablissementId.value || !anneeScolaireId.value) return;
-
-  dashLoading.value = true;
-  try {
-    // 1) classes (GET) -> peut renvoyer 404 si zéro
-    let classes = [];
-    try {
-      const resClasses = await axios.get(`${API_BASE}/api/classe/${etablissementId.value}`);
-      classes = Array.isArray(resClasses.data) ? resClasses.data : [];
-    } catch (e) {
-      if (e?.response?.status === 404) classes = [];
-      else throw e;
-    }
-
-    // 2) enseignants (GET)
-    const resTeachers = await axios.get(`${API_BASE}/api/Enseignants/${etablissementId.value}`);
-    const teachers = Array.isArray(resTeachers.data) ? resTeachers.data : [];
-
-    // 3) élèves (POST) (année scolaire prise en compte)
-    const resEleves = await axios.post(`${API_BASE}/api/eleves`, {
-      etablissement_id: etablissementId.value,
-      annee_scolaire_id: anneeScolaireId.value,
-    });
-    const eleves = Array.isArray(resEleves.data) ? resEleves.data : [];
-
-    nbClasses.value = classes.length;
-    nbEnseignants.value = teachers.length;
-    nbEleves.value = eleves.length;
-  } catch (err) {
-    console.error("❌ Dashboard counts error:", err);
-    showDashError(err?.response?.data?.error || err?.response?.data?.message);
-  } finally {
-    dashLoading.value = false;
-  }
-};
-
 let permissionInterval, notificationInterval;
 
 onMounted(async () => {
   etablissementId.value = parseInt(route.query.etablissement_id, 10);
   etablissementNom.value = route.query.etablissement_nom || "";
 
+  userType.value = localStorage.getItem("user_type") || "etablissement";
+  if (userType.value === "administration") {
+    try {
+      modulesAutorises.value = JSON.parse(localStorage.getItem("modules_autorises") || "[]");
+    } catch {
+      modulesAutorises.value = [];
+    }
+  }
+
   // 1) Charger l'année scolaire
   await fetchAnneeScolaire();
 
-  // 2) Charger le dashboard (vraies valeurs)
-  await fetchDashboardCounts();
-
-  // 3) Permissions + notif init
+  // 2) Permissions + notif init
   fetchPermissions();
   await syncNotifications();
 
-  // 4) Polling régulier
+  // 3) Polling régulier
   permissionInterval = setInterval(fetchPermissions, 30000);
   notificationInterval = setInterval(syncNotifications, 30000);
 });
@@ -395,14 +344,6 @@ onBeforeUnmount(() => {
   clearInterval(permissionInterval);
   clearInterval(notificationInterval);
 });
-
-// ✅ si l'année scolaire change après fetchAnneeScolaire (ou si route change), refresh dashboard
-watch(
-  () => [etablissementId.value, anneeScolaireId.value],
-  () => {
-    fetchDashboardCounts();
-  }
-);
 </script>
 
 <style scoped>

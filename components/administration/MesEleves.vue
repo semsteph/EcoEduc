@@ -37,13 +37,29 @@
           <p class="eleve-nom">{{ eleve.nom }}</p>
           <p class="eleve-prenom">{{ eleve.prenom }}</p>
         </div>
-        <v-icon
-          color="primary"
-          class="info-btn"
-          @click="toggleDetails(eleve)"
-        >
-          mdi-information
-        </v-icon>
+        <div class="d-flex">
+          <v-icon
+            color="primary"
+            class="info-btn mr-2"
+            @click="toggleDetails(eleve)"
+          >
+            mdi-information
+          </v-icon>
+          <v-icon
+            color="grey-darken-1"
+            class="info-btn mr-2"
+            @click="ouvrirEdition(eleve)"
+          >
+            mdi-pencil
+          </v-icon>
+          <v-icon
+            color="error"
+            class="info-btn"
+            @click="ouvrirSuppression(eleve)"
+          >
+            mdi-delete
+          </v-icon>
+        </div>
       </div>
     </div>
 
@@ -72,6 +88,64 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- DIALOGUE D'ÉDITION -->
+    <v-dialog v-model="editDialog" max-width="500px">
+      <v-card v-if="editForm">
+        <v-card-title class="headline">
+          <v-icon class="mr-2" color="primary">mdi-pencil</v-icon>
+          Modifier l'élève
+        </v-card-title>
+        <v-card-text>
+          <v-alert v-if="editError" type="error" density="compact" class="mb-4" closable @click:close="editError = ''">
+            {{ editError }}
+          </v-alert>
+          <v-text-field v-model="editForm.nom" label="Nom" variant="outlined" density="comfortable" class="mb-2" />
+          <v-text-field v-model="editForm.prenom" label="Prénom" variant="outlined" density="comfortable" class="mb-2" />
+          <v-text-field v-model="editForm.dateNaissance" type="date" label="Date de naissance" variant="outlined" density="comfortable" class="mb-2" />
+          <v-select v-model="editForm.sexe" :items="['M', 'F']" label="Sexe" variant="outlined" density="comfortable" class="mb-2" />
+          <v-select
+            v-model="editForm.classeId"
+            :items="classes"
+            item-title="nom"
+            item-value="id"
+            label="Classe"
+            variant="outlined"
+            density="comfortable"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text @click="editDialog = false">Annuler</v-btn>
+          <v-btn color="primary" :loading="editLoading" @click="enregistrerEdition">Enregistrer</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- DIALOGUE DE SUPPRESSION -->
+    <v-dialog v-model="deleteDialog" max-width="500px">
+      <v-card v-if="eleveASupprimer">
+        <v-card-title class="headline">
+          <v-icon class="mr-2" color="error">mdi-delete</v-icon>
+          Supprimer l'élève
+        </v-card-title>
+        <v-card-text>
+          <v-alert v-if="deleteError" type="error" density="compact" class="mb-4" closable @click:close="deleteError = ''">
+            {{ deleteError }}
+          </v-alert>
+          <p>
+            Confirmer la suppression de
+            <strong>{{ eleveASupprimer.nom }} {{ eleveASupprimer.prenom }}</strong> ?
+            Cette action est irréversible.
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text @click="deleteDialog = false">Annuler</v-btn>
+          <v-btn color="error" :loading="deleteLoading" @click="confirmerSuppression">Supprimer</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -85,9 +159,20 @@ export default {
   data() {
     return {
       eleves: [],
+      classes: [],
       searchQuery: "",
       selectedEleve: null,
-      dialog: false
+      dialog: false,
+
+      editDialog: false,
+      editForm: null,
+      editError: "",
+      editLoading: false,
+
+      deleteDialog: false,
+      eleveASupprimer: null,
+      deleteError: "",
+      deleteLoading: false
     };
   },
   computed: {
@@ -100,11 +185,16 @@ export default {
   },
   mounted() {
     this.fetchEleves();
+    this.fetchClasses();
   },
   methods: {
+    authHeaders() {
+      const token = localStorage.getItem("token");
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    },
     async fetchEleves() {
       try {
-        const response = await fetch("http://localhost:8080/api/eleves", {
+        const response = await fetch("/api/eleves", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -117,6 +207,14 @@ export default {
         console.error("Erreur lors du chargement des élèves :", error);
       }
     },
+    async fetchClasses() {
+      try {
+        const response = await fetch(`/api/classe/${this.etablissementId}`);
+        this.classes = response.ok ? await response.json() : [];
+      } catch (error) {
+        console.error("Erreur lors du chargement des classes :", error);
+      }
+    },
     getInitials(nom, prenom) {
       return nom.charAt(0).toUpperCase() + prenom.charAt(0).toUpperCase();
     },
@@ -126,6 +224,71 @@ export default {
     },
     voirBulletin(eleve) {
       alert(`Afficher le bulletin de ${eleve.nom} ${eleve.prenom}`);
+    },
+
+    ouvrirEdition(eleve) {
+      this.editError = "";
+      this.editForm = {
+        id: eleve.id,
+        nom: eleve.nom,
+        prenom: eleve.prenom,
+        dateNaissance: (eleve.date_naissance || "").slice(0, 10),
+        sexe: eleve.sexe || "",
+        classeId: eleve.classe_id,
+        parentId: eleve.parent_id
+      };
+      this.editDialog = true;
+    },
+    async enregistrerEdition() {
+      this.editError = "";
+      this.editLoading = true;
+      try {
+        const response = await fetch(`/api/eleves/${this.editForm.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...this.authHeaders() },
+          body: JSON.stringify(this.editForm)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          this.editError = data.message || "Erreur lors de la modification.";
+          return;
+        }
+        this.editDialog = false;
+        await this.fetchEleves();
+      } catch (error) {
+        console.error("Erreur lors de la modification de l'élève :", error);
+        this.editError = "Erreur lors de la modification.";
+      } finally {
+        this.editLoading = false;
+      }
+    },
+
+    ouvrirSuppression(eleve) {
+      this.deleteError = "";
+      this.eleveASupprimer = eleve;
+      this.deleteDialog = true;
+    },
+    async confirmerSuppression() {
+      this.deleteError = "";
+      this.deleteLoading = true;
+      try {
+        const response = await fetch(`/api/eleves/${this.eleveASupprimer.id}`, {
+          method: "DELETE",
+          headers: { ...this.authHeaders() }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          this.deleteError = data.message || "Erreur lors de la suppression.";
+          return;
+        }
+        this.deleteDialog = false;
+        await this.fetchEleves();
+      } catch (error) {
+        console.error("Erreur lors de la suppression de l'élève :", error);
+        this.deleteError = "Erreur lors de la suppression.";
+      } finally {
+        this.deleteLoading = false;
+      }
     }
   }
 };

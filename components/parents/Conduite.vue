@@ -231,7 +231,7 @@ export default {
           return;
         }
 
-        const response = await axios.get("http://localhost:8080/api/incidents", {
+        const response = await axios.get("/api/incidents", {
           headers: { Authorization: `Bearer ${token}` },
           params: {
             eleveId: this.childId,

@@ -9,9 +9,9 @@ const multer = require('multer');
 const moment = require('moment');
 const fs = require('fs');  // Ajout de fs
 const path = require('path');  // Ajout de path
-const axios = require('axios'); // Importation d'Axios
 const nodemailer = require('nodemailer');
 const admZip = require('adm-zip');
+const crypto = require('crypto');
 
 const dayjs = require('dayjs');
 const customParseFormat = require('dayjs/plugin/customParseFormat');
@@ -20,8 +20,9 @@ dayjs.extend(customParseFormat);
 
 const app = express();
 const port = 8080;
-const secretKey = 'your_jwt_secret';
-
+const scolariteRoutes = require('./routes/scolarite.routes.cjs');
+const dashboardRoutes = require('./routes/dashboard.routes.cjs');
+const assistantRoutes = require('./routes/assistant.routes.cjs');
 
 // Configuration de la connexion à la base de données avec un pool
 const db = mysql.createPool({
@@ -29,6 +30,7 @@ const db = mysql.createPool({
   user: 'root',
   password: '',
   database: 'projetoff',
+  charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -47,8 +49,64 @@ app.use(cors(corsOptions));
 app.use(express.json());
 // Rendre le dossier des photos public
 app.use('/uploads/photos', express.static(path.join(__dirname, 'uploads/photos')));
+// Rendre le dossier des preuves de paiement public (captures Mobile Money, reçus...)
+app.use('/uploads/preuves_paiement', express.static(path.join(__dirname, 'uploads/preuves_paiement')));
 // Configurer le stockage des fichiers pour `multer`
-const upload = multer({ dest: 'uploads/' });
+// Restreint aux types réellement attendus par ces routes (imports Excel et zip de photos).
+const allowedUploadExt = new Set(['.xlsx', '.xls', '.csv', '.zip']);
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (allowedUploadExt.has(ext)) cb(null, true);
+    else cb(new Error('Type de fichier non autorisé.'));
+  }
+});
+
+// ✅ secret unique, pris depuis .env
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error("❌ JWT_SECRET manquant dans .env");
+  process.exit(1);
+}
+
+// ✅ Middleware pour authentifier les requêtes
+const authenticateJWT = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  // 1) header manquant
+  if (!authHeader) {
+    return res.status(401).json({ message: "Token manquant" });
+  }
+
+  // 2) format attendu : Bearer <token>
+  if (!authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Format token invalide (Bearer requis)" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  // 3) token vide
+  if (!token) {
+    return res.status(401).json({ message: "Token manquant" });
+  }
+
+  // 4) vérification token
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      const msg = err.name === "TokenExpiredError" ? "Token expiré" : "Token invalide";
+      return res.status(403).json({ message: msg });
+    }
+
+    // decoded contient { id, etablissementId, role, iat, exp }
+    req.user = decoded;
+    next();
+  });
+};
+
+
 
 // Fonction pour mapper le type de note sélectionné au champ de la table Note
 function mapTypeNoteToField(typeNote) {
@@ -71,6 +129,9 @@ app.use((req, res, next) => {
   req.db = db;
   next();
 });
+app.use('/api/scolarite', scolariteRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/parent/assistant', assistantRoutes);
 
 // API pour ajouter une nouvelle année scolaire
 app.post('/api/annees-scolaires', async (req, res) => {
@@ -539,27 +600,56 @@ async function affecterElevesAClasse(connection, classeId, eleveIds) {
   await connection.execute(sql, [classeId, ...idsUniques]);
 }
 
-function repartirEquitablement(eleves, nbGroupes) {
-  if (nbGroupes <= 0) return [];
-
-  const total = eleves.length;
-  const base = Math.floor(total / nbGroupes);
-  const reste = total % nbGroupes;
-  const groupes = [];
-
-  let index = 0;
-
-  for (let i = 0; i < nbGroupes; i++) {
-    const size = base + (i < reste ? 1 : 0);
-    groupes.push(eleves.slice(index, index + size));
-    index += size;
-  }
-
-  return groupes;
+/**
+ * Répartit une quantité d’élèves en k groupes de tailles aussi égales que possible.
+ * Retourne un tableau de tailles (pas les élèves eux-mêmes).
+ */
+function tailleGroupesEquitables(total, k) {
+  if (k <= 0) return [];
+  const base = Math.floor(total / k);
+  const reste = total % k;
+  return Array.from({ length: k }, (_, i) => base + (i < reste ? 1 : 0));
 }
 
-function toutesTaillesRespectentMinimum(groupes, minimum) {
-  return groupes.every((g) => g.length >= minimum);
+/**
+ * Affecte des élèves entrants à un ensemble de classes en équilibrant l’EFFECTIF FINAL
+ * (élèves déjà présents, ex. redoublants + nouveaux entrants), pas juste le nombre
+ * d’entrants. À chaque tour, l’élève va à la classe qui a le moins d’élèves au total
+ * parmi celles qui n’ont pas encore atteint effectifMax. Retourne { classeId: [eleves] }
+ * et laisse dans le tableau retourné en 2e position les élèves qui n’ont pas pu être
+ * placés faute de place (ne devrait pas arriver si la capacité a été vérifiée avant).
+ */
+function repartirEnEquilibrantEffectifFinal(eleves, classes, effectifsExistants, effectifMax) {
+  const compteurs = new Map(classes.map(c => [c.id, effectifsExistants[c.id] || 0]));
+  const affectations = new Map(classes.map(c => [c.id, []]));
+  const nonPlaces = [];
+
+  for (const eleve of eleves) {
+    let meilleure = null;
+    let meilleurEffectif = Infinity;
+
+    for (const classe of classes) {
+      const effectifActuel = compteurs.get(classe.id);
+      if (effectifActuel < effectifMax && effectifActuel < meilleurEffectif) {
+        meilleure = classe;
+        meilleurEffectif = effectifActuel;
+      }
+    }
+
+    if (!meilleure) {
+      nonPlaces.push(eleve);
+      continue;
+    }
+
+    compteurs.set(meilleure.id, compteurs.get(meilleure.id) + 1);
+    affectations.get(meilleure.id).push(eleve);
+  }
+
+  const parClasse = {};
+  for (const [classeId, liste] of affectations) {
+    parClasse[classeId] = liste;
+  }
+  return [parClasse, nonPlaces];
 }
 
 function getNextClassName(nextNiveau, prefix, classesTriees) {
@@ -608,10 +698,11 @@ async function recupererResumeElevesPourCloture(connection, etablissementId, ann
      AND b.etablissement_id = ?
      AND b.Annee_scolaire_id = ?
     WHERE e.etablissement_id = ?
+      AND e.Annee_scolaire_id = ?
     GROUP BY e.id, e.nom, e.prenom, c.id, c.nom
     ORDER BY c.nom ASC, e.nom ASC, e.prenom ASC
     `,
-    [etablissementId, anneeScolaireId, etablissementId]
+    [etablissementId, anneeScolaireId, etablissementId, anneeScolaireId]
   );
 
   return rows.map((row) => {
@@ -688,6 +779,16 @@ function construirePlanPromotion(classesTriees, resumesEleves, params) {
   const creationAuto = !!params.activerCreationAutoClasse;
   const repartitionIntelligente = !!params.activerRepartitionIntelligente;
 
+  // Élèves qui restent dans leur classe actuelle après cette clôture (redoublants,
+  // décision différente de "Admis") : ils occupent déjà des places dans les classes
+  // qui vont aussi recevoir les élèves nouvellement promus.
+  const effectifsRestants = {};
+  for (const eleve of resumesEleves) {
+    if (eleve.decision === 'Admis') continue;
+    if (!eleve.classeId) continue;
+    effectifsRestants[eleve.classeId] = (effectifsRestants[eleve.classeId] || 0) + 1;
+  }
+
   for (const eleve of resumesEleves) {
     const { decision, classeNom, eleveId, eleveNom, elevePrenom } = eleve;
 
@@ -761,6 +862,20 @@ function construirePlanPromotion(classesTriees, resumesEleves, params) {
     }
   }
 
+  const enregistrerAffectation = (classe, groupe, type) => {
+    if (!groupe.length) return;
+    ajouterAffectation(affectationsParClasse, classe.id, groupe.map(e => e.eleveId));
+    const effectifExistant = effectifsRestants[classe.id] || 0;
+    detailsGroupes.push({
+      groupeDestination: classe.nom,
+      nombreEleves: groupe.length,
+      type,
+      eleves: groupe,
+      effectifExistant,
+      effectifFinal: effectifExistant + groupe.length
+    });
+  };
+
   for (const key in elevesParNiveau) {
     const [nextNiveau, prefix] = key.split('||');
     const eleves = elevesParNiveau[key];
@@ -786,233 +901,172 @@ function construirePlanPromotion(classesTriees, resumesEleves, params) {
       continue;
     }
 
+    // Mode simple : tout part dans la première classe trouvée, mais on refuse si ça
+    // dépasse l’effectif max plutôt que de laisser passer un dépassement silencieux —
+    // en mode simple il n’y a pas de mécanisme de repli comme en mode intelligent.
     if (!repartitionIntelligente) {
-      ajouterAffectation(
-        affectationsParClasse,
-        classesSuperieures[0].id,
-        eleves.map(e => e.eleveId)
-      );
+      const cible = classesSuperieures[0];
+      const effectifExistant = effectifsRestants[cible.id] || 0;
 
-      detailsGroupes.push({
-        groupeDestination: classesSuperieures[0].nom,
-        nombreEleves: count,
-        type: 'groupe_unique',
-        eleves
-      });
-
-      continue;
-    }
-
-    const existingCount = classesSuperieures.length;
-    const classesNecessaires = Math.max(1, Math.ceil(count / effectifMax));
-
-    if (existingCount >= classesNecessaires) {
-      const classesAUtiliser = classesSuperieures.slice(0, classesNecessaires);
-      const groupes = repartirEquitablement(eleves, classesAUtiliser.length);
-
-      if (classesAUtiliser.length > 1 && !toutesTaillesRespectentMinimum(groupes, effectifMin)) {
-        ajouterAffectation(
-          affectationsParClasse,
-          classesSuperieures[0].id,
-          eleves.map(e => e.eleveId)
-        );
-
-        detailsGroupes.push({
-          groupeDestination: classesSuperieures[0].nom,
-          nombreEleves: count,
-          type: 'groupe_unique',
-          eleves
+      if (effectifExistant + count > effectifMax) {
+        anomaliesPromotion.push({
+          groupe: `${nextNiveau}${prefix ? ' ' + prefix : ''}`,
+          probleme: `Répartition intelligente désactivée : tous les élèves iraient dans "${cible.nom}", ce qui dépasserait l’effectif maximum (${effectifExistant + count}/${effectifMax}).`,
+          eleves: eleves.map(e => ({
+            eleveId: e.eleveId,
+            nom: e.nom,
+            prenom: e.prenom,
+            classeActuelle: e.classeActuelle
+          }))
         });
-
         continue;
       }
 
-      classesAUtiliser.forEach((classe, idx) => {
-        const groupe = groupes[idx] || [];
-        ajouterAffectation(
-          affectationsParClasse,
-          classe.id,
-          groupe.map(e => e.eleveId)
-        );
-
-        detailsGroupes.push({
-          groupeDestination: classe.nom,
-          nombreEleves: groupe.length,
-          type: classesAUtiliser.length > 1 ? 'repartition_multi_classes' : 'affectation_existante',
-          eleves: groupe
-        });
-      });
-
+      enregistrerAffectation(cible, eleves, 'groupe_unique');
       continue;
     }
 
-    if (!creationAuto) {
-      anomaliesPromotion.push({
-        groupe: `${nextNiveau}${prefix ? ' ' + prefix : ''}`,
-        probleme: "Les classes existantes ne suffisent pas et la création automatique est désactivée",
-        eleves: eleves.map(e => ({
-          eleveId: e.eleveId,
-          nom: e.nom,
-          prenom: e.prenom,
-          classeActuelle: e.classeActuelle
-        }))
-      });
-      continue;
-    }
+    // Mode intelligent : on priorise les classes déjà actives (avec des redoublants,
+    // donc déjà ouvertes de toute façon) avant d’envisager d’activer une classe vide
+    // ou d’en créer une nouvelle — chaque classe supplémentaire a un coût réel
+    // (enseignant, salle) qu’il faut éviter si ce n’est pas nécessaire.
+    const classesActives = classesSuperieures.filter(c => (effectifsRestants[c.id] || 0) > 0);
+    const classesVides = classesSuperieures.filter(c => !((effectifsRestants[c.id] || 0) > 0));
 
-    const nbClassesManquantes = classesNecessaires - existingCount;
-    const nbClassesTotalCible = existingCount + nbClassesManquantes;
-    const groupesEquilibres = repartirEquitablement(eleves, nbClassesTotalCible);
-
-    if (toutesTaillesRespectentMinimum(groupesEquilibres, effectifMin)) {
-      classesSuperieures.forEach((classe, idx) => {
-        const groupe = groupesEquilibres[idx] || [];
-        ajouterAffectation(
-          affectationsParClasse,
-          classe.id,
-          groupe.map(e => e.eleveId)
-        );
-
-        detailsGroupes.push({
-          groupeDestination: classe.nom,
-          nombreEleves: groupe.length,
-          type: nbClassesTotalCible > 1 ? 'division_equilibree' : 'affectation_existante',
-          eleves: groupe
-        });
-      });
-
-      for (let i = existingCount; i < nbClassesTotalCible; i++) {
-        const groupe = groupesEquilibres[i] || [];
-        const nouveauNom = getNextClassName(nextNiveau, prefix, classesTriees);
-
-        creationsDeClasses.push({
-          nom: nouveauNom,
-          eleveIds: groupe.map(e => e.eleveId),
-          eleves: groupe
-        });
-
-        classesTriees.push({ id: `temp-${nextNiveau}-${prefix}-${i}`, nom: nouveauNom });
-        classesTriees.splice(0, classesTriees.length, ...trierClasses(classesTriees));
-
-        detailsGroupes.push({
-          groupeDestination: nouveauNom,
-          nombreEleves: groupe.length,
-          type: 'creation_nouvelle_classe',
-          eleves: groupe
-        });
-      }
-
-      continue;
-    }
-
-    if (existingCount === 1) {
-      const surplus = count - effectifMax;
-
-      if (surplus >= effectifMin) {
-        const groupe1 = eleves.slice(0, effectifMax);
-        const groupe2 = eleves.slice(effectifMax);
-        const classeExistante = classesSuperieures[0];
-        const nouveauNom = getNextClassName(nextNiveau, prefix, classesTriees);
-
-        ajouterAffectation(
-          affectationsParClasse,
-          classeExistante.id,
-          groupe1.map(e => e.eleveId)
-        );
-
-        creationsDeClasses.push({
-          nom: nouveauNom,
-          eleveIds: groupe2.map(e => e.eleveId),
-          eleves: groupe2
-        });
-
-        detailsGroupes.push({
-          groupeDestination: classeExistante.nom,
-          nombreEleves: groupe1.length,
-          type: 'affectation_existante',
-          eleves: groupe1
-        });
-
-        detailsGroupes.push({
-          groupeDestination: nouveauNom,
-          nombreEleves: groupe2.length,
-          type: 'creation_nouvelle_classe',
-          eleves: groupe2
-        });
-
-        continue;
-      }
-
-      const groupes2 = repartirEquitablement(eleves, 2);
-
-      if (toutesTaillesRespectentMinimum(groupes2, effectifMin)) {
-        const classeExistante = classesSuperieures[0];
-        const nouveauNom = getNextClassName(nextNiveau, prefix, classesTriees);
-
-        ajouterAffectation(
-          affectationsParClasse,
-          classeExistante.id,
-          groupes2[0].map(e => e.eleveId)
-        );
-
-        creationsDeClasses.push({
-          nom: nouveauNom,
-          eleveIds: groupes2[1].map(e => e.eleveId),
-          eleves: groupes2[1]
-        });
-
-        detailsGroupes.push({
-          groupeDestination: classeExistante.nom,
-          nombreEleves: groupes2[0].length,
-          type: 'division_equilibree',
-          eleves: groupes2[0]
-        });
-
-        detailsGroupes.push({
-          groupeDestination: nouveauNom,
-          nombreEleves: groupes2[1].length,
-          type: 'division_equilibree',
-          eleves: groupes2[1]
-        });
-
-        continue;
-      }
-
-      ajouterAffectation(
-        affectationsParClasse,
-        classesSuperieures[0].id,
-        eleves.map(e => e.eleveId)
-      );
-
-      detailsGroupes.push({
-        groupeDestination: classesSuperieures[0].nom,
-        nombreEleves: count,
-        type: 'groupe_unique',
-        eleves
-      });
-
-      continue;
-    }
-
-    ajouterAffectation(
-      affectationsParClasse,
-      classesSuperieures[0].id,
-      eleves.map(e => e.eleveId)
+    const placesActives = classesActives.reduce(
+      (somme, c) => somme + Math.max(0, effectifMax - (effectifsRestants[c.id] || 0)),
+      0
     );
 
-    detailsGroupes.push({
-      groupeDestination: classesSuperieures[0].nom,
-      nombreEleves: count,
-      type: 'groupe_unique',
-      eleves
-    });
+    let classesUtilisees;
+    const creationsAFaire = []; // { nom, taille }
+
+    if (placesActives >= count) {
+      classesUtilisees = classesActives;
+    } else {
+      const manque = count - placesActives;
+      const nbVidesNecessaires = Math.max(0, Math.ceil(manque / effectifMax));
+
+      if (classesVides.length >= nbVidesNecessaires) {
+        classesUtilisees = classesActives.concat(classesVides.slice(0, nbVidesNecessaires));
+      } else {
+        const manqueRestant = manque - classesVides.length * effectifMax;
+
+        if (!creationAuto) {
+          anomaliesPromotion.push({
+            groupe: `${nextNiveau}${prefix ? ' ' + prefix : ''}`,
+            probleme: "Les classes existantes (actives et vides) ne suffisent pas et la création automatique est désactivée",
+            eleves: eleves.map(e => ({
+              eleveId: e.eleveId,
+              nom: e.nom,
+              prenom: e.prenom,
+              classeActuelle: e.classeActuelle
+            }))
+          });
+          continue;
+        }
+
+        classesUtilisees = classesActives.concat(classesVides);
+
+        let nbNouvelles = Math.max(1, Math.ceil(manqueRestant / effectifMax));
+        let taillesNouvelles = tailleGroupesEquitables(manqueRestant, nbNouvelles);
+
+        while (nbNouvelles > 1 && !taillesNouvelles.every(t => t >= effectifMin)) {
+          nbNouvelles -= 1;
+          taillesNouvelles = tailleGroupesEquitables(manqueRestant, nbNouvelles);
+        }
+
+        for (let i = 0; i < nbNouvelles; i++) {
+          const nouveauNom = getNextClassName(nextNiveau, prefix, classesTriees);
+          creationsAFaire.push({ nom: nouveauNom, taille: taillesNouvelles[i] });
+          classesTriees.push({ id: `temp-${nextNiveau}-${prefix}-${i}`, nom: nouveauNom });
+        }
+        classesTriees.splice(0, classesTriees.length, ...trierClasses(classesTriees));
+      }
+    }
+
+    const [affectationsExistantes, nonPlaces] = repartirEnEquilibrantEffectifFinal(
+      eleves,
+      classesUtilisees,
+      effectifsRestants,
+      effectifMax
+    );
+
+    const typeAffectation = classesUtilisees.length > 1 ? 'repartition_multi_classes' : 'affectation_existante';
+    for (const classe of classesUtilisees) {
+      enregistrerAffectation(classe, affectationsExistantes[classe.id] || [], typeAffectation);
+    }
+
+    // Le surplus qui n’a pas pu tenir dans les classes existantes va dans les
+    // nouvelles classes créées, dans l’ordre calculé plus haut.
+    let curseur = 0;
+    for (const creation of creationsAFaire) {
+      const groupe = nonPlaces.slice(curseur, curseur + creation.taille);
+      curseur += creation.taille;
+
+      creationsDeClasses.push({
+        nom: creation.nom,
+        eleveIds: groupe.map(e => e.eleveId),
+        eleves: groupe
+      });
+
+      detailsGroupes.push({
+        groupeDestination: creation.nom,
+        nombreEleves: groupe.length,
+        type: 'creation_nouvelle_classe',
+        eleves: groupe,
+        effectifExistant: 0,
+        effectifFinal: groupe.length
+      });
+    }
+  }
+
+  // Alerte (non bloquante) : une classe peut, malgré tout, dépasser l’effectif maximum
+  // paramétré — cas résiduels (mode simple déjà bloqué plus haut, ou dernier recours
+  // de création avec effectifMin impossible à respecter). Ceci prévient l’administrateur
+  // avant validation, sans changer la répartition déjà calculée.
+  const alertesCapacite = [];
+
+  for (const classeIdStr in affectationsParClasse) {
+    const classeId = Number(classeIdStr);
+    const classeInfo = classesTriees.find(c => Number(c.id) === classeId);
+    const effectifExistant = effectifsRestants[classeId] || 0;
+    const effectifNouveaux = affectationsParClasse[classeIdStr].length;
+    const effectifFinal = effectifExistant + effectifNouveaux;
+
+    if (effectifFinal > effectifMax) {
+      alertesCapacite.push({
+        classeId,
+        classeNom: classeInfo ? classeInfo.nom : `Classe #${classeId}`,
+        effectifExistant,
+        effectifNouveaux,
+        effectifFinal,
+        effectifMax,
+        probleme: `Effectif final ${effectifFinal}/${effectifMax} (${effectifNouveaux} nouvel(le)s admis + ${effectifExistant} redoublant(s) déjà présent(s)).`
+      });
+    }
+  }
+
+  for (const creation of creationsDeClasses) {
+    if (creation.eleveIds.length > effectifMax) {
+      alertesCapacite.push({
+        classeId: null,
+        classeNom: creation.nom,
+        effectifExistant: 0,
+        effectifNouveaux: creation.eleveIds.length,
+        effectifFinal: creation.eleveIds.length,
+        effectifMax,
+        probleme: `Nouvelle classe "${creation.nom}" à créer avec ${creation.eleveIds.length} élève(s), au-dessus du maximum paramétré (${effectifMax}).`
+      });
+    }
   }
 
   return {
     anomaliesPromotion,
     affectationsParClasse,
     creationsDeClasses,
-    detailsGroupes
+    detailsGroupes,
+    alertesCapacite
   };
 }
 
@@ -1025,8 +1079,8 @@ async function analyserClotureAnnee(connection, etablissementId, anneeScolaireId
   const params = await fetchClotureParams(connection, etablissementId);
 
   const [annees] = await connection.execute(
-    `SELECT id, statut FROM annee_scolaire WHERE id = ?`,
-    [anneeScolaireId]
+    `SELECT id, statut FROM annee_scolaire WHERE id = ? AND etablissement_id = ?`,
+    [anneeScolaireId, etablissementId]
   );
 
   if (annees.length === 0) {
@@ -1037,7 +1091,7 @@ async function analyserClotureAnnee(connection, etablissementId, anneeScolaireId
     };
   }
 
-  if (annees[0].statut === 'Clôturée') {
+  if (annees[0].statut === 'cloturee') {
     return {
       ok: false,
       status: 400,
@@ -1119,8 +1173,9 @@ async function analyserClotureAnnee(connection, etablissementId, anneeScolaireId
      FROM eleve e
      JOIN classes c ON e.classe_id = c.id
      WHERE e.etablissement_id = ?
+       AND e.Annee_scolaire_id = ?
      ORDER BY c.nom ASC, e.nom ASC, e.prenom ASC`,
-    [etablissementId]
+    [etablissementId, anneeScolaireId]
   );
 
   const rapportMoyennesManquantes = [];
@@ -1218,6 +1273,7 @@ async function analyserClotureAnnee(connection, etablissementId, anneeScolaireId
         rapportParClasse,
         rapportMoyennesManquantes: [],
         anomaliesPromotion: plan.anomaliesPromotion,
+        alertesCapacite: plan.alertesCapacite,
         detailsGroupes: plan.detailsGroupes,
         totalClasses: rapportParClasse.length,
         totalAnomaliesPromotion: plan.anomaliesPromotion.length,
@@ -1235,10 +1291,12 @@ async function analyserClotureAnnee(connection, etablissementId, anneeScolaireId
       rapportParClasse,
       rapportMoyennesManquantes: [],
       anomaliesPromotion: [],
+      alertesCapacite: plan.alertesCapacite,
       detailsGroupes: plan.detailsGroupes,
       totalClasses: rapportParClasse.length,
       totalAffectationsExistantes: Object.keys(plan.affectationsParClasse).length,
       totalCreationsDeClasses: plan.creationsDeClasses.length,
+      totalAlertesCapacite: plan.alertesCapacite.length,
       parametresUtilises: params
     },
     planExecution: {
@@ -1286,13 +1344,17 @@ async function executerPlanCloture(connection, etablissementId, planExecution) {
  * ROUTES PARAMÈTRES
  * -----------------------------
  */
-app.get('/api/cloture-parametres/:etablissementId', async (req, res) => {
+app.get('/api/cloture-parametres/:etablissementId', authenticateJWT, async (req, res) => {
   const etablissementId = Number(req.params.etablissementId);
 
   if (!etablissementId) {
     return res.status(400).json({
       message: "L’identifiant de l’établissement est requis."
     });
+  }
+
+  if (Number(req.user.etablissementId) !== etablissementId) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
   }
 
   let connection;
@@ -1312,13 +1374,17 @@ app.get('/api/cloture-parametres/:etablissementId', async (req, res) => {
   }
 });
 
-app.post('/api/cloture-parametres', async (req, res) => {
+app.post('/api/cloture-parametres', authenticateJWT, async (req, res) => {
   const { etablissementId } = req.body;
 
   if (!etablissementId) {
     return res.status(400).json({
       message: "L’identifiant de l’établissement est requis."
     });
+  }
+
+  if (Number(req.user.etablissementId) !== Number(etablissementId)) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
   }
 
   const params = sanitizeClotureParams(req.body);
@@ -1409,7 +1475,7 @@ app.post('/api/cloture-parametres', async (req, res) => {
  * ROUTE CLÔTURE
  * -----------------------------
  */
-app.post('/api/cloture-annee-scolaire', async (req, res) => {
+app.post('/api/cloture-annee-scolaire', authenticateJWT, async (req, res) => {
   const {
     etablissementId,
     anneeScolaireId,
@@ -1420,6 +1486,10 @@ app.post('/api/cloture-annee-scolaire', async (req, res) => {
     return res.status(400).json({
       message: "Les IDs de l’établissement et de l’année scolaire sont requis."
     });
+  }
+
+  if (Number(req.user.etablissementId) !== Number(etablissementId)) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
   }
 
   let connection;
@@ -1468,7 +1538,7 @@ app.post('/api/cloture-annee-scolaire', async (req, res) => {
 
     await connection.execute(
       `UPDATE annee_scolaire
-       SET statut = 'Clôturée'
+       SET statut = 'cloturee'
        WHERE id = ?`,
       [anneeScolaireId]
     );
@@ -1694,14 +1764,14 @@ app.post('/api/eleves', async (req, res) => {
 
   try {
     const [rows] = await db.execute(
-      `SELECT 
-         e.id, e.nom, e.prenom, e.classe_id, c.nom AS classe_nom
-       FROM 
+      `SELECT
+         e.id, e.nom, e.prenom, e.date_naissance, e.sexe, e.classe_id, c.nom AS classe_nom, e.Parents_id AS parent_id
+       FROM
          eleve e
-       JOIN 
+       JOIN
          classes c ON e.classe_id = c.id
-       WHERE 
-         e.etablissement_id = ? AND e.Annee_scolaire_id = ?`,
+       WHERE
+         e.etablissement_id = ? AND e.Annee_scolaire_id = ? AND e.statut = 'actif'`,
       [etablissement_id, annee_scolaire_id]
     );
     res.json(rows);
@@ -1915,21 +1985,157 @@ app.put('/api/Classes/:id', async (req, res) => {
   }
 });
 
-app.post('/api/eleves/reinscription', async (req, res) => {
+app.post('/api/eleves/reinscription', authenticateJWT, async (req, res) => {
   const { eleveIds, anneeScolaireId } = req.body;
 
-  if (!Array.isArray(eleveIds) || !anneeScolaireId) {
+  if (!Array.isArray(eleveIds) || eleveIds.length === 0 || !anneeScolaireId) {
     return res.status(400).json({ message: 'Données manquantes' });
   }
 
+  const etablissementId = req.user.etablissementId;
+  if (!etablissementId) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
+  }
+
+  let connection;
+
   try {
-    for (const id of eleveIds) {
-      await db.query('UPDATE eleve SET Annee_scolaire_id = ? WHERE id = ?', [anneeScolaireId, id]);
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const [anneeRows] = await connection.query(
+      'SELECT id FROM annee_scolaire WHERE id = ? AND etablissement_id = ?',
+      [anneeScolaireId, etablissementId]
+    );
+    if (anneeRows.length === 0) {
+      await connection.rollback();
+      return res.status(403).json({ message: "Cette année scolaire n'appartient pas à votre établissement." });
     }
+
+    const idsUniques = [...new Set(eleveIds.map((id) => Number(id)).filter(Boolean))];
+    if (idsUniques.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ message: 'Identifiants élèves invalides.' });
+    }
+
+    const placeholders = idsUniques.map(() => '?').join(', ');
+    const [elevesRows] = await connection.query(
+      `SELECT id FROM eleve WHERE id IN (${placeholders}) AND etablissement_id = ?`,
+      [...idsUniques, etablissementId]
+    );
+    if (elevesRows.length !== idsUniques.length) {
+      await connection.rollback();
+      return res.status(403).json({ message: "Certains élèves n'appartiennent pas à votre établissement." });
+    }
+
+    await connection.query(
+      `UPDATE eleve SET Annee_scolaire_id = ? WHERE id IN (${placeholders})`,
+      [anneeScolaireId, ...idsUniques]
+    );
+
+    await connection.commit();
     res.json({ message: 'Réinscription réussie' });
   } catch (error) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error('Erreur rollback réinscription :', rollbackError);
+      }
+    }
     console.error('Erreur API réinscription:', error);
     res.status(500).json({ message: 'Erreur serveur' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+// Marquer des élèves comme partis (non réinscrits) : les retire des listes de classe
+// actives sans effacer leur historique, contrairement à une suppression.
+app.post('/api/eleves/marquer-parti', authenticateJWT, async (req, res) => {
+  const { eleveIds } = req.body;
+  const etablissementId = req.user.etablissementId;
+
+  if (!etablissementId) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
+  }
+  if (!Array.isArray(eleveIds) || eleveIds.length === 0) {
+    return res.status(400).json({ message: 'Aucun élève sélectionné.' });
+  }
+
+  const idsUniques = [...new Set(eleveIds.map((id) => Number(id)).filter(Boolean))];
+  if (idsUniques.length === 0) {
+    return res.status(400).json({ message: 'Identifiants élèves invalides.' });
+  }
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+
+    const placeholders = idsUniques.map(() => '?').join(', ');
+    const [elevesRows] = await connection.query(
+      `SELECT id FROM eleve WHERE id IN (${placeholders}) AND etablissement_id = ?`,
+      [...idsUniques, etablissementId]
+    );
+    if (elevesRows.length !== idsUniques.length) {
+      return res.status(403).json({ message: "Certains élèves n'appartiennent pas à votre établissement." });
+    }
+
+    await connection.query(
+      `UPDATE eleve SET statut = 'parti', date_depart = CURDATE() WHERE id IN (${placeholders})`,
+      idsUniques
+    );
+
+    res.json({ message: `${idsUniques.length} élève(s) marqué(s) comme parti(s).` });
+  } catch (error) {
+    console.error('Erreur lors du marquage des élèves partis:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+// Annule un marquage "parti" fait par erreur (remet l'élève actif).
+app.post('/api/eleves/annuler-depart', authenticateJWT, async (req, res) => {
+  const { eleveIds } = req.body;
+  const etablissementId = req.user.etablissementId;
+
+  if (!etablissementId) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
+  }
+  if (!Array.isArray(eleveIds) || eleveIds.length === 0) {
+    return res.status(400).json({ message: 'Aucun élève sélectionné.' });
+  }
+
+  const idsUniques = [...new Set(eleveIds.map((id) => Number(id)).filter(Boolean))];
+  if (idsUniques.length === 0) {
+    return res.status(400).json({ message: 'Identifiants élèves invalides.' });
+  }
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+
+    const placeholders = idsUniques.map(() => '?').join(', ');
+    const [elevesRows] = await connection.query(
+      `SELECT id FROM eleve WHERE id IN (${placeholders}) AND etablissement_id = ?`,
+      [...idsUniques, etablissementId]
+    );
+    if (elevesRows.length !== idsUniques.length) {
+      return res.status(403).json({ message: "Certains élèves n'appartiennent pas à votre établissement." });
+    }
+
+    await connection.query(
+      `UPDATE eleve SET statut = 'actif', date_depart = NULL WHERE id IN (${placeholders})`,
+      idsUniques
+    );
+
+    res.json({ message: `${idsUniques.length} élève(s) remis en statut actif.` });
+  } catch (error) {
+    console.error("Erreur lors de l'annulation du départ :", error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
@@ -2058,8 +2264,23 @@ app.put('/api/permissions/:id', async (req, res) => {
 //Enseignant
 // Enseignant - récupérer notifications et s'assurer qu'elles existent dans notificationProf (non lues par défaut)
 // 🔹 Synchronisation des notifications (pas de retour de données)
-app.post('/api/notificationprof/sync/:etablissementId/:anneeScolaireId/:enseignantId', async (req, res) => {
+// Un enseignant ne peut agir que sur ses propres notifications : le token JWT
+// enseignant porte `id` (enseignantId) et `etablissement` (etablissementId), à
+// distinguer des tokens administration qui portent `etablissementId`.
+const verifierProprieteEnseignant = (req, res, etablissementId, enseignantId) => {
+  if (
+    Number(req.user.etablissement) !== Number(etablissementId) ||
+    Number(req.user.id) !== Number(enseignantId)
+  ) {
+    res.status(403).json({ message: 'Accès non autorisé.' });
+    return false;
+  }
+  return true;
+};
+
+app.post('/api/notificationprof/sync/:etablissementId/:anneeScolaireId/:enseignantId', authenticateJWT, async (req, res) => {
   const { etablissementId, anneeScolaireId, enseignantId } = req.params;
+  if (!verifierProprieteEnseignant(req, res, etablissementId, enseignantId)) return;
 
   try {
     const insertQuery = `
@@ -2092,8 +2313,9 @@ app.post('/api/notificationprof/sync/:etablissementId/:anneeScolaireId/:enseigna
   }
 });
 // 🔹 Récupération des notifications depuis notificationProf
-app.get('/api/notificationprof/:etablissementId/:anneeScolaireId/:enseignantId', async (req, res) => {
+app.get('/api/notificationprof/:etablissementId/:anneeScolaireId/:enseignantId', authenticateJWT, async (req, res) => {
   const { etablissementId, anneeScolaireId, enseignantId } = req.params;
+  if (!verifierProprieteEnseignant(req, res, etablissementId, enseignantId)) return;
 
   try {
     const selectQuery = `
@@ -2131,9 +2353,35 @@ app.get('/api/notificationprof/:etablissementId/:anneeScolaireId/:enseignantId',
   }
 });
 
-app.put('/api/notificationprof/mark-read-bulk', async (req, res) => {
+// Marque TOUTES les notifications non lues d'un enseignant comme lues (clic sur la cloche).
+// Route utilisée par pages/professeurs/dashbord.vue::showNotifications() — jusqu'ici absente,
+// l'appel échouait en 404 et le clic sur la cloche ne faisait donc rien côté serveur.
+app.put('/api/notificationprof/mark-read/:etablissementId/:anneeScolaireId/:enseignantId', authenticateJWT, async (req, res) => {
+  const { etablissementId, anneeScolaireId, enseignantId } = req.params;
+  if (!verifierProprieteEnseignant(req, res, etablissementId, enseignantId)) return;
+
+  try {
+    await req.db.query(
+      `UPDATE notificationProf np
+       JOIN permission p ON np.permission_id = p.id
+       SET np.is_read = 1, np.read_at = NOW()
+       WHERE np.enseignant_id = ?
+         AND np.etablissement_id = ?
+         AND p.Annee_scolaire_id = ?
+         AND np.is_read = 0`,
+      [enseignantId, etablissementId, anneeScolaireId]
+    );
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('❌ Erreur mark-read notificationprof:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+app.put('/api/notificationprof/mark-read-bulk', authenticateJWT, async (req, res) => {
   try {
     const { notificationIds } = req.body;
+    const enseignantId = req.user.id;
 
     if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
       return res.status(400).json({
@@ -2142,15 +2390,20 @@ app.put('/api/notificationprof/mark-read-bulk', async (req, res) => {
       });
     }
 
-    // Construire placeholders dynamiques
-    const placeholders = notificationIds.map(() => '?').join(',');
+    const idsUniques = [...new Set(notificationIds.map((id) => Number(id)).filter(Boolean))];
+    if (idsUniques.length === 0) {
+      return res.status(400).json({ success: false, message: 'Identifiants invalides.' });
+    }
+
+    // On ne marque que les notifications qui appartiennent bien à l'enseignant connecté.
+    const placeholders = idsUniques.map(() => '?').join(',');
     const sql = `
       UPDATE notificationProf
-      SET is_read = 1
-      WHERE id IN (${placeholders})
+      SET is_read = 1, read_at = NOW()
+      WHERE id IN (${placeholders}) AND enseignant_id = ?
     `;
 
-    const [result] = await db.query(sql, notificationIds);
+    const [result] = await db.query(sql, [...idsUniques, enseignantId]);
 
     return res.json({
       success: true,
@@ -2322,6 +2575,19 @@ app.post('/api/inscription', async (req, res) => {
   }
 
   try {
+    const params = await fetchClotureParams(req.db, etablissementId);
+    const [effectifRows] = await req.db.query(
+      'SELECT COUNT(*) AS total FROM eleve WHERE classe_id = ?',
+      [classe]
+    );
+    const effectifActuel = effectifRows[0].total;
+
+    if (effectifActuel >= params.effectifMaxParClasse) {
+      return res.status(409).json({
+        error: `Effectif maximum atteint pour cette classe (${effectifActuel}/${params.effectifMaxParClasse}). Impossible d'inscrire un élève supplémentaire.`
+      });
+    }
+
     // Insertion de l'élève dans la base de données
     const [result] = await req.db.query(
       'INSERT INTO eleve (nom, prenom, date_naissance, sexe, classe_id, Parents_id, etablissement_id, Annee_scolaire_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -2420,6 +2686,15 @@ app.post('/api/import-eleves', upload.single('file'), async (req, res) => {
     let insertsReussis = 0;
     const erreurs = [];
 
+    try {
+    const params = await fetchClotureParams(connection, etablissementId);
+    const [effectifRows] = await connection.query(
+      'SELECT COUNT(*) AS total FROM eleve WHERE classe_id = ?',
+      [classeId]
+    );
+    const effectifInitial = effectifRows[0].total;
+    let effectifCourant = effectifInitial;
+
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
 
@@ -2432,6 +2707,10 @@ app.post('/api/import-eleves', upload.single('file'), async (req, res) => {
         // VERIFICATION CRITIQUE
         if (!eleveNom || !elevePrenom || !dateNaissance || !parentEmail) {
           throw new Error(`Données manquantes à la ligne ${i + 3}`);
+        }
+
+        if (effectifCourant >= params.effectifMaxParClasse) {
+          throw new Error(`Effectif maximum atteint pour cette classe (${params.effectifMaxParClasse}) : élève non inscrit.`);
         }
 
         // GESTION PARENT
@@ -2483,6 +2762,7 @@ app.post('/api/import-eleves', upload.single('file'), async (req, res) => {
         );
 
         insertsReussis++;
+        effectifCourant++;
       } catch (innerError) {
         console.error(`Erreur ligne ${i + 3}:`, innerError.message);
         erreurs.push({ ligne: i + 3, error: innerError.message });
@@ -2492,18 +2772,33 @@ app.post('/api/import-eleves', upload.single('file'), async (req, res) => {
     // Nettoyage du fichier uploadé
     fs.unlinkSync(file.path);
 
+    const rapport = {
+      totalLignes: data.length,
+      insertionsReussies: insertsReussis,
+      nombreErreurs: erreurs.length,
+      effectifClasseAvant: effectifInitial,
+      effectifClasseApres: effectifCourant,
+      effectifMaxParClasse: params.effectifMaxParClasse,
+      erreurs
+    };
+
     // Si aucun élève n'a été inséré, on renvoie une erreur 422
     if (insertsReussis === 0) {
       return res.status(422).json({
         message: "L'importation a échoué pour toutes les lignes.",
-        details: erreurs
+        details: erreurs,
+        rapport
       });
     }
 
     return res.status(200).json({
-      message: `Importation réussie : ${insertsReussis} élèves inscrits.`,
-      alertes: erreurs.length > 0 ? erreurs : null
+      message: `Importation terminée : ${insertsReussis}/${data.length} élève(s) inscrit(s).`,
+      alertes: erreurs.length > 0 ? erreurs : null,
+      rapport
     });
+    } finally {
+      connection.release();
+    }
 
   } catch (globalError) {
     console.error("Erreur Import Globale:", globalError);
@@ -2520,7 +2815,7 @@ app.post('/api/import-eleves', upload.single('file'), async (req, res) => {
 });
 
 // Route pour l'inscription d'un enseignant
-app.post('/api/Enseignants', async (req, res) => {
+app.post('/api/Enseignants', authenticateJWT, async (req, res) => {
   const { name, firstName, email, phone, username, password, etablissementId } = req.body;
 
   try {
@@ -2542,10 +2837,12 @@ app.post('/api/Enseignants', async (req, res) => {
       return res.status(409).json({ error: 'Ce nom d’utilisateur est déjà utilisé dans cet établissement.' });
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     // Insérer les données
     const [result] = await req.db.query(
       'INSERT INTO enseignants (nom, prenom, email, telephone, mot_de_passe, nom_utilisateur, etablissement_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, firstName, email, phone, password, username, etablissementId]
+      [name, firstName, email, phone, hashedPassword, username, etablissementId]
     );
 
     res.status(201).json({
@@ -2918,7 +3215,7 @@ app.get('/api/EnseignantAdmin/:etablissementId', async (req, res) => {
   }
 });
 
-app.put('/api/Enseignants/:id', async (req, res) => {
+app.put('/api/Enseignants/:id', authenticateJWT, async (req, res) => {
   const id = req.params.id;
   const { name, firstName, email, phone, username, password } = req.body;
 
@@ -2947,7 +3244,7 @@ app.put('/api/Enseignants/:id', async (req, res) => {
   }
   if (password) {
     updates.push('mot_de_passe = ?');
-    values.push(password);
+    values.push(await bcrypt.hash(password, 10));
   }
 
   if (updates.length > 0) {
@@ -2996,11 +3293,23 @@ app.post('/api/loginEns', async (req, res) => {
     }
 
     const enseignant = rows[0];
-    const storedPassword = enseignant.enseignant_mot_de_passe;
+    const storedPassword = (enseignant.enseignant_mot_de_passe || '').trim();
+    const inputPassword = password.trim();
+    const isBcryptHash = /^\$2[aby]\$/.test(storedPassword);
 
-    const passwordOk =
-      password.trim() === storedPassword.trim() ||
-      (await bcrypt.compare(password.trim(), storedPassword));
+    let passwordOk;
+    if (isBcryptHash) {
+      passwordOk = await bcrypt.compare(inputPassword, storedPassword);
+    } else {
+      // Compte hérité créé avant le passage au hachage : on accepte encore une
+      // comparaison en clair une seule fois, puis on migre immédiatement le
+      // mot de passe vers un hash bcrypt pour cette ligne.
+      passwordOk = inputPassword === storedPassword;
+      if (passwordOk) {
+        const migratedHash = await bcrypt.hash(inputPassword, 10);
+        await db.query('UPDATE enseignants SET mot_de_passe = ? WHERE id = ?', [migratedHash, enseignant.enseignant_id]);
+      }
+    }
 
     if (!passwordOk) {
       return res.status(401).json({ message: 'Mot de passe incorrect' });
@@ -3033,54 +3342,6 @@ app.post('/api/loginEns', async (req, res) => {
   }
 });
 
-
-
-// ✅ secret unique, pris depuis .env
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  console.error("❌ JWT_SECRET manquant dans .env");
-  process.exit(1);
-}
-
-// ✅ Middleware pour authentifier les requêtes
-const authenticateJWT = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  console.log("🔐 [AUTH] header =", authHeader);
-
-  // 1) header manquant
-  if (!authHeader) {
-    return res.status(401).json({ message: "Token manquant" });
-  }
-
-  // 2) format attendu : Bearer <token>
-  if (!authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Format token invalide (Bearer requis)" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  // 3) token vide
-  if (!token) {
-    return res.status(401).json({ message: "Token manquant" });
-  }
-
-  // 4) vérification token
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    console.log("🔍 [AUTH] verify err =", err?.name, err?.message);
-    console.log("👤 [AUTH] decoded =", decoded);
-
-    if (err) {
-      const msg = err.name === "TokenExpiredError" ? "Token expiré" : "Token invalide";
-      return res.status(403).json({ message: msg });
-    }
-
-    // decoded contient { id, etablissementId, role, iat, exp }
-    req.user = decoded;
-    next();
-  });
-};
 
 // Génère un code à 6 chiffres
 function generateResetCode() {
@@ -3164,7 +3425,15 @@ app.post('/api/verify-reset-code', async (req, res) => {
       return res.status(404).json({ message: 'Compte enseignant introuvable.' });
     }
 
-    res.status(200).json({ message: 'Code valide.', enseignantId: enseignant[0].id });
+    // Jeton de réinitialisation signé et à courte durée de vie : prouve que le code
+    // OTP a bien été vérifié pour CE compte, sans laisser le client choisir l'id cible.
+    const resetToken = jwt.sign(
+      { purpose: 'teacher-password-reset', enseignantId: enseignant[0].id },
+      JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+
+    res.status(200).json({ message: 'Code valide.', resetToken });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur lors de la vérification du code.' });
@@ -3173,7 +3442,24 @@ app.post('/api/verify-reset-code', async (req, res) => {
 
 // Mise à jour du mot de passe
 app.post('/api/update-password', async (req, res) => {
-  const { enseignantId, newPassword } = req.body;
+  const { resetToken, newPassword } = req.body;
+
+  if (!resetToken || !newPassword) {
+    return res.status(400).json({ message: 'Jeton de réinitialisation et nouveau mot de passe requis.' });
+  }
+
+  let payload;
+  try {
+    payload = jwt.verify(resetToken, JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ message: 'Jeton de réinitialisation invalide ou expiré.' });
+  }
+
+  if (payload.purpose !== 'teacher-password-reset' || !payload.enseignantId) {
+    return res.status(401).json({ message: 'Jeton de réinitialisation invalide.' });
+  }
+
+  const enseignantId = payload.enseignantId;
 
   try {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -3185,7 +3471,7 @@ app.post('/api/update-password', async (req, res) => {
 
     // Supprime les codes associés à l'email de cet enseignant
     await db.query(`
-      DELETE FROM reset_codes 
+      DELETE FROM reset_codes
       WHERE email = (SELECT email FROM enseignants WHERE id = ?)
     `,
       [enseignantId]
@@ -3224,19 +3510,22 @@ app.get('/api/enseignant/matieres-classes', authenticateJWT, async (req, res) =>
 app.get('/api/classes/:classeId/eleves', async (req, res) => {
   try {
     const classId = req.params.classeId;
+    const inclurePartis = req.query.inclurePartis === 'true';
 
-    // Requête SQL pour récupérer les id, noms et prénoms des élèves
-    const [rows] = await req.db.execute(
-      'SELECT id, nom, prenom FROM eleve WHERE classe_id = ?',
-      [classId]
-    );
+    // Une classe sans élève (ex. classe nouvellement créée, pas encore peuplée) est un
+    // état normal, pas une erreur : on renvoie un tableau vide plutôt qu'un 404, pour
+    // que les écrans (présence, notes, conduite...) l'affichent comme "vide" au lieu
+    // d'un message d'erreur générique.
+    // Par défaut on exclut les élèves marqués "parti" (non réinscrits) : ils ne
+    // doivent plus apparaître en présence/notes/conduite ni dans la liste à traiter
+    // en réinscription. ?inclurePartis=true permet de les revoir pour annuler un
+    // marquage fait par erreur.
+    const sql = inclurePartis
+      ? 'SELECT id, nom, prenom, statut FROM eleve WHERE classe_id = ?'
+      : "SELECT id, nom, prenom, statut FROM eleve WHERE classe_id = ? AND statut = 'actif'";
 
-    // Vérification si des élèves ont été trouvés
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'Aucun élève trouvé pour cette classe.' });
-    }
+    const [rows] = await req.db.execute(sql, [classId]);
 
-    // Retourner les résultats
     res.json(rows);
   } catch (error) {
     console.error('Erreur lors de la récupération des élèves:', error);
@@ -3246,7 +3535,7 @@ app.get('/api/classes/:classeId/eleves', async (req, res) => {
 
 
 
-app.delete('/api/Enseignants/:id', async (req, res) => {
+app.delete('/api/Enseignants/:id', authenticateJWT, async (req, res) => {
   const id = req.params.id;
   try {
     await req.db.query('DELETE FROM enseignants WHERE id = ?', [id]);
@@ -3627,6 +3916,13 @@ app.post('/api/deleteNote', async (req, res) => {
   if (!eleveId || !semestreId || !anneeScolaireId || !classeId || !etablissementId || !noteType) {
       console.error('❌ Données manquantes:', { eleveId, semestreId, anneeScolaireId, classeId, etablissementId, noteType });
       return res.status(400).json({ message: 'Données manquantes pour la suppression de la note.' });
+  }
+
+  // Liste blanche des colonnes autorisées : noteType vient du client et ne doit
+  // jamais être interpolé tel quel dans le SQL (risque d'injection).
+  const allowedNoteColumns = new Set(['inter1', 'inter2', 'inter3', 'inter4', 'TP1', 'TP2', 'Dev1', 'Dev2']);
+  if (!allowedNoteColumns.has(noteType)) {
+      return res.status(400).json({ message: 'Type de note invalide.' });
   }
 
   try {
@@ -4010,26 +4306,46 @@ app.post('/api/parent-verify-reset-code', async (req, res) => {
     }
 
     const parentId = rows[0].id;
-    res.json({ success: true, message: 'Code valide.', parentId });
+
+    // Jeton de réinitialisation signé et à courte durée de vie : prouve que le code
+    // OTP a bien été vérifié pour CE compte, sans laisser le client choisir l'id cible.
+    const resetToken = jwt.sign(
+      { purpose: 'parent-password-reset', parentId, etablissementId: etablissement },
+      JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+
+    res.json({ success: true, message: 'Code valide.', resetToken });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Erreur serveur.' });
   }
 });
 app.post('/api/parent-update-password', async (req, res) => {
-  const { parentId, newPassword, etablissement } = req.body;
-  console.log("🔧 Reçu dans /api/update-password :", { parentId, newPassword, etablissement });
-  if (!parentId || !newPassword || !etablissement) {
+  const { resetToken, newPassword } = req.body;
+  if (!resetToken || !newPassword) {
     return res.status(400).json({ success: false, message: 'Champs manquants.' });
   }
 
+  let payload;
+  try {
+    payload = jwt.verify(resetToken, JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Jeton de réinitialisation invalide ou expiré.' });
+  }
+
+  if (payload.purpose !== 'parent-password-reset' || !payload.parentId) {
+    return res.status(401).json({ success: false, message: 'Jeton de réinitialisation invalide.' });
+  }
+
+  const { parentId, etablissementId } = payload;
+
   try {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    console.log("🔐 Mot de passe hashé :", hashedPassword);
 
     const [result] = await db.query(
       'UPDATE parents SET mot_de_passe = ? WHERE id = ? AND etablissement_id = ?',
-      [hashedPassword, parentId, etablissement]
+      [hashedPassword, parentId, etablissementId]
     );
   
     console.log("📊 Résultat de la requête UPDATE :", result);
@@ -4077,6 +4393,236 @@ app.get("/api/parent/children", authenticateJWT, async (req, res) => {
   } catch (error) {
     console.error("❌ Erreur lors de la récupération des enfants:", error);
     return res.status(500).json({ message: "Erreur interne du serveur" });
+  }
+});
+
+// ✅ Tableau de bord parent : statistiques agrégées sur tous les enfants du parent connecté
+// (moyennes, présence, conduite, scolarité) pour une année scolaire donnée.
+app.get("/api/parent/dashboard/:anneeScolaireId", authenticateJWT, async (req, res) => {
+  const parentId = req.user.id;
+  const { anneeScolaireId } = req.params;
+
+  const dashboardVide = () => ({
+    enfants: [],
+    totaux: {
+      nombreEnfants: 0,
+      moyenneGlobale: null,
+      totalAbsences: 0,
+      totalHeuresPunition: 0,
+      montantTotalScolarite: 0,
+      montantPayeScolarite: 0,
+      resteScolarite: 0,
+      tauxRecouvrement: 0,
+      paiementsEnAttente: 0,
+    },
+    absencesParMois: [],
+    moyennesParSemestre: [],
+  });
+
+  try {
+    const [children] = await db.query(
+      `SELECT e.id, e.prenom, e.nom, c.nom AS classe
+       FROM eleve e
+       JOIN classes c ON e.Classe_id = c.id
+       WHERE e.Parents_id = ?`,
+      [parentId]
+    );
+
+    if (children.length === 0) {
+      return res.json(dashboardVide());
+    }
+
+    const childIds = children.map((c) => c.id);
+
+    const [
+      moyennesRows,
+      moyennesSemestreRows,
+      presenceRows,
+      absencesMoisRows,
+      punitionsRows,
+      scolariteRows,
+      paiementsEnAttenteRows,
+    ] = await Promise.all([
+      db
+        .query(
+          `SELECT eleves_id AS childId, ROUND(AVG(moy), 2) AS moyenne, COUNT(moy) AS nbNotes
+           FROM note
+           WHERE eleves_id IN (?) AND Annee_scolaire_id = ? AND moy IS NOT NULL
+           GROUP BY eleves_id`,
+          [childIds, anneeScolaireId]
+        )
+        .then(([r]) => r),
+
+      db
+        .query(
+          `SELECT n.eleves_id AS childId, s.nom AS semestre, ROUND(AVG(n.moy), 2) AS moyenne
+           FROM note n
+           JOIN semestre s ON n.Semestre_id = s.id
+           WHERE n.eleves_id IN (?) AND n.Annee_scolaire_id = ? AND n.moy IS NOT NULL
+           GROUP BY n.eleves_id, s.id, s.nom
+           ORDER BY s.id`,
+          [childIds, anneeScolaireId]
+        )
+        .then(([r]) => r),
+
+      db
+        .query(
+          `SELECT eleve_id AS childId,
+                  SUM(CASE WHEN statut = 'Absent' THEN 1 ELSE 0 END) AS absences,
+                  COUNT(*) AS total
+           FROM presence
+           WHERE eleve_id IN (?) AND Annee_scolaire_id = ?
+           GROUP BY eleve_id`,
+          [childIds, anneeScolaireId]
+        )
+        .then(([r]) => r),
+
+      db
+        .query(
+          `SELECT DATE_FORMAT(date, '%Y-%m') AS mois, COUNT(*) AS total
+           FROM presence
+           WHERE eleve_id IN (?) AND Annee_scolaire_id = ? AND statut = 'Absent'
+             AND date >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+           GROUP BY mois`,
+          [childIds, anneeScolaireId]
+        )
+        .then(([r]) => r),
+
+      db
+        .query(
+          `SELECT eleve_id AS childId, COALESCE(SUM(total_hours), 0) AS heures
+           FROM punitions
+           WHERE eleve_id IN (?) AND Annee_scolaire_id = ?
+           GROUP BY eleve_id`,
+          [childIds, anneeScolaireId]
+        )
+        .then(([r]) => r),
+
+      db
+        .query(
+          `SELECT eleve_id AS childId, montant_total AS montantTotal, montant_paye AS montantPaye, reste
+           FROM scolarite
+           WHERE eleve_id IN (?) AND annee_scolaire_id = ?`,
+          [childIds, anneeScolaireId]
+        )
+        .then(([r]) => r),
+
+      db
+        .query(
+          `SELECT s.eleve_id AS childId, COUNT(*) AS n
+           FROM paiement p
+           JOIN scolarite s ON s.id = p.scolarite_id
+           WHERE s.eleve_id IN (?) AND s.annee_scolaire_id = ? AND p.statut = 'en_attente'
+           GROUP BY s.eleve_id`,
+          [childIds, anneeScolaireId]
+        )
+        .then(([r]) => r),
+    ]);
+
+    const byChild = (rows) => new Map(rows.map((r) => [Number(r.childId), r]));
+    const moyMap = byChild(moyennesRows);
+    const presMap = byChild(presenceRows);
+    const punMap = byChild(punitionsRows);
+    const scolMap = byChild(scolariteRows);
+    const attenteMap = byChild(paiementsEnAttenteRows);
+
+    const semestreMap = new Map();
+    moyennesSemestreRows.forEach((r) => {
+      if (!semestreMap.has(r.semestre)) semestreMap.set(r.semestre, {});
+      semestreMap.get(r.semestre)[r.childId] = Number(r.moyenne);
+    });
+
+    const enfants = children.map((c) => {
+      const moy = moyMap.get(c.id);
+      const pres = presMap.get(c.id);
+      const pun = punMap.get(c.id);
+      const scol = scolMap.get(c.id);
+      const attente = attenteMap.get(c.id);
+
+      const totalSeances = Number(pres?.total || 0);
+      const absences = Number(pres?.absences || 0);
+      const tauxPresence =
+        totalSeances > 0
+          ? Math.round(((totalSeances - absences) / totalSeances) * 1000) / 10
+          : null;
+
+      const montantTotal = Number(scol?.montantTotal || 0);
+      const montantPaye = Number(scol?.montantPaye || 0);
+      const reste = Number(scol?.reste ?? Math.max(montantTotal - montantPaye, 0));
+
+      return {
+        id: c.id,
+        nom: c.nom,
+        prenom: c.prenom,
+        classe: c.classe,
+        moyenneGenerale: moy ? Number(moy.moyenne) : null,
+        nbNotes: Number(moy?.nbNotes || 0),
+        totalSeances,
+        absences,
+        tauxPresence,
+        heuresPunition: Number(pun?.heures || 0),
+        scolarite: {
+          defini: !!scol,
+          montantTotal,
+          montantPaye,
+          reste,
+          tauxRecouvrement:
+            montantTotal > 0 ? Math.round((montantPaye / montantTotal) * 1000) / 10 : 0,
+        },
+        paiementsEnAttente: Number(attente?.n || 0),
+      };
+    });
+
+    const withMoyenne = enfants.filter((e) => e.moyenneGenerale !== null);
+    const moyenneGlobale = withMoyenne.length
+      ? Math.round(
+          (withMoyenne.reduce((a, e) => a + e.moyenneGenerale, 0) / withMoyenne.length) * 100
+        ) / 100
+      : null;
+
+    const totalAbsences = enfants.reduce((a, e) => a + e.absences, 0);
+    const totalHeuresPunition =
+      Math.round(enfants.reduce((a, e) => a + e.heuresPunition, 0) * 100) / 100;
+    const montantTotalScolarite = enfants.reduce((a, e) => a + e.scolarite.montantTotal, 0);
+    const montantPayeScolarite = enfants.reduce((a, e) => a + e.scolarite.montantPaye, 0);
+    const resteScolarite = enfants.reduce((a, e) => a + e.scolarite.reste, 0);
+    const paiementsEnAttente = enfants.reduce((a, e) => a + e.paiementsEnAttente, 0);
+
+    const mois6 = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = dayjs().subtract(i, "month");
+      mois6.push({ cle: d.format("YYYY-MM"), libelle: d.format("MMM YY") });
+    }
+    const absencesParCle = new Map(absencesMoisRows.map((r) => [r.mois, Number(r.total)]));
+
+    res.json({
+      enfants,
+      totaux: {
+        nombreEnfants: enfants.length,
+        moyenneGlobale,
+        totalAbsences,
+        totalHeuresPunition,
+        montantTotalScolarite,
+        montantPayeScolarite,
+        resteScolarite,
+        tauxRecouvrement:
+          montantTotalScolarite > 0
+            ? Math.round((montantPayeScolarite / montantTotalScolarite) * 1000) / 10
+            : 0,
+        paiementsEnAttente,
+      },
+      absencesParMois: mois6.map((m) => ({
+        mois: m.libelle,
+        total: absencesParCle.get(m.cle) || 0,
+      })),
+      moyennesParSemestre: Array.from(semestreMap.entries()).map(([semestre, valeurs]) => ({
+        semestre,
+        valeurs,
+      })),
+    });
+  } catch (error) {
+    console.error("❌ Erreur GET /api/parent/dashboard :", error);
+    res.status(500).json({ message: "Erreur lors du chargement du tableau de bord." });
   }
 });
 
@@ -4516,25 +5062,6 @@ app.get('/api/eleves/:classId/:anneeScolaireId', async (req, res) => {
 });
 
 
-app.get('/api/classes/:classId/eleves', async (req, res) => {
-  const classId = req.params.classId; // Récupère le classId directement
-
-  // Assurez-vous que classId est bien une chaîne de caractères ou un nombre
-  if (!classId) {
-    return res.status(400).send('Class ID is required');
-  }
-
-  const sql = 'SELECT id, nom, prenom FROM eleve WHERE classe_id = ?';
-
-  try {
-    const [results] = await req.db.query(sql, [classId]);
-    res.json(results);
-  } catch (err) {
-    console.error('Database query error:', err);
-    res.status(500).send('Internal Server Error');
-  }
-});
-
 app.get('/api/presence/:studentId/:semestre/:anneeScolaireId', async (req, res) => {
   const { studentId, semestre, anneeScolaireId } = req.params;
   
@@ -4777,7 +5304,7 @@ app.get('/api/classe/:etablissementId', async (req, res) => {
   }
 });
 /////////////////////////////Migration manulle  des eleves pour une crasse superieure dans reinscription 
-app.post('/api/eleves/migrer', async (req, res) => {
+app.post('/api/eleves/migrer', authenticateJWT, async (req, res) => {
   const { eleveIds, destinationClasseId } = req.body;
 
   console.log('[API][MIGRATION] body reçu =', req.body);
@@ -4792,6 +5319,11 @@ app.post('/api/eleves/migrer', async (req, res) => {
     return res.status(400).json({
       message: "La classe de destination est requise."
     });
+  }
+
+  const etablissementId = req.user.etablissementId;
+  if (!etablissementId) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
   }
 
   let connection;
@@ -4820,8 +5352,8 @@ app.post('/api/eleves/migrer', async (req, res) => {
     const placeholders = idsUniques.map(() => '?').join(', ');
 
     const [classeRows] = await connection.query(
-      'SELECT id, nom FROM classes WHERE id = ? LIMIT 1',
-      [classeId]
+      'SELECT id, nom FROM classes WHERE id = ? AND etablissement_id = ? LIMIT 1',
+      [classeId, etablissementId]
     );
 
     if (classeRows.length === 0) {
@@ -4832,14 +5364,34 @@ app.post('/api/eleves/migrer', async (req, res) => {
     }
 
     const [elevesRows] = await connection.query(
-      `SELECT id, nom, prenom, classe_id FROM eleve WHERE id IN (${placeholders})`,
-      idsUniques
+      `SELECT id, nom, prenom, classe_id FROM eleve WHERE id IN (${placeholders}) AND etablissement_id = ?`,
+      [...idsUniques, etablissementId]
     );
 
-    if (elevesRows.length === 0) {
+    if (elevesRows.length !== idsUniques.length) {
       await connection.rollback();
-      return res.status(404).json({
-        message: "Aucun élève trouvé pour la migration."
+      return res.status(403).json({
+        message: "Certains élèves sélectionnés n'appartiennent pas à votre établissement."
+      });
+    }
+
+    const clotureParams = await fetchClotureParams(connection, etablissementId);
+    const effectifMax = Math.max(1, Number(clotureParams.effectifMaxParClasse) || 50);
+
+    const [effectifRows] = await connection.query(
+      `SELECT COUNT(*) AS total FROM eleve WHERE classe_id = ? AND id NOT IN (${placeholders})`,
+      [classeId, ...idsUniques]
+    );
+    const effectifActuel = Number(effectifRows[0]?.total || 0);
+    const effectifFinal = effectifActuel + idsUniques.length;
+
+    if (effectifFinal > effectifMax) {
+      await connection.rollback();
+      return res.status(409).json({
+        message: `Cette migration porterait "${classeRows[0].nom}" à ${effectifFinal} élève(s), au-dessus de l'effectif maximum autorisé (${effectifMax}). Ajustez l'effectif dans les paramètres de clôture ou choisissez une autre classe.`,
+        effectifActuel,
+        effectifFinal,
+        effectifMax
       });
     }
 
@@ -4874,6 +5426,144 @@ app.post('/api/eleves/migrer', async (req, res) => {
     if (connection) connection.release();
   }
 });
+
+// Modification des informations d'un élève (nom, prénom, date de naissance, sexe, classe, parent)
+app.put('/api/eleves/:id', authenticateJWT, async (req, res) => {
+  const eleveId = Number(req.params.id);
+  const { nom, prenom, dateNaissance, sexe, classeId, parentId } = req.body;
+  const etablissementId = req.user.etablissementId;
+
+  if (!etablissementId) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
+  }
+  if (!eleveId) {
+    return res.status(400).json({ message: "Identifiant de l'élève invalide." });
+  }
+  if (!nom || !prenom || !dateNaissance || !sexe || !classeId) {
+    return res.status(400).json({ message: 'Tous les champs sont requis (nom, prénom, date de naissance, sexe, classe).' });
+  }
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+
+    const [eleveRows] = await connection.query(
+      'SELECT id, classe_id FROM eleve WHERE id = ? AND etablissement_id = ?',
+      [eleveId, etablissementId]
+    );
+    if (eleveRows.length === 0) {
+      return res.status(404).json({ message: "Élève introuvable dans votre établissement." });
+    }
+
+    const [classeRows] = await connection.query(
+      'SELECT id, nom FROM classes WHERE id = ? AND etablissement_id = ?',
+      [classeId, etablissementId]
+    );
+    if (classeRows.length === 0) {
+      return res.status(404).json({ message: "Classe introuvable dans votre établissement." });
+    }
+
+    // Contrôle d'effectif max uniquement si on déplace l'élève vers une autre classe
+    if (Number(eleveRows[0].classe_id) !== Number(classeId)) {
+      const params = await fetchClotureParams(connection, etablissementId);
+      const [effectifRows] = await connection.query(
+        'SELECT COUNT(*) AS total FROM eleve WHERE classe_id = ?',
+        [classeId]
+      );
+      const effectifActuel = Number(effectifRows[0].total);
+      if (effectifActuel >= params.effectifMaxParClasse) {
+        return res.status(409).json({
+          message: `Effectif maximum atteint pour "${classeRows[0].nom}" (${effectifActuel}/${params.effectifMaxParClasse}).`
+        });
+      }
+    }
+
+    if (parentId) {
+      const [parentRows] = await connection.query(
+        'SELECT id FROM parents WHERE id = ? AND etablissement_id = ?',
+        [parentId, etablissementId]
+      );
+      if (parentRows.length === 0) {
+        return res.status(404).json({ message: "Parent introuvable dans votre établissement." });
+      }
+    }
+
+    await connection.query(
+      `UPDATE eleve
+       SET nom = ?, prenom = ?, date_naissance = ?, sexe = ?, classe_id = ?${parentId ? ', Parents_id = ?' : ''}
+       WHERE id = ?`,
+      parentId
+        ? [nom, prenom, dateNaissance, sexe, classeId, parentId, eleveId]
+        : [nom, prenom, dateNaissance, sexe, classeId, eleveId]
+    );
+
+    res.json({ message: "Élève modifié avec succès." });
+  } catch (error) {
+    console.error("Erreur lors de la modification de l'élève:", error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+// Suppression d'un élève : autorisée uniquement s'il n'a encore aucun historique
+// (notes, présences, punitions, scolarité, permissions) — sinon on préserve les données
+// et on redirige vers la migration pour corriger une classe erronée.
+app.delete('/api/eleves/:id', authenticateJWT, async (req, res) => {
+  const eleveId = Number(req.params.id);
+  const etablissementId = req.user.etablissementId;
+
+  if (!etablissementId) {
+    return res.status(403).json({ message: 'Accès non autorisé.' });
+  }
+  if (!eleveId) {
+    return res.status(400).json({ message: "Identifiant de l'élève invalide." });
+  }
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+
+    const [eleveRows] = await connection.query(
+      'SELECT id, nom, prenom FROM eleve WHERE id = ? AND etablissement_id = ?',
+      [eleveId, etablissementId]
+    );
+    if (eleveRows.length === 0) {
+      return res.status(404).json({ message: "Élève introuvable dans votre établissement." });
+    }
+
+    const [[notesRow]] = await connection.query('SELECT COUNT(*) AS total FROM note WHERE Eleves_id = ?', [eleveId]);
+    const [[presencesRow]] = await connection.query('SELECT COUNT(*) AS total FROM presence WHERE eleve_id = ?', [eleveId]);
+    const [[punitionsRow]] = await connection.query('SELECT COUNT(*) AS total FROM punitions WHERE eleve_id = ?', [eleveId]);
+    const [[scolariteRow]] = await connection.query('SELECT COUNT(*) AS total FROM scolarite WHERE eleve_id = ?', [eleveId]);
+    const [[permissionsRow]] = await connection.query('SELECT COUNT(*) AS total FROM permission WHERE eleve_id = ?', [eleveId]);
+
+    const historique = {
+      notes: notesRow.total,
+      presences: presencesRow.total,
+      punitions: punitionsRow.total,
+      scolarite: scolariteRow.total,
+      permissions: permissionsRow.total
+    };
+
+    if (Object.values(historique).some(total => total > 0)) {
+      return res.status(409).json({
+        message: "Impossible de supprimer cet élève : des données lui sont déjà associées (notes, présences, punitions, scolarité ou permissions de sortie). Utilisez la migration pour corriger sa classe si besoin.",
+        historique
+      });
+    }
+
+    await connection.query('DELETE FROM eleve WHERE id = ?', [eleveId]);
+
+    res.json({ message: `${eleveRows[0].nom} ${eleveRows[0].prenom} a été supprimé avec succès.` });
+  } catch (error) {
+    console.error("Erreur lors de la suppression de l'élève:", error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 //api pour notification administration dashbord
 app.get('/api/eleve/:studentId', async (req, res) => {
   const studentId = parseInt(req.params.studentId);
@@ -5974,11 +6664,16 @@ app.get('/api/bulletined/:childId/:anneeScolaireId', async (req, res) => {
   }
 
   try {
+    // La table bulletin ne stocke pas la classe de l'élève au moment de l'édition.
+    // On la retrouve via la table note (qui, elle, garde classe_id par élève/semestre/
+    // année) pour éviter d'afficher la classe ACTUELLE de l'élève sur un bulletin
+    // d'une année antérieure. Repli sur la classe courante si aucune note historique
+    // ne correspond (cas résiduel, ex. bulletin saisi sans passer par la saisie de notes).
     const [results] = await req.db.query(`
-      SELECT 
-        e.nom AS eleveNom, 
+      SELECT
+        e.nom AS eleveNom,
         e.prenom AS elevePrenom,
-        c.nom AS classeNom,
+        COALESCE(hc.nom, cLive.nom) AS classeNom,
         s.id AS semestre_id,
         s.nom AS semestreNom,
         m.nom AS matiereNom,
@@ -5993,10 +6688,16 @@ app.get('/api/bulletined/:childId/:anneeScolaireId', async (req, res) => {
         b.decision
       FROM bulletin b
       JOIN eleve e ON e.id = b.eleve_id
-      JOIN classes c ON c.id = e.classe_id
       JOIN semestre s ON s.id = b.semestre_id
       JOIN matieres m ON m.id = b.matiere_id
       JOIN coefficient coef ON coef.id = b.coef_id
+      LEFT JOIN (
+        SELECT Eleves_id, Semestre_id, Annee_scolaire_id, MAX(classe_id) AS classe_id
+        FROM note
+        GROUP BY Eleves_id, Semestre_id, Annee_scolaire_id
+      ) hn ON hn.Eleves_id = b.eleve_id AND hn.Semestre_id = b.semestre_id AND hn.Annee_scolaire_id = b.Annee_scolaire_id
+      LEFT JOIN classes hc ON hc.id = hn.classe_id
+      LEFT JOIN classes cLive ON cLive.id = e.classe_id
       WHERE b.eleve_id = ? AND b.Annee_scolaire_id = ?
       ORDER BY s.nom, m.nom
     `, [childId, anneeScolaireId]);
@@ -6107,10 +6808,12 @@ app.post('/api/etablissements', async (req, res) => {
   }
 
   try {
+    const hashedPassword = await bcrypt.hash(mot_de_passe, 10);
+
     // Ajout de l'établissement dans la table Etablissement
     const [result] = await db.query(
       'INSERT INTO etablissement (nom, departement_id, commune_id, statut, telephone, mail, nom_utilisateur, mot_de_passe) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [nom, departement_id, commune_id, statut, telephone, mail, nom_utilisateur, mot_de_passe]
+      [nom, departement_id, commune_id, statut, telephone, mail, nom_utilisateur, hashedPassword]
     );
 
     const idEtablissement = result.insertId;
@@ -6140,12 +6843,8 @@ app.post('/api/etablissements', async (req, res) => {
 app.post('/api/loginEtablissement', async (req, res) => {
   const { nom_utilisateur, mot_de_passe } = req.body;
 
-  // Log des données reçues
-  console.log('Données reçues pour la connexion :', req.body);
-
   // Vérifier si les champs requis sont fournis
   if (!nom_utilisateur || !mot_de_passe) {
-    console.log('Champs manquants :', { nom_utilisateur, mot_de_passe });
     return res.status(400).json({ message: 'Nom d\'utilisateur et mot de passe requis.' });
   }
 
@@ -6156,42 +6855,44 @@ app.post('/api/loginEtablissement', async (req, res) => {
       return res.status(500).json({ message: 'Erreur de connexion à la base de données.' });
     }
 
-    // Log avant la requête SQL
-    console.log('Exécution de la requête SQL pour trouver l\'utilisateur :', nom_utilisateur);
-
     // Requête SQL pour trouver l'utilisateur
     const [rows] = await db.query('SELECT * FROM etablissement WHERE nom_utilisateur = ?', [nom_utilisateur]);
 
-    // Log du résultat de la requête SQL
-    console.log('Résultat de la requête SQL :', rows);
-
     // Vérification si l'utilisateur existe
     if (rows.length === 0) {
-      console.log('Nom d’utilisateur incorrect :', nom_utilisateur);
       return res.status(404).json({ message: 'Nom d’utilisateur incorrect' });
     }
 
     const etablissement = rows[0];
+    const storedPassword = etablissement.mot_de_passe || '';
+    const isBcryptHash = /^\$2[aby]\$/.test(storedPassword);
 
-    // Log de l'établissement trouvé
-    console.log('Établissement trouvé :', etablissement);
+    let passwordOk;
+    if (isBcryptHash) {
+      passwordOk = await bcrypt.compare(mot_de_passe, storedPassword);
+    } else {
+      // Compte hérité créé avant le passage au hachage : on accepte encore une
+      // comparaison en clair une seule fois, puis on migre immédiatement le
+      // mot de passe vers un hash bcrypt pour cette ligne.
+      passwordOk = mot_de_passe === storedPassword;
+      if (passwordOk) {
+        const migratedHash = await bcrypt.hash(mot_de_passe, 10);
+        await db.query('UPDATE etablissement SET mot_de_passe = ? WHERE id = ?', [migratedHash, etablissement.id]);
+      }
+    }
 
-    // Comparaison des mots de passe
-    console.log('Mot de passe fourni :', mot_de_passe);
-    console.log('Mot de passe stocké :', etablissement.mot_de_passe);
-
-    if (mot_de_passe !== etablissement.mot_de_passe) {
-      console.log('Mot de passe incorrect.');
+    if (!passwordOk) {
       return res.status(401).json({ message: 'Mot de passe incorrect.' });
     }
 
     // Générer un token JWT
     const token = jwt.sign(
       {
+        type: 'etablissement',
         etablissementId: etablissement.id,
         nom: etablissement.nom,
       },
-      secretKey,
+      JWT_SECRET,
       { expiresIn: '24h' } // Durée de validité du token
     );
 
@@ -6213,105 +6914,280 @@ app.post('/api/loginEtablissement', async (req, res) => {
   }
 });
 
-// API OpenAI: Exemple d'utilisation pour une activité éducative
-app.post('/api/assistant', async (req, res) => {
-  const { studentFirstName, studentLastName, subjectName, className, activity, activityDate, userMessage } = req.body;
+// ============================
+// GESTION DES COLLABORATEURS (table `administrations`)
+// ============================
 
-  const apiKey = process.env.OPENAI_API_KEY;
+function genererMotDePasseTemporaire() {
+  return crypto.randomBytes(6).toString('hex');
+}
 
-  if (!studentFirstName || !studentLastName || !subjectName || !className || !activity || !activityDate || !userMessage) {
-    return res.status(400).json({ error: 'Tous les champs sont requis.' });
+function parseModulesAutorises(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return [];
+  }
+}
+
+// Réservé au fondateur/directeur connecté (token établissement)
+const requireEtablissement = (req, res, next) => {
+  if (!req.user || req.user.type !== 'etablissement') {
+    return res.status(403).json({ message: 'Accès réservé au fondateur/directeur.' });
+  }
+  next();
+};
+
+// Connexion d'un collaborateur (comptable, secrétaire, etc.)
+app.post('/api/loginAdministration', async (req, res) => {
+  const { email, mot_de_passe } = req.body;
+
+  if (!email || !mot_de_passe) {
+    return res.status(400).json({ message: 'Email et mot de passe requis.' });
   }
 
-  const prompt = `
-    Élève: ${studentFirstName} ${studentLastName}
-    Matière: ${subjectName}
-    Classe: ${className}
-    Activité réalisée: ${activity}
-    Date de l'activité: ${activityDate}
-    Question: ${userMessage}
-
-    Bonjour GPT, veuillez aider cet élève à mieux comprendre l'activité ou répondre à sa question.
-  `;
-
   try {
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
+    const [rows] = await db.query(
+      `SELECT administrations.*, etablissement.nom AS etablissement_nom
+       FROM administrations
+       LEFT JOIN etablissement ON etablissement.id = administrations.etablissement_id
+       WHERE administrations.email = ?`,
+      [email]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Email incorrect.' });
+    }
+
+    const collaborateur = rows[0];
+    const passwordOk = await bcrypt.compare(String(mot_de_passe), collaborateur.mot_de_passe);
+
+    if (!passwordOk) {
+      return res.status(401).json({ message: 'Mot de passe incorrect.' });
+    }
+
+    const modulesAutorises = parseModulesAutorises(collaborateur.modules_autorises);
+
+    const token = jwt.sign(
       {
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 200,
+        type: 'administration',
+        administrationId: collaborateur.id,
+        etablissementId: collaborateur.etablissement_id,
+        nom: collaborateur.nom,
+        prenom: collaborateur.prenom,
+        poste: collaborateur.poste,
+        modules_autorises: modulesAutorises,
       },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      }
+      JWT_SECRET,
+      { expiresIn: '24h' }
     );
 
-    res.json({ reply: response.data.choices[0].message.content });
-  } catch (error) {
-    console.error('Erreur avec OpenAI:', error.response?.data || error.message);
-    return res.status(error.response?.status || 500).json({
-      error: error.response?.data || 'Erreur avec le service OpenAI.',
+    res.json({
+      message: 'Connexion réussie.',
+      token,
+      administration: {
+        id: collaborateur.id,
+        nom: collaborateur.nom,
+        prenom: collaborateur.prenom,
+        poste: collaborateur.poste,
+        etablissement_id: collaborateur.etablissement_id,
+        etablissement_nom: collaborateur.etablissement_nom,
+        modules_autorises: modulesAutorises,
+      },
     });
-  }
-});
-
-
-app.get('/api/assistants/:childId', async (req, res) => {
-  const { childId } = req.params;
-  
-  try {
-    console.log("Requête API reçue pour l'élève ID :", childId);
-
-    // Vérification 1 : Récupération de l'ID de la classe pour l'élève
-    const [eleveRows] = await db.query(
-      'SELECT classe_id FROM eleve WHERE id = ?',
-      [childId]
-    );
-
-    if (eleveRows.length === 0) {
-      console.log("Aucune classe trouvée pour l'élève ID :", childId);
-      return res.status(404).json({ message: "Classe introuvable pour cet élève." });
-    }
-
-    const classId = eleveRows[0].classe_id;
-    console.log("Classe ID récupéré :", classId);
-
-    // Vérification 2 : Récupération des matières, activités et dates pour la classe
-    const [testsRows] = await db.query(
-      `SELECT t.date, t.activite, m.nom AS matiereNom
-       FROM tests t
-       JOIN matieres m ON t.matière_id = m.id
-       WHERE t.classe_id = ?`,
-      [classId]
-    );
-
-    if (testsRows.length === 0) {
-      console.log("Aucun test trouvé pour la classe ID :", classId);
-      return res.status(404).json({ message: "Aucun test trouvé pour cette classe." });
-    }
-
-    console.log("Données des tests récupérées :", testsRows);
-
-    // Transformation des données pour l'interface
-    const assistants = testsRows.map(test => ({
-      date: test.date,
-      activity: test.activite,
-      subject: test.matiereNom,
-    }));
-
-    console.log("Données finales des assistants envoyées :", assistants);
-
-    // Envoi des données à l'interface
-    res.status(200).json(assistants);
   } catch (error) {
-    console.error("Erreur lors de la récupération des données pour l'élève :", error);
-    res.status(500).json({ message: "Erreur interne du serveur." });
+    console.error('Erreur lors de la connexion collaborateur :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
+
+// Liste des collaborateurs de l'établissement du fondateur connecté
+app.get('/api/administration/collaborateurs', authenticateJWT, requireEtablissement, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT id, nom, prenom, poste, telephone, email, modules_autorises FROM administrations WHERE etablissement_id = ? ORDER BY nom, prenom',
+      [req.user.etablissementId]
+    );
+    res.json(rows.map((row) => ({ ...row, modules_autorises: parseModulesAutorises(row.modules_autorises) })));
+  } catch (error) {
+    console.error('Erreur lors de la récupération des collaborateurs :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Création d'un collaborateur (mot de passe généré automatiquement)
+app.post('/api/administration/collaborateurs', authenticateJWT, requireEtablissement, async (req, res) => {
+  const { nom, prenom, poste, telephone, email, modules_autorises } = req.body;
+
+  if (!nom || !prenom || !poste || !email) {
+    return res.status(400).json({ message: 'Nom, prénom, poste et email sont requis.' });
+  }
+
+  try {
+    const motDePasseTemporaire = genererMotDePasseTemporaire();
+    const motDePasseHash = await bcrypt.hash(motDePasseTemporaire, 10);
+    const modulesAutorises = Array.isArray(modules_autorises) ? modules_autorises : [];
+
+    const [result] = await db.query(
+      `INSERT INTO administrations (nom, prenom, poste, telephone, email, mot_de_passe, etablissement_id, modules_autorises)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [nom, prenom, poste, telephone || null, email, motDePasseHash, req.user.etablissementId, JSON.stringify(modulesAutorises)]
+    );
+
+    res.status(201).json({
+      message: 'Collaborateur créé avec succès.',
+      collaborateur: {
+        id: result.insertId,
+        nom,
+        prenom,
+        poste,
+        telephone: telephone || null,
+        email,
+        modules_autorises: modulesAutorises,
+      },
+      mot_de_passe_temporaire: motDePasseTemporaire,
+    });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Un collaborateur avec cet email existe déjà.' });
+    }
+    console.error('Erreur lors de la création du collaborateur :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Modification d'un collaborateur (poste, modules autorisés, coordonnées)
+app.put('/api/administration/collaborateurs/:id', authenticateJWT, requireEtablissement, async (req, res) => {
+  const { id } = req.params;
+  const { nom, prenom, poste, telephone, email, modules_autorises } = req.body;
+
+  try {
+    const [rows] = await db.query('SELECT id FROM administrations WHERE id = ? AND etablissement_id = ?', [
+      id,
+      req.user.etablissementId,
+    ]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Collaborateur introuvable.' });
+    }
+
+    await db.query(
+      `UPDATE administrations
+       SET nom = ?, prenom = ?, poste = ?, telephone = ?, email = ?, modules_autorises = ?
+       WHERE id = ? AND etablissement_id = ?`,
+      [
+        nom,
+        prenom,
+        poste,
+        telephone || null,
+        email,
+        JSON.stringify(Array.isArray(modules_autorises) ? modules_autorises : []),
+        id,
+        req.user.etablissementId,
+      ]
+    );
+
+    res.json({ message: 'Collaborateur mis à jour avec succès.' });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'Un collaborateur avec cet email existe déjà.' });
+    }
+    console.error('Erreur lors de la mise à jour du collaborateur :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Suppression d'un collaborateur
+app.delete('/api/administration/collaborateurs/:id', authenticateJWT, requireEtablissement, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await db.query('DELETE FROM administrations WHERE id = ? AND etablissement_id = ?', [
+      id,
+      req.user.etablissementId,
+    ]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Collaborateur introuvable.' });
+    }
+    res.json({ message: 'Collaborateur supprimé avec succès.' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression du collaborateur :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Réinitialisation du mot de passe d'un collaborateur, déclenchée par le fondateur
+app.post(
+  '/api/administration/collaborateurs/:id/reset-password',
+  authenticateJWT,
+  requireEtablissement,
+  async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      const [rows] = await db.query('SELECT id FROM administrations WHERE id = ? AND etablissement_id = ?', [
+        id,
+        req.user.etablissementId,
+      ]);
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Collaborateur introuvable.' });
+      }
+
+      const motDePasseTemporaire = genererMotDePasseTemporaire();
+      const motDePasseHash = await bcrypt.hash(motDePasseTemporaire, 10);
+
+      await db.query('UPDATE administrations SET mot_de_passe = ? WHERE id = ?', [motDePasseHash, id]);
+
+      res.json({ message: 'Mot de passe réinitialisé avec succès.', mot_de_passe_temporaire: motDePasseTemporaire });
+    } catch (error) {
+      console.error('Erreur lors de la réinitialisation du mot de passe :', error);
+      res.status(500).json({ message: 'Erreur serveur.' });
+    }
+  }
+);
+
+// Le collaborateur change lui-même son mot de passe
+app.put('/api/administration/mon-mot-de-passe', authenticateJWT, async (req, res) => {
+  if (!req.user || req.user.type !== 'administration') {
+    return res.status(403).json({ message: 'Réservé aux comptes collaborateurs.' });
+  }
+
+  const { ancien_mot_de_passe, nouveau_mot_de_passe } = req.body;
+
+  if (!ancien_mot_de_passe || !nouveau_mot_de_passe) {
+    return res.status(400).json({ message: 'Ancien et nouveau mot de passe requis.' });
+  }
+
+  try {
+    const [rows] = await db.query('SELECT mot_de_passe FROM administrations WHERE id = ?', [
+      req.user.administrationId,
+    ]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Compte introuvable.' });
+    }
+
+    const passwordOk = await bcrypt.compare(String(ancien_mot_de_passe), rows[0].mot_de_passe);
+    if (!passwordOk) {
+      return res.status(401).json({ message: 'Ancien mot de passe incorrect.' });
+    }
+
+    const nouveauHash = await bcrypt.hash(String(nouveau_mot_de_passe), 10);
+    await db.query('UPDATE administrations SET mot_de_passe = ? WHERE id = ?', [
+      nouveauHash,
+      req.user.administrationId,
+    ]);
+
+    res.json({ message: 'Mot de passe modifié avec succès.' });
+  } catch (error) {
+    console.error('Erreur lors du changement de mot de passe :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// L'assistant IA de matière (chat enfant/parent) vit désormais dans
+// routes/assistant.routes.cjs, monté sur /api/parent/assistant (auth +
+// vérification de propriété élève/parent, historique persistant, garde-fous).
 
 
 app.post("/api/upload-photos-zip", upload.single("zipFile"), async (req, res) => {

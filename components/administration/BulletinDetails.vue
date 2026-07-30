@@ -121,7 +121,7 @@
                   </tbody>
                 </v-table>
               </v-responsive>
-              <div v-else class="pa-10 text-center text-grey">
+              <div v-else class="pa-3 pa-sm-10 text-center text-grey">
                 <v-icon size="40" color="red-lighten-3" class="mb-2">mdi-close-circle-outline</v-icon>
                 <p class="text-body-1 font-weight-bold">Aucune note disponible pour ce semestre.</p>
               </div>
@@ -139,12 +139,12 @@
             {{ dialogTitle }}
           </v-toolbar-title>
         </v-toolbar>
-        <v-card-text class="pa-6 text-center text-body-1 font-weight-medium" style="white-space: pre-line;">
+        <v-card-text class="pa-2 pa-sm-6 text-center text-body-1 font-weight-medium" style="white-space: pre-line;">
           {{ message }}
         </v-card-text>
         <v-card-actions class="pa-4 bg-blue-lighten-5">
           <v-spacer></v-spacer>
-          <v-btn color="blue-darken-4" variant="elevated" rounded="pill" @click="closeDialog" class="px-8">OK</v-btn>
+          <v-btn color="blue-darken-4" variant="elevated" rounded="pill" @click="closeDialog" class="px-2 px-sm-8">OK</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -182,7 +182,7 @@ export default {
   methods: {
     async fetchBulletinData() {
       try {
-        const response = await axios.get('http://localhost:8080/api/bulletin', {
+        const response = await axios.get('/api/bulletin', {
           params: { classeId: this.classId, etablissementId: this.etablissementId, anneeScolaireId: this.anneeScolaireId }
         });
         const { semestres, matieres, notes, classeNom } = response.data;
@@ -304,7 +304,7 @@ export default {
               };
 
               try {
-                await axios.post('http://localhost:8080/api/sauvegarde-bulletin', payload);
+                await axios.post('/api/sauvegarde-bulletin', payload);
               } catch (err) {
                 const apiError = err.response?.data;
                 if (apiError?.matieresManquantes?.length > 0) {

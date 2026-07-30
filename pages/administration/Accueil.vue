@@ -74,7 +74,7 @@
             <v-row class="no-margin-row">
               <v-col cols="12" md="4" v-for="(item, i) in features" :key="i" class="pa-2">
                 <v-card class="info-card" elevation="10">
-                  <v-card-text class="pa-6 text-center">
+                  <v-card-text class="pa-2 pa-sm-6 text-center">
                     <v-icon color="primary" size="48" class="mb-4">{{ item.icon }}</v-icon>
                     <h3 class="headline-modern">{{ item.title }}</h3>
                     <p class="body-text">{{ item.text }}</p>
@@ -85,11 +85,11 @@
             
             <v-card class="cta-card mt-10" elevation="12">
               <v-row no-gutters align="center">
-                <v-col cols="12" md="8" class="pa-8">
+                <v-col cols="12" md="8" class="pa-2 pa-sm-8">
                   <h2 class="text-h4 font-weight-bold mb-2">Prêt à commencer ?</h2>
                   <p class="text-subtitle-1">Rejoignez l'avenir de l'éducation numérique dès aujourd'hui.</p>
                 </v-col>
-                <v-col cols="12" md="4" class="text-center pa-8">
+                <v-col cols="12" md="4" class="text-center pa-2 pa-sm-8">
                   <v-btn size="x-large" color="white" variant="elevated" class="text-primary font-weight-black" rounded @click="navigateTo('/administration/inscription')">
                     S'inscrire
                   </v-btn>
@@ -274,7 +274,7 @@ const features = [
   .text-h4 {
     font-size: 1.4rem !important;
   }
-  .pa-8 {
+  .pa-2 pa-sm-8 {
     padding: 20px !important; /* Réduit le padding sur mobile pour éviter le débordement */
   }
 }

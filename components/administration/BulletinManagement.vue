@@ -219,7 +219,7 @@
                           @click="goToClass(classe.id)"
                           ripple
                         >
-                          <v-card-text class="text-center pa-6">
+                          <v-card-text class="text-center pa-2 pa-sm-6">
                             <v-avatar color="blue-lighten-4" size="64" class="mb-4">
                               <v-icon color="blue-darken-4" size="32">mdi-google-classroom</v-icon>
                             </v-avatar>
@@ -365,7 +365,7 @@ export default {
     async fetchClasses() {
       this.loading = true
       try {
-        const response = await axios.get(`http://localhost:8080/api/classe/${this.etablissementId}`)
+        const response = await axios.get(`/api/classe/${this.etablissementId}`)
         console.log('[FRONT] classes récupérées =', response.data)
         this.classes = response.data
       } catch (error) {
@@ -387,7 +387,7 @@ export default {
         console.log('[FRONT] chargement années scolaires pour etablissementId =', this.etablissementId)
 
         const response = await axios.get(
-          `http://localhost:8080/api/annees-scolaires/etablissement/${this.etablissementId}`
+          `/api/annees-scolaires/etablissement/${this.etablissementId}`
         )
 
         console.log('[FRONT] réponse brute API années scolaires =', response)

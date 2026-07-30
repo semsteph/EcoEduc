@@ -391,7 +391,7 @@ export default {
         { title: "Actions", value: "actions", sortable: false },
       ],
 
-      API_BASE: "http://localhost:8080",
+      API_BASE: "",
     };
   },
   computed: {

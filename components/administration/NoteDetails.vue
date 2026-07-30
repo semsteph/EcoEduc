@@ -125,7 +125,7 @@
               </v-table>
             </v-responsive>
 
-            <div v-else class="text-center pa-8 border-dashed rounded-lg grey--text">
+            <div v-else class="text-center pa-2 pa-sm-8 border-dashed rounded-lg grey--text">
               <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-database-off</v-icon>
               <p>Aucune note enregistrée pour cette période.</p>
             </div>
@@ -158,7 +158,7 @@ export default {
   methods: {
     async fetchData() {
       try {
-        const response = await axios.get('http://localhost:8080/api/classe-details', {
+        const response = await axios.get('/api/classe-details', {
           params: {
             classeId: this.classId,
             anneeScolaireId: this.anneeScolaireId,

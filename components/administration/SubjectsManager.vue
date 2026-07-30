@@ -8,7 +8,7 @@
       </v-btn>
     </v-toolbar>
 
-    <v-card-text class="pa-6">
+    <v-card-text class="pa-2 pa-sm-6">
       <v-row dense class="mb-4">
         <v-col cols="12" md="6">
           <v-text-field
@@ -93,7 +93,7 @@
           <v-toolbar-title class="font-weight-bold">Supprimer la matière</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <v-alert type="warning" outlined class="mb-4">Cette action est irréversible.</v-alert>
           <p class="mb-0">
             Confirmer la suppression de : <strong>{{ subjectToDelete?.nom }}</strong> ?
@@ -107,7 +107,7 @@
           <v-btn
             color="red"
             dark
-            class="rounded-lg px-6"
+            class="rounded-lg px-2 px-sm-6"
             :loading="loadingDeleteSubject"
             @click="deleteSubjectInline"
           >
@@ -128,7 +128,7 @@
           </v-btn>
         </v-toolbar>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <div class="d-flex align-start">
             <v-avatar color="success" size="44" class="mr-4">
               <v-icon color="white">mdi-check</v-icon>
@@ -144,7 +144,7 @@
         <v-divider />
         <v-card-actions class="pa-4">
           <v-spacer />
-          <v-btn :color="toolbarColor" dark class="rounded-lg px-6" @click="successDialog = false">
+          <v-btn :color="toolbarColor" dark class="rounded-lg px-2 px-sm-6" @click="successDialog = false">
             OK
           </v-btn>
         </v-card-actions>
@@ -162,7 +162,7 @@
           </v-btn>
         </v-toolbar>
 
-        <v-card-text class="pa-6">
+        <v-card-text class="pa-2 pa-sm-6">
           <div class="d-flex align-start">
             <v-avatar color="red" size="44" class="mr-4">
               <v-icon color="white">mdi-alert-circle</v-icon>
@@ -205,7 +205,7 @@
         <v-divider />
         <v-card-actions class="pa-4">
           <v-spacer />
-          <v-btn color="red" dark class="rounded-lg px-6" @click="errorDialog = false">
+          <v-btn color="red" dark class="rounded-lg px-2 px-sm-6" @click="errorDialog = false">
             Fermer
           </v-btn>
         </v-card-actions>
@@ -221,7 +221,7 @@ export default {
   name: "SubjectsManager",
   props: {
     etablissementId: { type: Number, required: true },
-    apiBaseUrl: { type: String, default: "http://localhost:8080" },
+    apiBaseUrl: { type: String, default: "" },
     title: { type: String, default: "Répartition — Matières" },
     toolbarColor: { type: String, default: "#3949AB" },
     autoLoad: { type: Boolean, default: true },

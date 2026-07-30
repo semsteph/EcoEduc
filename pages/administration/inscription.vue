@@ -142,7 +142,7 @@ export default {
   },
   async mounted() {
     try {
-      const response = await axios.get('http://localhost:8080/api/communes');
+      const response = await axios.get('/api/communes');
       this.departements = response.data;
     } catch (error) {
       console.error('Erreur récupération des données :', error);
@@ -167,7 +167,7 @@ export default {
       };
 
       try {
-        await axios.post('http://localhost:8080/api/etablissements', formData);
+        await axios.post('/api/etablissements', formData);
         this.resetForm();
         this.dialog = true;
         setTimeout(() => {

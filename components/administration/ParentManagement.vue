@@ -21,7 +21,7 @@
               @click="showForm ? (showForm = false) : openForm()"
               block
               elevation="2"
-              class="rounded-lg px-6"
+              class="rounded-lg px-2 px-sm-6"
             >
               <v-icon left>{{ showForm ? 'mdi-view-list' : 'mdi-account-plus' }}</v-icon>
               {{ showForm ? 'Voir la liste' : 'Inscrire un Parent' }}
@@ -164,7 +164,7 @@
                   <v-btn
                     color="success"
                     type="submit"
-                    class="rounded-lg px-8"
+                    class="rounded-lg px-2 px-sm-8"
                     elevation="2"
                     :loading="saving"
                   >
@@ -270,7 +270,7 @@
         <v-card-actions class="pa-4">
           <v-spacer></v-spacer>
           <v-btn variant="text" @click="confirmDeleteDialog = false">Annuler</v-btn>
-          <v-btn color="error" variant="flat" @click="confirmDelete" class="px-6 rounded-md" :loading="deleting">
+          <v-btn color="error" variant="flat" @click="confirmDelete" class="px-2 px-sm-6 rounded-md" :loading="deleting">
             Supprimer
           </v-btn>
         </v-card-actions>
@@ -285,7 +285,7 @@
           {{ dialogMessage }}
         </v-card-text>
         <v-card-actions class="justify-center pb-4">
-          <v-btn color="primary" variant="flat" class="px-8 rounded-lg" @click="dialog = false">OK</v-btn>
+          <v-btn color="primary" variant="flat" class="px-2 px-sm-8 rounded-lg" @click="dialog = false">OK</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -346,7 +346,7 @@ export default {
 
     fetchParents() {
       axios
-        .get(`http://localhost:8080/api/Parents/${this.etablissementId}`)
+        .get(`/api/Parents/${this.etablissementId}`)
         .then((response) => {
           this.parents = response.data || [];
         })
@@ -378,8 +378,8 @@ export default {
       const isUpdate = !!this.newParent.id;
       const apiMethod = isUpdate ? "put" : "post";
       const apiUrl = isUpdate
-        ? `http://localhost:8080/api/Parents/${this.newParent.id}`
-        : "http://localhost:8080/api/Parents";
+        ? `/api/Parents/${this.newParent.id}`
+        : "/api/Parents";
 
       const payload = {
         name: this.newParent.name,
@@ -432,7 +432,7 @@ export default {
       this.deleting = true;
 
       axios
-        .delete(`http://localhost:8080/api/Parents/${this.parentToDelete.id}`)
+        .delete(`/api/Parents/${this.parentToDelete.id}`)
         .then(() => {
           const deleted = this.parentToDelete;
           this.parents = this.parents.filter((p) => p.id !== deleted.id);

@@ -5,7 +5,7 @@
     </v-btn>
 
     <!-- LOADING -->
-    <div v-if="loading" class="text-center pa-10">
+    <div v-if="loading" class="text-center pa-3 pa-sm-10">
       <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
       <div class="mt-4 font-weight-bold">Traitement des données...</div>
     </div>
@@ -20,7 +20,7 @@
           </v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-6 bg-white">
+        <v-card-text class="pa-2 pa-sm-6 bg-white">
           <!-- CONSIGNES -->
           <v-alert type="info" variant="tonal" class="mb-5 rounded-lg text-black">
             <div class="font-weight-bold mb-2">
@@ -260,7 +260,7 @@
 <script>
 import axios from "axios";
 
-const API_BASE = "http://localhost:8080";
+const API_BASE = "";
 
 export default {
   props: {

@@ -199,7 +199,7 @@ export default {
         this.error = null;
         this.loading = true;
 
-        const response = await axios.get("http://localhost:8080/api/eleve-notes", {
+        const response = await axios.get("/api/eleve-notes", {
           params: {
             childId: this.childId,
             anneeScolaireId: this.anneeScolaireId,

@@ -318,7 +318,7 @@ export default {
       mobilePage: 1,
       mobilePerPage: 6,
 
-      API_BASE: "http://localhost:8080",
+      API_BASE: "",
     };
   },
   computed: {

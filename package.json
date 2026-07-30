@@ -18,6 +18,7 @@
     "@nuxt/kit": "^3.12.4",
     "@nuxtjs/axios": "^5.13.6",
     "adm-zip": "^0.5.16",
+    "apexcharts": "^6.5.0",
     "axios": "^1.7.2",
     "bcrypt": "^5.1.1",
     "body-parser": "^1.20.3",
@@ -37,6 +38,7 @@
     "nodemailer": "^7.0.2",
     "nuxt": "^3.12.3",
     "vue": "latest",
+    "vue3-apexcharts": "^1.11.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

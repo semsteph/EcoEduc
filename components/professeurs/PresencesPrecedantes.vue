@@ -189,7 +189,7 @@ export default {
       this.error = null;
 
       try {
-        const response = await axios.get(`http://localhost:8080/api/absents`, {
+        const response = await axios.get(`/api/absents`, {
           params: {
             classeId: this.classeId,
             etablissementId: this.etablissementId,

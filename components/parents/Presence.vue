@@ -258,7 +258,7 @@ export default {
         this.error = null;
         this.loading = true;
 
-        const response = await axios.get("http://localhost:8080/api/presence", {
+        const response = await axios.get("/api/presence", {
           params: {
             childId: this.childId,
             anneeScolaireId: this.anneeScolaireId,
@@ -345,7 +345,7 @@ export default {
 
         const updatePromises = Object.keys(this.modifiedMotifs).map((id) => {
           return axios.post(
-            `http://localhost:8080/api/presence/${id}/motif`,
+            `/api/presence/${id}/motif`,
             { motif: this.modifiedMotifs[id] },
             { headers: { Authorization: `Bearer ${token}` } }
           );
