@@ -24,19 +24,20 @@
 <script>
 export default {
   props: {
-    value: {
+    modelValue: {
       type: Boolean,
       default: false,
     },
   },
+  emits: ['update:modelValue', 'logout'],
   computed: {
     // Synchroniser directement la valeur avec le modèle local
     dialog: {
       get() {
-        return this.value;
+        return this.modelValue;
       },
       set(val) {
-        this.$emit('update:value', val);
+        this.$emit('update:modelValue', val);
       },
     },
   },

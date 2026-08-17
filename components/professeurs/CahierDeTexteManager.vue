@@ -477,8 +477,10 @@ export default {
 
     async fetchNotesData() {
       try {
+        const token = localStorage.getItem("token");
         const response = await axios.get(
-          `${this.API_BASE}/api/getActivities/${this.classeId}/${this.subjectId}/${this.anneeScolaireId}`
+          `${this.API_BASE}/api/getActivities/${this.classeId}/${this.subjectId}/${this.anneeScolaireId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
         this.activities = {};
@@ -529,7 +531,10 @@ export default {
 
       try {
         this.adding = true;
-        await axios.post(`${this.API_BASE}/api/addActivity`, payload);
+        const addActivityToken = localStorage.getItem("token");
+        await axios.post(`${this.API_BASE}/api/addActivity`, payload, {
+          headers: { Authorization: `Bearer ${addActivityToken}` },
+        });
         this.successMessage = true;
         this.closeDialog();
         await this.fetchNotesData();

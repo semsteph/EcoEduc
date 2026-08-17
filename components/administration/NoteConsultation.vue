@@ -138,7 +138,10 @@ export default {
     async fetchClasses() {
       this.loading = true
       try {
-        const res = await axios.get(`/api/classe/${this.etablissementId}`)
+        const token = localStorage.getItem('token')
+        const res = await axios.get(`/api/classe/${this.etablissementId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         this.classes = res.data
       } catch (err) {
         console.error('Erreur classes:', err)

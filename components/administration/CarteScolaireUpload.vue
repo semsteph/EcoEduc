@@ -303,8 +303,10 @@ export default {
       this.importResult = null;
 
       try {
+        const token = localStorage.getItem("token");
         const res = await axios.get(
-          `${API_BASE}/api/cartes-scolaires/verification/${this.classId}/${this.etablissementId}`
+          `${API_BASE}/api/cartes-scolaires/verification/${this.classId}/${this.etablissementId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
         // attendu côté API : { eleves: [...], tousOntUnePhoto: boolean }
@@ -338,8 +340,12 @@ export default {
       formData.append("etablissementId", this.etablissementId);
 
       try {
+        const zipToken = localStorage.getItem("token");
         const { data } = await axios.post(`${API_BASE}/api/upload-photos-zip`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${zipToken}`,
+          },
         });
 
         this.importResult = data;

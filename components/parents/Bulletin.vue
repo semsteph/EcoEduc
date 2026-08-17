@@ -117,8 +117,10 @@ export default {
   methods: {
     async fetchData() {
   try {
+    const token = localStorage.getItem("token");
     const response = await axios.get(
-      `/api/bulletined/${this.childId}/${this.anneeScolaireId}`
+      `/api/bulletined/${this.childId}/${this.anneeScolaireId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
     const data = response.data;
 
@@ -287,6 +289,14 @@ export default {
   max-width: 100%;
 }
 
+.eleve-info h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 /* Bouton Télécharger PDF */
 .download-btn {
   background-color: #4caf50;
@@ -297,6 +307,7 @@ export default {
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.3s ease;
+  min-height: 40px;
 }
 
 .download-btn:hover {
@@ -338,6 +349,7 @@ export default {
 
 .notes-table {
   width: 100%;
+  min-width: 420px;
   border-collapse: collapse;
   margin-top: 20px;
 }
@@ -364,14 +376,16 @@ export default {
 
 @media (max-width: 480px) {
   .semestre-btn {
-    font-size: 10px;
-    padding: 4px;
+    font-size: 13px;
+    padding: 8px 6px;
+    min-height: 40px;
     flex: 0 1 calc(50% - 8px); /* Sur mobiles, deux boutons par ligne */
   }
 
   .notes-table th,
   .notes-table td {
-    font-size: 10px;
+    font-size: 13px;
+    padding: 8px 6px;
   }
 
   .download-btn {

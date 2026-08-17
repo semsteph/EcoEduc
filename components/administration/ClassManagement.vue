@@ -350,6 +350,11 @@ export default {
   },
 
   methods: {
+    authHeaders() {
+      const token = localStorage.getItem('token');
+      return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    },
+
     triggerNotify(title, message, type = 'success', isConfirm = false, actionType = null, targetId = null) {
       const config = {
         success: { color: 'green-darken-1', icon: 'mdi-check-circle' },
@@ -418,7 +423,7 @@ export default {
         cycle: this.selectedCycle,
         nombre: this.numberOfClasses,
         etablissement_id: this.etablissementId
-      })
+      }, this.authHeaders())
       .then(() => {
         this.fetchClasses();
         this.closeClassDialog();
@@ -451,7 +456,7 @@ export default {
         semestre_id: this.selectedSemestreId,
         etablissement_id: this.etablissementId,
         anneeScolaireId: this.anneeScolaireId
-      })
+      }, this.authHeaders())
       .then(() => {
         this.activeForm = null;
         this.triggerNotify('Réussite', 'Notes de conduite attribuées.', 'success');
@@ -488,7 +493,7 @@ export default {
     },
 
     fetchClasses() {
-      axios.get(`/api/classetablissement/${this.etablissementId}`)
+      axios.get(`/api/classetablissement/${this.etablissementId}`, this.authHeaders())
         .then((res) => {
           console.log('[Classes] Réponse brute API classetablissement :', res.data);
 
@@ -523,7 +528,8 @@ export default {
 
     deleteClass(id) {
       axios.delete(`/api/Classes/${id}`, {
-        data: { etablissement_id: this.etablissementId }
+        data: { etablissement_id: this.etablissementId },
+        ...this.authHeaders(),
       })
       .then(() => {
         this.fetchClasses();

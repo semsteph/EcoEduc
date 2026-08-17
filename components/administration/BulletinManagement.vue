@@ -365,7 +365,10 @@ export default {
     async fetchClasses() {
       this.loading = true
       try {
-        const response = await axios.get(`/api/classe/${this.etablissementId}`)
+        const token = localStorage.getItem('token')
+        const response = await axios.get(`/api/classe/${this.etablissementId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         console.log('[FRONT] classes récupérées =', response.data)
         this.classes = response.data
       } catch (error) {

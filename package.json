@@ -12,6 +12,7 @@
     "dev:concurrent": "concurrently \"npm run dev\" \"npm run start\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@capacitor/android": "^7.4.3",
     "@capacitor/cli": "^7.4.3",
     "@capacitor/core": "^7.4.3",

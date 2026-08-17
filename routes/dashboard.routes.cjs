@@ -31,6 +31,7 @@ function derniersMois(n) {
   const mois = [];
   for (let i = n - 1; i >= 0; i--) {
     const d = dayjs().subtract(i, 'month');
+    
     mois.push({ cle: d.format('YYYY-MM'), libelle: d.format('MMM YY') });
   }
   return mois;
@@ -42,6 +43,10 @@ function derniersMois(n) {
 // ---------------------------------------------------------------------
 router.get('/stats/:etablissementId/:anneeScolaireId', authenticateStaff, async (req, res) => {
   const { etablissementId, anneeScolaireId } = req.params;
+
+  if (Number(etablissementId) !== Number(req.user.etablissementId)) {
+    return res.status(403).json({ message: "Vous n'avez pas accès à cet établissement." });
+  }
 
   try {
     const db = req.db;

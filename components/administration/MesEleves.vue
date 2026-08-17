@@ -194,9 +194,13 @@ export default {
     },
     async fetchEleves() {
       try {
+        const token = localStorage.getItem("token");
         const response = await fetch("/api/eleves", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({
             etablissement_id: this.etablissementId,
             annee_scolaire_id: this.anneeScolaireId
@@ -209,7 +213,10 @@ export default {
     },
     async fetchClasses() {
       try {
-        const response = await fetch(`/api/classe/${this.etablissementId}`);
+        const token = localStorage.getItem("token");
+        const response = await fetch(`/api/classe/${this.etablissementId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         this.classes = response.ok ? await response.json() : [];
       } catch (error) {
         console.error("Erreur lors du chargement des classes :", error);

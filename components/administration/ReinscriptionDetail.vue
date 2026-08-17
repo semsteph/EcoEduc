@@ -358,7 +358,9 @@ export default {
     fetchStudents() {
       console.log('[FRONT] fetchStudents classId =', this.classId, 'afficherPartis =', this.afficherPartis);
 
+      const token = localStorage.getItem('token');
       axios.get(`/api/classes/${this.classId}/eleves`, {
+        headers: { Authorization: `Bearer ${token}` },
         params: this.afficherPartis ? { inclurePartis: true } : {}
       })
         .then(response => {
@@ -428,7 +430,10 @@ export default {
 
       console.log('[FRONT] chargement classes établissement =', this.etablissementId);
 
-      axios.get(`/api/classe/${this.etablissementId}`)
+      const tokenEtab = localStorage.getItem('token');
+      axios.get(`/api/classe/${this.etablissementId}`, {
+        headers: { Authorization: `Bearer ${tokenEtab}` },
+      })
         .then(response => {
           console.log('[FRONT] classes établissement récupérées =', response.data);
 

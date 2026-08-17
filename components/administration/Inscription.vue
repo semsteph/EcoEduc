@@ -377,7 +377,10 @@ const toggleBulkForm = () => {
 
 const fetchClasses = async () => {
   try {
-    const res = await axios.get(`/api/classe/${props.etablissementId}`);
+    const token = localStorage.getItem("token");
+    const res = await axios.get(`/api/classe/${props.etablissementId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     classes.value = res.data || [];
   } catch (e) {
     console.error("Erreur classes:", e);
@@ -386,7 +389,10 @@ const fetchClasses = async () => {
 
 const fetchParents = async () => {
   try {
-    const res = await axios.get(`/api/Parents/${props.etablissementId}`);
+    const token = localStorage.getItem("token");
+    const res = await axios.get(`/api/Parents/${props.etablissementId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     const raw = res.data || [];
     parents.value = raw.map(p => ({
       id: p.id,
@@ -442,10 +448,13 @@ const onParentDeleted = async () => {
 const submitForm = async () => {
   loading.value = true;
   try {
+    const inscriptionToken = localStorage.getItem("token");
     await axios.post('/api/inscription', {
       ...form.value,
       etablissementId: props.etablissementId,
       anneeScolaireId: props.anneeScolaireId
+    }, {
+      headers: { Authorization: `Bearer ${inscriptionToken}` },
     });
     alert("L'élève a été inscrit avec succès !");
     resetForm();
@@ -498,8 +507,12 @@ const submitBulkForm = async () => {
   formData.append('anneeScolaireId', props.anneeScolaireId);
 
   try {
+    const importToken = localStorage.getItem("token");
     const res = await axios.post('/api/import-eleves', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: `Bearer ${importToken}`,
+      }
     });
     bulkReport.value = res.data?.rapport || null;
     bulkReportDialog.value = true;

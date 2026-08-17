@@ -1,20 +1,20 @@
 <template>
-  <v-app-bar color="blue darken-3" dark app elevation="4">
-    <v-btn icon @click="$emit('toggleDrawer')" class="white--text">
+  <v-app-bar dark app elevation="4" density="compact" class="app-toolbar">
+    <v-btn icon @click="$emit('toggleDrawer')" class="toolbar-btn" aria-label="Menu">
       <v-icon>mdi-menu</v-icon>
     </v-btn>
 
-    <v-toolbar-title class="white--text font-weight-bold text-h5 ml-2">
+    <v-toolbar-title class="toolbar-title font-weight-bold ml-1">
       EchoEducation
     </v-toolbar-title>
 
     <v-spacer></v-spacer>
 
-    <v-btn icon @click="showMessages" class="white--text">
+    <v-btn icon @click="showMessages" class="toolbar-btn" aria-label="Messages">
       <v-icon>mdi-message</v-icon>
     </v-btn>
 
-    <v-btn icon @click="handleNotificationClick" class="white--text">
+    <v-btn icon @click="handleNotificationClick" class="toolbar-btn" aria-label="Notifications">
       <v-badge
         v-if="badgeCount > 0"
         :content="badgeCount"
@@ -82,7 +82,27 @@ export default {
 </script>
 
 <style scoped>
-.v-app-bar { background-color: #1976d2; }
-.v-toolbar-title { font-family: "Roboto", sans-serif; font-size: 1.25rem; }
-.v-btn:hover { background-color: rgba(255, 255, 255, 0.1); }
+.app-toolbar { background-color: #1976d2; }
+
+.toolbar-title {
+  font-family: "Roboto", sans-serif;
+  font-size: 1.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbar-btn {
+  min-width: 44px;
+  min-height: 44px;
+}
+.toolbar-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 400px) {
+  .toolbar-title {
+    font-size: 1rem;
+  }
+}
 </style>

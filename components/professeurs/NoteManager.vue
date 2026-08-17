@@ -341,7 +341,10 @@ export default {
     // Récupération des étudiants et tri par ordre alphabétique
     async getStudents() {
       try {
-        const response = await axios.get(`/api/classes/${this.classeId}/eleves`);
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`/api/classes/${this.classeId}/eleves`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         this.students = response.data || [];
 
         this.students.sort((a, b) => {
@@ -398,9 +401,13 @@ export default {
       const semesterId = this.getSemesterId(this.currentSemester);
 
       try {
+        const deleteToken = localStorage.getItem("token");
         const response = await fetch("/api/deleteNote", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${deleteToken}`,
+          },
           body: JSON.stringify({
             eleveId: student.id,
             semestreId: semesterId,
@@ -507,8 +514,10 @@ export default {
     async fetchNotesData() {
       try {
         const semesterId = this.getSemesterId(this.currentSemester);
+        const token = localStorage.getItem("token");
         const response = await axios.get(
-          `/api/notes/${this.classeId}/${this.subjectId}/${semesterId}/${this.anneeScolaireId}`
+          `/api/notes/${this.classeId}/${this.subjectId}/${semesterId}/${this.anneeScolaireId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
         const notesData = response.data || [];
 
@@ -564,7 +573,10 @@ export default {
           })),
         };
 
-        await axios.post(`/api/notes/save`, payload);
+        const saveToken = localStorage.getItem("token");
+        await axios.post(`/api/notes/save`, payload, {
+          headers: { Authorization: `Bearer ${saveToken}` },
+        });
 
         this.showSnack("✅ Notes sauvegardées avec succès !", "success");
       } catch (error) {

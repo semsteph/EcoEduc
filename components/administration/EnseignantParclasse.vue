@@ -170,7 +170,10 @@ export default {
     async fetchClasses(showToast = false) {
       this.loading = true;
       try {
-        const res = await axios.get(`/api/classe/${this.etablissementId}`);
+        const token = localStorage.getItem("token");
+        const res = await axios.get(`/api/classe/${this.etablissementId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         this.classes = Array.isArray(res.data) ? res.data : [];
         if (showToast) this.snackbar = { show: true, text: "Classes mises à jour." };
       } catch (error) {

@@ -322,6 +322,11 @@ export default {
     },
   },
   methods: {
+    authHeaders() {
+      const token = localStorage.getItem("token");
+      return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    },
+
     // ✅ Normalisation : API renvoie Date/Duree/Motif/Statut/Contact -> on force date/duree/motif/statut/contact
     normalizePermission(p) {
       return {
@@ -339,7 +344,8 @@ export default {
       this.loading = true;
       try {
         const response = await axios.get(
-          `/api/permissions/${this.etablissementId}/${this.anneeScolaireId}`
+          `/api/permissions/${this.etablissementId}/${this.anneeScolaireId}`,
+          this.authHeaders()
         );
 
         const raw = Array.isArray(response.data) ? response.data : [];
@@ -365,7 +371,7 @@ export default {
           try {
             await axios.put(`/api/permissions/${message.id}`, {
               is_read: true,
-            });
+            }, this.authHeaders());
             message.is_read = true;
 
             // ✅ aussi dans permissions (cohérence)
@@ -392,7 +398,7 @@ export default {
       const permissionsWithDetails = await Promise.all(
         this.filteredPermissions.map(async (permission) => {
           try {
-            const res = await axios.get(`/api/students/${permission.eleve_id}`);
+            const res = await axios.get(`/api/students/${permission.eleve_id}`, this.authHeaders());
             const { eleveNom, elevePrenom, classeNom } = res.data;
 
             return {
@@ -420,7 +426,7 @@ export default {
 
       if (!message.is_read) {
         try {
-          await axios.put(`/api/permissions/${message.id}`, { is_read: true });
+          await axios.put(`/api/permissions/${message.id}`, { is_read: true }, this.authHeaders());
           message.is_read = true;
 
           // ✅ cohérence de liste
@@ -444,7 +450,7 @@ export default {
       try {
         await axios.put(`/api/permissions/${this.selectedMessage.id}`, {
           statut: this.selectedStatus,
-        });
+        }, this.authHeaders());
 
         this.selectedMessage.statut = this.selectedStatus;
 

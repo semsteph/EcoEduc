@@ -124,7 +124,10 @@ export default {
   },
   methods: {
     fetchDetails() {
-      axios.get(`/api/classes/${this.classId}/${this.anneeScolaireId}/details`)
+      const token = localStorage.getItem('token');
+      axios.get(`/api/classes/${this.classId}/${this.anneeScolaireId}/details`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then(response => {
           this.matieres = response.data.matieres;
         })

@@ -147,7 +147,7 @@ export default {
   methods: {
     async fetchEnseignants() {
       try {
-        const response = await axios.get(`/api/EnseignantAdmin/${this.etablissementId}`);
+        const response = await axios.get(`/api/EnseignantAdmin/${this.etablissementId}`, this.authHeaders());
         this.enseignants = response.data;
         console.log(response.data);
         console.log(this.etablissementId);

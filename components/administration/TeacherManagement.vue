@@ -502,10 +502,12 @@ export default {
   methods: {
     async fetchData() {
       try {
+        const token = localStorage.getItem("token");
+        const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
         const [teachersRes, classesRes, subjectsRes, coefficientRes] = await Promise.all([
-          axios.get(`/api/Enseignants/${this.etablissementId}`),
-          axios.get(`/api/classe/${this.etablissementId}`),
-          axios.get(`/api/Matieres/${this.etablissementId}`),
+          axios.get(`/api/Enseignants/${this.etablissementId}`, authHeaders),
+          axios.get(`/api/classe/${this.etablissementId}`, authHeaders),
+          axios.get(`/api/Matieres/${this.etablissementId}`, authHeaders),
           axios.get("/api/Coefficient"),
         ]);
 
@@ -623,7 +625,10 @@ export default {
     async trySubmitAffectation(payload) {
       this.isSubmitting = true;
       try {
-        await axios.post("/api/Enseignants/add", payload);
+        const addToken = localStorage.getItem("token");
+        await axios.post("/api/Enseignants/add", payload, {
+          headers: { Authorization: `Bearer ${addToken}` },
+        });
         this.resetAddForm();
       } catch (error) {
         const conflictType = this.detectConflictType(error);

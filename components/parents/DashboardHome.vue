@@ -741,6 +741,7 @@ const semestreChartOptions = computed(() => ({
 }
 
 @media (max-width: 600px) {
+  .pdash { padding: 16px 12px; }
   .child-stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .chart-card { padding: 14px; }
 }

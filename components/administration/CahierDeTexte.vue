@@ -78,7 +78,10 @@ export default {
   },
   methods: {
     fetchClasses() {
-      axios.get(`/api/classe/${this.etablissementId}`)
+      const token = localStorage.getItem('token');
+      axios.get(`/api/classe/${this.etablissementId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then(response => {
           this.classes = response.data;
         })

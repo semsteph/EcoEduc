@@ -10,30 +10,41 @@
       </v-btn>
     </v-toolbar>
     
-    <v-simple-table class="custom-table">
-      <thead>
-        <tr>
-          <th class="custom-header">Date</th>
-          <th class="custom-header">Motif</th>
-          <th class="custom-header">Durée</th>
-          <th class="custom-header">Contact</th>
-          <th class="custom-header">Statut</th>
-          <th class="custom-header">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="permission in permissions" :key="permission.id" class="custom-row">
-          <td class="custom-cell">{{ formatDate(permission.Date) }}</td>
-          <td class="custom-cell">{{ permission.Motif }}</td>
-          <td class="custom-cell">{{ permission.Duree }}</td>
-          <td class="custom-cell">{{ permission.Contact }}</td>
-          <td class="custom-cell">{{ permission.Statut ? permission.Statut : 'En attente' }}</td>
-          <td class="custom-cell action-cell">
-            <v-icon @click="deletePermission(permission.id)" color="red" class="clickable-icon">mdi-delete</v-icon>
-          </td>
-        </tr>
-      </tbody>
-    </v-simple-table>
+    <div class="table-wrap">
+      <v-simple-table class="custom-table">
+        <thead>
+          <tr>
+            <th class="custom-header">Date</th>
+            <th class="custom-header">Motif</th>
+            <th class="custom-header">Durée</th>
+            <th class="custom-header">Contact</th>
+            <th class="custom-header">Statut</th>
+            <th class="custom-header">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="permission in permissions" :key="permission.id" class="custom-row">
+            <td class="custom-cell">{{ formatDate(permission.Date) }}</td>
+            <td class="custom-cell">{{ permission.Motif }}</td>
+            <td class="custom-cell">{{ permission.Duree }}</td>
+            <td class="custom-cell">{{ permission.Contact }}</td>
+            <td class="custom-cell">{{ permission.Statut ? permission.Statut : 'En attente' }}</td>
+            <td class="custom-cell action-cell">
+              <v-btn
+                icon
+                variant="text"
+                color="red"
+                class="delete-btn"
+                @click="deletePermission(permission.id)"
+                aria-label="Supprimer la permission"
+              >
+                <v-icon>mdi-delete</v-icon>
+              </v-btn>
+            </td>
+          </tr>
+        </tbody>
+      </v-simple-table>
+    </div>
 
     <v-dialog v-model="dialog" max-width="500px">
       <v-card>
@@ -114,7 +125,10 @@ export default {
   },
   methods: {
     fetchPermissions() {
-      axios.get(`/api/permissions/${this.childId}/${this.etablissementId}/${this.anneeScolaireId}`)
+      const token = localStorage.getItem('token');
+      axios.get(`/api/permissions/${this.childId}/${this.etablissementId}/${this.anneeScolaireId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then(response => {
           this.permissions = response.data;
         })
@@ -129,7 +143,7 @@ export default {
     },
   
     addPermission() {
-      
+      const token = localStorage.getItem('token');
       axios.post(`/api/permissions/${this.childId}`, {
         date: this.newPermission.date,
         motif: this.newPermission.motif,
@@ -140,6 +154,8 @@ export default {
         etablissementId: this.etablissementId,
         anneeScolaireId: this.anneeScolaireId
 
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
       })
       .then(response => {
         this.permissions.push({
@@ -161,7 +177,10 @@ export default {
  
     },
     deletePermission(permissionId) {
-      axios.delete(`/api/permissions/${permissionId}`)
+      const token = localStorage.getItem('token');
+      axios.delete(`/api/permissions/${permissionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then(() => {
           this.permissions = this.permissions.filter(permission => permission.id !== permissionId);
           this.showSnackbar('Permission supprimée avec succès', 'error');
@@ -201,12 +220,22 @@ export default {
   margin: 0 auto;
 }
 
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .custom-table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   background-color: white;
   border-radius: 10px;
-  overflow-x: auto;
+}
+
+.custom-header,
+.custom-cell {
+  white-space: nowrap;
 }
 
 .custom-header {
@@ -222,7 +251,6 @@ export default {
   padding: 10px 12px;
   border-bottom: 1px solid #e0e0e0;
   color: #333;
-  word-wrap: break-word;
 }
 
 .custom-row:nth-child(even) {
@@ -239,8 +267,9 @@ export default {
   white-space: nowrap;
 }
 
-.clickable-icon {
-  cursor: pointer;
+.delete-btn {
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .back-button {
@@ -260,10 +289,6 @@ export default {
   }
   .custom-table-container {
     padding: 10px;
-  }
-  .custom-table {
-    display: block;
-    overflow-x: auto;
   }
   .v-btn {
     font-size: 14px;

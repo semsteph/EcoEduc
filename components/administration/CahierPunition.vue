@@ -200,9 +200,11 @@ export default {
 
       this.loadingData = true;
       try {
+        const token = localStorage.getItem('token');
         const response = await axios.get(`/api/incident`, {
+          headers: { Authorization: `Bearer ${token}` },
           params: {
-            studentId: this.studentId, 
+            studentId: this.studentId,
             semestre: this.currentSemestre,
             anneeScolaireId: this.anneeScolaireId
           }
@@ -219,6 +221,7 @@ export default {
     },
     async addPunishment() {
       try {
+        const token = localStorage.getItem('token');
         await axios.post(`/api/incidents`, {
           eleveId: this.studentId,
           semestre: this.currentSemestre,
@@ -229,6 +232,8 @@ export default {
           motif: this.newPunishment.motif,
           etablissementId: this.etablissementId,
           anneeScolaireId: this.anneeScolaireId
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         this.showAddPunishmentForm = false;

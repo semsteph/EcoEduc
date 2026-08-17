@@ -158,7 +158,9 @@ export default {
   methods: {
     async fetchData() {
       try {
+        const token = localStorage.getItem('token');
         const response = await axios.get('/api/classe-details', {
+          headers: { Authorization: `Bearer ${token}` },
           params: {
             classeId: this.classId,
             anneeScolaireId: this.anneeScolaireId,

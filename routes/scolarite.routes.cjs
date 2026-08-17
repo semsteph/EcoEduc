@@ -86,6 +86,47 @@ function authenticateStaff(req, res, next) {
   });
 }
 
+// Vérifie que l'établissement demandé est bien celui de l'utilisateur authentifié
+// (authenticateStaff n'est pas suffisant seul : ça vérifie une signature de token,
+// pas que le token appartient à CET établissement).
+function verifierEtablissementOr403(req, res, etablissementId) {
+  if (Number(etablissementId) !== Number(req.user.etablissementId)) {
+    res.status(403).json({ message: "Vous n'avez pas accès à cet établissement." });
+    return false;
+  }
+  return true;
+}
+
+async function verifierClasseEtablissementOr403(req, res, classeId) {
+  const [rows] = await req.db.query('SELECT etablissement_id FROM classes WHERE id = ?', [classeId]);
+  if (rows.length === 0) {
+    res.status(404).json({ message: 'Classe introuvable.' });
+    return false;
+  }
+  return verifierEtablissementOr403(req, res, rows[0].etablissement_id);
+}
+
+async function verifierEleveEtablissementOr403(req, res, eleveId) {
+  const [rows] = await req.db.query('SELECT etablissement_id FROM eleve WHERE id = ?', [eleveId]);
+  if (rows.length === 0) {
+    res.status(404).json({ message: 'Élève introuvable.' });
+    return false;
+  }
+  return verifierEtablissementOr403(req, res, rows[0].etablissement_id);
+}
+
+async function verifierPaiementEtablissementOr403(req, res, paiementId) {
+  const [rows] = await req.db.query(
+    `SELECT s.etablissement_id FROM paiement p JOIN scolarite s ON s.id = p.scolarite_id WHERE p.id = ?`,
+    [paiementId]
+  );
+  if (rows.length === 0) {
+    res.status(404).json({ message: 'Paiement introuvable.' });
+    return false;
+  }
+  return verifierEtablissementOr403(req, res, rows[0].etablissement_id);
+}
+
 // Vérifie que l'élève appartient bien au parent authentifié, renvoie l'élève (avec classe_id)
 async function getEleveDuParentOr403(req, res, eleveId) {
   const [rows] = await req.db.query(
@@ -139,6 +180,7 @@ function calculerEcheances(echeances, montantPaye) {
 // ---------------------------------------------------------------------
 router.get('/eleves/:classId/:anneeScolaireId', authenticateStaff, async (req, res) => {
   const { classId, anneeScolaireId } = req.params;
+  if (!(await verifierClasseEtablissementOr403(req, res, classId))) return;
   try {
     const [rows] = await req.db.query(
       `SELECT e.id, e.nom, e.prenom,
@@ -167,6 +209,7 @@ router.get('/eleves/:classId/:anneeScolaireId', authenticateStaff, async (req, r
 // ---------------------------------------------------------------------
 router.get('/paiements/:eleveId/:anneeScolaireId', authenticateStaff, async (req, res) => {
   const { eleveId, anneeScolaireId } = req.params;
+  if (!(await verifierEleveEtablissementOr403(req, res, eleveId))) return;
   try {
     const [rows] = await req.db.query(
       `SELECT p.id, p.montant,
@@ -202,6 +245,7 @@ router.post('/paiement', authenticateStaff, async (req, res) => {
   if (!eleveId || !anneeScolaireId || !montantNum || montantNum <= 0) {
     return res.status(400).json({ message: 'Données de paiement invalides.' });
   }
+  if (!(await verifierEleveEtablissementOr403(req, res, eleveId))) return;
 
   const conn = await req.db.getConnection();
   try {
@@ -259,6 +303,7 @@ router.post('/montant', authenticateStaff, async (req, res) => {
   if (!eleveId || !classeId || !anneeScolaireId || !etablissementId || montantTotal == null) {
     return res.status(400).json({ message: 'Champs manquants.' });
   }
+  if (!verifierEtablissementOr403(req, res, etablissementId)) return;
 
   try {
     await req.db.query(
@@ -289,6 +334,7 @@ router.post('/classe', authenticateStaff, async (req, res) => {
   if (!classeId || !anneeScolaireId || !etablissementId || montantTotal == null) {
     return res.status(400).json({ message: 'Champs manquants.' });
   }
+  if (!verifierEtablissementOr403(req, res, etablissementId)) return;
 
   try {
     const [result] = await req.db.query(
@@ -314,6 +360,7 @@ router.post('/classe', authenticateStaff, async (req, res) => {
 // ---------------------------------------------------------------------
 router.get('/promotions/:etablissementId', authenticateStaff, async (req, res) => {
   const { etablissementId } = req.params;
+  if (!verifierEtablissementOr403(req, res, etablissementId)) return;
 
   try {
     const [rows] = await req.db.query(
@@ -343,6 +390,7 @@ router.post('/promotion', authenticateStaff, async (req, res) => {
   if (!promotionId || !anneeScolaireId || !etablissementId || montantTotal == null) {
     return res.status(400).json({ message: 'Champs manquants.' });
   }
+  if (!verifierEtablissementOr403(req, res, etablissementId)) return;
 
   try {
     const [classesRows] = await req.db.query(
@@ -385,6 +433,7 @@ router.post('/promotion', authenticateStaff, async (req, res) => {
 // ---------------------------------------------------------------------
 router.get('/echeances/:classeId/:anneeScolaireId', authenticateStaff, async (req, res) => {
   const { classeId, anneeScolaireId } = req.params;
+  if (!(await verifierClasseEtablissementOr403(req, res, classeId))) return;
   try {
     const [rows] = await req.db.query(
       `SELECT id, libelle, montant, date_limite, ordre
@@ -416,6 +465,7 @@ router.post('/echeances', authenticateStaff, async (req, res) => {
       return res.status(400).json({ message: 'Chaque échéance doit avoir un libellé, un montant > 0 et une date limite.' });
     }
   }
+  if (!verifierEtablissementOr403(req, res, etablissementId)) return;
 
   const conn = await req.db.getConnection();
   try {
@@ -455,6 +505,7 @@ router.post('/echeances', authenticateStaff, async (req, res) => {
 // ---------------------------------------------------------------------
 router.get('/paiements-en-attente/:etablissementId/:anneeScolaireId', authenticateStaff, async (req, res) => {
   const { etablissementId, anneeScolaireId } = req.params;
+  if (!verifierEtablissementOr403(req, res, etablissementId)) return;
   try {
     const [rows] = await req.db.query(
       `SELECT p.id, p.montant, p.mode_paiement AS modePaiement, p.date_paiement AS datePaiement,
@@ -481,6 +532,7 @@ router.get('/paiements-en-attente/:etablissementId/:anneeScolaireId', authentica
 // ---------------------------------------------------------------------
 router.put('/paiement/:id/valider', authenticateStaff, async (req, res) => {
   const { id } = req.params;
+  if (!(await verifierPaiementEtablissementOr403(req, res, id))) return;
   try {
     const [result] = await req.db.query(
       `UPDATE paiement SET statut = 'valide', traite_at = NOW()
@@ -504,6 +556,7 @@ router.put('/paiement/:id/valider', authenticateStaff, async (req, res) => {
 router.put('/paiement/:id/rejeter', authenticateStaff, async (req, res) => {
   const { id } = req.params;
   const { motif } = req.body;
+  if (!(await verifierPaiementEtablissementOr403(req, res, id))) return;
   try {
     const [result] = await req.db.query(
       `UPDATE paiement SET statut = 'rejete', motif_rejet = ?, traite_at = NOW()

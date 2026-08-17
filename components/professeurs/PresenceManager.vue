@@ -364,8 +364,10 @@ export default {
 
     async getStudents() {
       try {
+        const token = localStorage.getItem("token");
         const response = await axios.get(
-          `${this.API_BASE}/api/classes/${this.classeId}/eleves`
+          `${this.API_BASE}/api/classes/${this.classeId}/eleves`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
 
         this.students = (response.data || []).map((student) => ({
@@ -421,7 +423,10 @@ export default {
           return;
         }
 
-        await axios.post(`${this.API_BASE}/api/presence`, dataToSave);
+        const saveToken = localStorage.getItem("token");
+        await axios.post(`${this.API_BASE}/api/presence`, dataToSave, {
+          headers: { Authorization: `Bearer ${saveToken}` },
+        });
 
         this.students = this.students.map((s) => ({ ...s, date: "", status: "" }));
         this.successDialog = true;

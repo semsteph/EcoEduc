@@ -147,11 +147,13 @@ export default {
         this.$emit('update-notification-count', nonLuesCount);
 
         // Formater chaque notification
+        const notifToken = localStorage.getItem("token");
+        const notifAuthHeaders = { headers: { Authorization: `Bearer ${notifToken}` } };
         const formatted = await Promise.all(rawData.map(async notif => {
-          const studentRes = await axios.get(`/api/eleve/${notif.eleve_id}`);
+          const studentRes = await axios.get(`/api/eleve/${notif.eleve_id}`, notifAuthHeaders);
           const studentData = studentRes.data;
 
-          const classRes = await axios.get(`/api/classes/${studentData.classe_id}`);
+          const classRes = await axios.get(`/api/classes/${studentData.classe_id}`, notifAuthHeaders);
           const classData = classRes.data;
 
           return {
@@ -186,9 +188,14 @@ export default {
 
     async contactParent(studentId) {
       try {
-        const studentRes = await axios.get(`/api/eleve/${studentId}`);
+        const token = localStorage.getItem("token");
+        const studentRes = await axios.get(`/api/eleve/${studentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const parentId = studentRes.data.Parents_id;
-        const parentRes = await axios.get(`/api/parentid/${parentId}`);
+        const parentRes = await axios.get(`/api/parentid/${parentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         this.parentInfo = parentRes.data;
         this.dialog = true;
       } catch (error) {

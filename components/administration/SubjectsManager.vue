@@ -273,6 +273,11 @@ export default {
   },
 
   methods: {
+    authHeaders() {
+      const token = localStorage.getItem("token");
+      return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    },
+
     subjectsUrl() {
       return `${this.apiBaseUrl}/api/Matieres/${this.etablissementId}`;
     },
@@ -362,7 +367,7 @@ export default {
     async fetchSubjectsList() {
       this.loadingSubjects = true;
       try {
-        const res = await axios.get(this.subjectsUrl());
+        const res = await axios.get(this.subjectsUrl(), this.authHeaders());
         this.inlineSubjects = res.data || [];
         this.showSuccess("Liste mise à jour", `✅ ${this.inlineSubjects.length} matière(s) chargée(s).`);
       } catch (e) {
@@ -384,7 +389,7 @@ export default {
         await axios.post(`${this.apiBaseUrl}/api/Matieres`, {
           name,
           etablissementId: this.etablissementId,
-        });
+        }, this.authHeaders());
 
         this.inlineSubjectName = "";
         await this.fetchSubjectsList();
@@ -412,7 +417,7 @@ export default {
       const subjectName = this.subjectToDelete?.nom || "la matière";
 
       try {
-        await axios.delete(`${this.apiBaseUrl}/api/Matieres/${this.subjectToDelete.id}`);
+        await axios.delete(`${this.apiBaseUrl}/api/Matieres/${this.subjectToDelete.id}`, this.authHeaders());
 
         this.deleteSubjectDialog = false;
         this.subjectToDelete = null;

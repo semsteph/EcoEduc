@@ -199,7 +199,9 @@ export default {
         this.error = null;
         this.loading = true;
 
+        const token = localStorage.getItem("token");
         const response = await axios.get("/api/eleve-notes", {
+          headers: { Authorization: `Bearer ${token}` },
           params: {
             childId: this.childId,
             anneeScolaireId: this.anneeScolaireId,

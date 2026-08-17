@@ -415,7 +415,10 @@ export default {
 
     async fetchStudents() {
       try {
-        const response = await axios.get(`${this.API_BASE}/api/classes/${this.classeId}/eleves`);
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`${this.API_BASE}/api/classes/${this.classeId}/eleves`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         this.students = (response.data || []).map((student) => ({
           id: student.id,
           fullName: `${student.nom} ${student.prenom}`,
@@ -451,8 +454,10 @@ export default {
 
     async fetchTotalHours(studentId) {
       try {
+        const token = localStorage.getItem("token");
         const response = await axios.get(
-          `${this.API_BASE}/api/punitions/somme-heures/${studentId}/${this.anneeScolaireId}`
+          `${this.API_BASE}/api/punitions/somme-heures/${studentId}/${this.anneeScolaireId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
         );
         return response.data.totalHours;
       } catch (error) {
@@ -506,7 +511,10 @@ export default {
           })),
         };
 
-        await axios.post(`${this.API_BASE}/api/save/conduct`, payload);
+        const saveConductToken = localStorage.getItem("token");
+        await axios.post(`${this.API_BASE}/api/save/conduct`, payload, {
+          headers: { Authorization: `Bearer ${saveConductToken}` },
+        });
 
         validRecords.forEach((r) => {
           const target = this.conductRecords.find((x) => x.studentId === r.studentId);

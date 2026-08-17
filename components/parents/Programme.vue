@@ -44,7 +44,7 @@
       >
         <v-card-title class="card__title">
           <v-icon class="mr-2" color="primary">mdi-calendar-clock</v-icon>
-          <span>Vue tableau</span>
+          <span>Emploi du temps</span>
         </v-card-title>
 
         <v-divider />
@@ -199,10 +199,7 @@ export default {
   },
   computed: {
     isMobile() {
-      // Vuetify 2: $vuetify.breakpoint
-      return this.$vuetify && this.$vuetify.breakpoint
-        ? this.$vuetify.breakpoint.smAndDown
-        : false;
+      return this.$vuetify?.display?.smAndDown ?? false;
     },
     isEmpty() {
       return (
@@ -222,7 +219,10 @@ export default {
       this.error = null;
 
       try {
-        const res = await fetch(`/api/programme/${this.childId}`);
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/programme/${this.childId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!res.ok) throw new Error(`Erreur API (${res.status})`);
         const data = await res.json();
 

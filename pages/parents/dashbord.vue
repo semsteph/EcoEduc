@@ -147,6 +147,7 @@ import Acceuil from "@/components/parents/Acceuil.vue";
 import DashboardHome from "@/components/parents/DashboardHome.vue";
 import LogoutDialog from "@/components/parents/LogoutDialog.vue";
 import NotificationsComponent from "@/components/parents/NotificationsComponent.vue";
+import MessagesComponent from "@/components/parents/MessagesComponent.vue";
 
 export default {
   components: {
@@ -156,6 +157,7 @@ export default {
     DashboardHome,
     LogoutDialog,
     NotificationsComponent,
+    MessagesComponent,
   },
   setup() {
     const router = useRouter();
@@ -519,12 +521,23 @@ export default {
 }
 
 @media (max-width: 600px) {
-  .page-shell { padding: 16px 10px; }
-  .content-container { padding: 16px; border-radius: 18px; }
+  /* Sur mobile, chaque sous-page gère déjà son propre fond, sa carte et son
+     en-tête (topbar avec bouton retour) : la carte flottante du shell ne fait
+     que doubler ce chrome et gaspiller de l'espace vertical. On la neutralise
+     pour laisser les sous-pages s'afficher en plein écran, bord à bord. */
+  .page-shell { padding: 0; }
+  .content-container {
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    backdrop-filter: none;
+    max-width: none;
+  }
 }
 
 @media (max-width: 360px) {
-  .content-container { padding: 14px; }
   .drawer-title { font-size: 0.98rem; }
 }
 </style>

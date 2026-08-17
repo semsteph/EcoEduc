@@ -304,7 +304,10 @@ export default {
               };
 
               try {
-                await axios.post('/api/sauvegarde-bulletin', payload);
+                const token = localStorage.getItem('token');
+                await axios.post('/api/sauvegarde-bulletin', payload, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
               } catch (err) {
                 const apiError = err.response?.data;
                 if (apiError?.matieresManquantes?.length > 0) {

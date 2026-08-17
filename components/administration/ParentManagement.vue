@@ -345,8 +345,11 @@ export default {
     },
 
     fetchParents() {
+      const token = localStorage.getItem("token");
       axios
-        .get(`/api/Parents/${this.etablissementId}`)
+        .get(`/api/Parents/${this.etablissementId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         .then((response) => {
           this.parents = response.data || [];
         })
@@ -393,7 +396,11 @@ export default {
 
       if (!isUpdate) payload.password = this.newParent.password;
 
-      axios[apiMethod](apiUrl, payload)
+      const token = localStorage.getItem("token");
+
+      axios[apiMethod](apiUrl, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then((response) => {
           const savedParent = response.data;
 
@@ -431,8 +438,12 @@ export default {
 
       this.deleting = true;
 
+      const token = localStorage.getItem("token");
+
       axios
-        .delete(`/api/Parents/${this.parentToDelete.id}`)
+        .delete(`/api/Parents/${this.parentToDelete.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         .then(() => {
           const deleted = this.parentToDelete;
           this.parents = this.parents.filter((p) => p.id !== deleted.id);

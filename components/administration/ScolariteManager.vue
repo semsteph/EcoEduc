@@ -360,7 +360,8 @@ export default {
 
       try {
         const response = await axios.get(
-          `/api/classe/${this.etablissementId}`
+          `/api/classe/${this.etablissementId}`,
+          this.authHeaders()
         )
         this.classes = response.data
       } catch (error) {
