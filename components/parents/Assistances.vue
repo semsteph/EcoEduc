@@ -34,7 +34,7 @@
         <v-card v-else-if="!error && subjects.length === 0" class="empty-card" variant="outlined">
           <v-card-text class="empty-content">
             <div class="empty-icon">
-              <v-icon size="42">mdi-robot-confused-outline</v-icon>
+              <v-icon size="42">mdi-account-question-outline</v-icon>
             </div>
             <div class="empty-title">Aucun assistant disponible</div>
             <div class="empty-subtitle">
@@ -51,8 +51,8 @@
         <!-- Subject cards -->
         <div v-else class="subjects-wrap">
           <div v-for="subject in subjects" :key="subject.matiereId" class="subject-card" @click="selectSubject(subject)">
-            <div class="subject-icon">
-              <v-icon size="22">mdi-forum-outline</v-icon>
+            <div class="assistant-avatar">
+              <v-icon size="22">mdi-account</v-icon>
             </div>
 
             <div class="subject-info">
@@ -296,15 +296,16 @@ export default {
   transform: translateY(-2px);
   box-shadow: 0 18px 55px rgba(11, 46, 74, 0.14);
 }
-.subject-icon {
+/* Silhouette de personne : chaque assistant représente un tuteur, pas un robot. */
+.assistant-avatar {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--primary-600);
-  border: 1px solid rgba(37, 99, 235, 0.22);
+  background: linear-gradient(135deg, var(--primary), var(--primary-600));
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35);
   flex: 0 0 auto;
 }
 .subject-info {

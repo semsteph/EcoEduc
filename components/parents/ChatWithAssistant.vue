@@ -7,7 +7,12 @@
       </v-btn>
 
       <div class="topbar-title">
-        <div class="title">Assistant {{ subjectName }}</div>
+        <div class="title-row">
+          <div class="assistant-avatar avatar-sm">
+            <v-icon size="16">mdi-account</v-icon>
+          </div>
+          <div class="title">Assistant {{ subjectName }}</div>
+        </div>
         <div class="subtitle" v-if="activity">{{ activity }}</div>
       </div>
 
@@ -31,12 +36,18 @@
           class="bubble-row"
           :class="message.role === 'user' ? 'row-user' : 'row-assistant'"
         >
+          <div v-if="message.role !== 'user'" class="assistant-avatar avatar-sm">
+            <v-icon size="16">mdi-account</v-icon>
+          </div>
           <div class="bubble" :class="message.role === 'user' ? 'bubble-user' : 'bubble-assistant'">
             {{ message.content }}
           </div>
         </div>
 
         <div v-if="sending" class="bubble-row row-assistant">
+          <div class="assistant-avatar avatar-sm">
+            <v-icon size="16">mdi-account</v-icon>
+          </div>
           <div class="bubble bubble-assistant bubble-typing">
             <span class="dot"></span>
             <span class="dot"></span>
@@ -259,6 +270,13 @@ export default {
   min-width: 0;
   text-align: center;
 }
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
 .title {
   font-size: 1.05rem;
   font-weight: 900;
@@ -266,6 +284,23 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Silhouette de personne : l'assistant est un tuteur, pas un robot. */
+.assistant-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--primary), var(--primary-600));
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+.avatar-sm {
+  width: 26px;
+  height: 26px;
 }
 .subtitle {
   font-size: 0.82rem;
@@ -297,6 +332,8 @@ export default {
 
 .bubble-row {
   display: flex;
+  align-items: flex-end;
+  gap: 6px;
 }
 .row-user {
   justify-content: flex-end;

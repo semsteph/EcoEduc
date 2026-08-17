@@ -125,7 +125,7 @@ export default {
         { name: "Programme", route: "programme", icon: "mdi-book-open-page-variant-outline", tone: "purple" },
         { name: "Demande de Permission", route: "permission", icon: "mdi-file-sign", tone: "purple" },
         { name: "Activité", route: "activite", icon: "mdi-run", tone: "amber" },
-        { name: "Assistances", route: "assistances", icon: "mdi-lifebuoy", tone: "green" },
+        { name: "Assistances", route: "assistances", icon: "mdi-account-voice", tone: "green" },
       ],
       defaultPhoto: "/_nuxt/assets/parents/istockphoto-1495088043-612x612.jpg",
     };

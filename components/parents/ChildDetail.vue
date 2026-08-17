@@ -77,7 +77,7 @@ export default {
         { label: "Activité", icon: "mdi-run" },
         { label: "Bulletin", icon: "mdi-file-document-outline" },
         { label: "Demande de Permission", icon: "mdi-file-sign" },
-        { label: "Assistances", icon: "mdi-lifebuoy" },
+        { label: "Assistances", icon: "mdi-account-voice" },
       ],
       selectedDetail: null,
     };
