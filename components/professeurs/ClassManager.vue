@@ -78,6 +78,18 @@
       />
     </template>
 
+    <!-- Vue DevoirsManager -->
+    <template v-else-if="currentView === 'DevoirsManager'">
+      <DevoirsManager
+        :classe-id="selectedClassId || selectedClass?.classe_id"
+        :subject-id="subjectId"
+        :etablissement-id="etablissementId"
+        :annee-scolaire="anneeScolaire"
+        :annee-scolaire-id="anneeScolaireId"
+        @back="goBack"
+      />
+    </template>
+
     <!-- Liste des classes -->
     <template v-else>
       <div class="cm-header">
@@ -138,6 +150,7 @@ import NoteManager from "~/components/professeurs/NoteManager.vue";
 import PresenceManager from "~/components/professeurs/PresenceManager.vue";
 import ConductManager from "~/components/professeurs/ConductManager.vue";
 import CahierDeTexteManager from "~/components/professeurs/CahierDeTexteManager.vue";
+import DevoirsManager from "~/components/professeurs/DevoirsManager.vue";
 import PresencesPrecedantes from "~/components/professeurs/PresencesPrecedantes.vue";
 
 export default {
@@ -149,6 +162,7 @@ export default {
     PresencesPrecedantes,
     ConductManager,
     CahierDeTexteManager,
+    DevoirsManager,
   },
   props: {
     subjectId: { type: Number, required: true },

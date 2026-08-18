@@ -78,6 +78,7 @@ export default {
         { label: "Bulletin", icon: "mdi-file-document-outline" },
         { label: "Demande de Permission", icon: "mdi-file-sign" },
         { label: "Assistances", icon: "mdi-account-voice" },
+        { label: "Devoirs", icon: "mdi-notebook-edit-outline" },
       ],
       selectedDetail: null,
     };

@@ -9,6 +9,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "start": "nodemon server.cjs",
+    "start:prod": "node server.cjs",
     "dev:concurrent": "concurrently \"npm run dev\" \"npm run start\""
   },
   "dependencies": {

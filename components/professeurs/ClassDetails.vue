@@ -42,6 +42,7 @@ export default {
         { key: "PresenceManager", label: "Gérer Présence", icon: "mdi-calendar-check-outline" },
         { key: "PresencesPrecedantes", label: "Les derniers absents", icon: "mdi-account-off-outline" },
         { key: "CahierDeTexteManager", label: "Cahier de texte", icon: "mdi-book-open-variant" },
+        { key: "DevoirsManager", label: "Devoirs", icon: "mdi-notebook-edit-outline" },
       ],
     };
   },

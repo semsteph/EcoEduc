@@ -83,7 +83,8 @@
             >
               <div class="notif-inner">
                 <div class="notif-icon" :class="{ 'icon-new': notif.isNew }">
-                  <v-icon size="22">
+                  <v-icon v-if="notif.isDevoir" size="22">mdi-notebook-edit-outline</v-icon>
+                  <v-icon v-else size="22">
                     {{ notif.isNew ? "mdi-bell-alert-outline" : "mdi-bell-outline" }}
                   </v-icon>
                 </div>
@@ -106,7 +107,7 @@
                     </span>
                   </div>
 
-                  <div class="notif-actions">
+                  <div v-if="!notif.isDevoir" class="notif-actions">
                     <v-btn
                       v-if="!notif.hasMotif"
                       class="btn-link"
@@ -238,18 +239,40 @@ export default {
       return this.notifications.map((n, index) => {
         const isNew = !this.toBool(n?.is_read);
         const studentName = `${n?.studentName || ""} ${n?.studentPrenom || ""}`.trim();
+
+        if (n?.type === "devoir") {
+          const matiere = n?.matiereNom ? ` de ${n.matiereNom}` : "";
+          const text = studentName
+            ? `Votre enfant ${studentName} a un nouveau devoir${matiere} : ${n?.titre || ""}.`
+            : `Nouveau devoir${matiere} : ${n?.titre || ""}.`;
+
+          return {
+            key: `devoir-${n?.devoir_id ?? index}`,
+            type: "devoir",
+            devoir_id: n?.devoir_id,
+            date: n?.date,
+            isNew,
+            hasMotif: false,
+            isDevoir: true,
+            text,
+            timeLabel: this.fakeTime(index),
+          };
+        }
+
         const dateLabel = this.relativeDateLabel(n?.date);
         const text = studentName
           ? `Votre enfant ${studentName} ${dateLabel}.`
           : `Absence ${dateLabel}.`;
 
         return {
-          key: n?.presence_id ?? `${index}`,
+          key: `absence-${n?.presence_id ?? index}`,
+          type: "absence",
           presence_id: n?.presence_id,
           date: n?.date,
           isNew,
           hasMotif: Boolean(String(n?.motif || "").trim()),
           motif: n?.motif || "",
+          isDevoir: false,
           text,
           timeLabel: this.fakeTime(index),
         };

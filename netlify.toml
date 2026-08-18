@@ -1,0 +1,29 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # L'app (Vuetify en autoImport + gros bundles) dépasse la limite mémoire
+  # par défaut de Node pendant le build du bundle Nitro/Netlify sans ça :
+  # testé et confirmé nécessaire (crash "JavaScript heap out of memory" sans).
+  NODE_OPTIONS = "--max-old-space-size=4096"
+
+# Proxy toutes les requêtes /api/* vers le backend Express hébergé sur Railway.
+# Grâce à cette redirection, aucun composant Vue n'a besoin d'être modifié :
+# ils continuent d'appeler des chemins relatifs comme "/api/eleves".
+#
+# ⚠️ Remplacer l'URL ci-dessous par l'URL publique réelle du service Railway
+# une fois le backend déployé (Railway > votre service > Settings > Domains).
+[[redirects]]
+  from = "/api/*"
+  to = "https://TON-BACKEND.up.railway.app/api/:splat"
+  status = 200
+  force = true
+
+# Les fichiers uploadés (photos, preuves de paiement) sont servis par le
+# backend, pas par Netlify : même principe de proxy.
+[[redirects]]
+  from = "/uploads/*"
+  to = "https://TON-BACKEND.up.railway.app/uploads/:splat"
+  status = 200
+  force = true

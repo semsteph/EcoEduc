@@ -56,10 +56,15 @@ css: [
   runtimeConfig: {
     openaiApiKey: process.env.OPENAI_API_KEY, // Clé OpenAI (uniquement côté serveur)
     public: {
-      baseURL: 'http://localhost:3002', // Base URL exposée côté client
+      baseURL: process.env.NUXT_PUBLIC_BASE_URL || 'http://localhost:3002', // Base URL exposée côté client
     },
   },
 
+  // Déploiement sur Netlify (SSR classique via Netlify Functions).
+  nitro: {
+    preset: 'netlify',
+  },
+
   compatibilityDate: '2024-07-08',
-  
+
 })

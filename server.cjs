@@ -4,13 +4,21 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const port = 8080;
+// Railway (et la plupart des hébergeurs) imposent leur propre port via
+// process.env.PORT ; en local (LAMPP) on retombe sur 8080 comme avant.
+const port = process.env.PORT || 8080;
 
 const db = require('./server-lib/db.cjs');
 
-// Middleware CORS
+// Middleware CORS — CORS_ORIGIN peut contenir plusieurs origines séparées
+// par des virgules (ex: l'URL Netlify de prod + localhost pour le dev).
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 const corsOptions = {
-  origin: 'http://localhost:3000',
+  origin: allowedOrigins,
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
   optionsSuccessStatus: 204
@@ -64,9 +72,10 @@ app.use('/api', require('./routes/presence.routes.cjs'));
 app.use('/api', require('./routes/notes.routes.cjs'));
 app.use('/api', require('./routes/parent-dashboard.routes.cjs'));
 app.use('/api', require('./routes/programme.routes.cjs'));
+app.use('/api', require('./routes/devoirs.routes.cjs'));
 app.use('/api', require('./routes/bulletin.routes.cjs'));
 app.use('/api', require('./routes/administration.routes.cjs'));
 
 app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+  console.log(`Server running on port ${port}`);
 });

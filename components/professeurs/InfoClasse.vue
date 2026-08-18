@@ -92,6 +92,13 @@ const items = [
     desc: "Publier le contenu des cours.",
     topClass: "top-blue",
   },
+  {
+    name: "Devoirs",
+    route: "DevoirsManager",
+    icon: "mdi-notebook-edit-outline",
+    desc: "Donner des exercices à faire à la maison.",
+    topClass: "top-blue-dark",
+  },
 ];
 
 function navigateTo(view) {

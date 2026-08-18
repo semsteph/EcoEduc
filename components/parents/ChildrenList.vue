@@ -148,6 +148,16 @@
         />
       </template>
 
+      <!-- DEVOIRS -->
+      <template v-else-if="currentView === 'devoirs'">
+        <Devoirs
+          :child="selectedChild"
+          :childId="selectedChild.id"
+          :childName="selectedChild.prenom + ' ' + selectedChild.nom"
+          @back="goToDetails"
+        />
+      </template>
+
       <!-- ACTIVITE -->
       <template v-else-if="currentView === 'activite'">
         <Activite
@@ -266,6 +276,7 @@ import DemandeDePermission from "./DemandeDePermission.vue";
 import Activite from "./Activite.vue";
 import Bulletin from "./Bulletin.vue";
 import Assistances from "./Assistances.vue";
+import Devoirs from "./Devoirs.vue";
 import axios from "axios";
 
 const API_URL = "/api/parent/children";
@@ -282,6 +293,7 @@ export default {
     Activite,
     Bulletin,
     Assistances,
+    Devoirs,
   },
 
   props: {

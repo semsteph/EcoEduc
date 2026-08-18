@@ -405,11 +405,6 @@ router.get("/notificationed/:parentId/:etablissementId/:anneeScolaireId", authen
       [parentId, parentId, etablissementId, anneeScolaireId, startMonth, endMonth]
     );
 
-    // Si aucun élève ou aucune absence, on renvoie vide sans 404 (UX mieux)
-    if (!rows.length) {
-      return res.json({ notifications: [], alertMessages: [] });
-    }
-
     // ✅ Enregistrer automatiquement comme "vu" les absences non lues
     const toInsert = rows
       .filter((n) => Number(n.is_read) === 0)
@@ -442,21 +437,92 @@ router.get("/notificationed/:parentId/:etablissementId/:anneeScolaireId", authen
       }
     });
 
-    // ✅ Réponse finale
-    return res.json({
-      notifications: rows.map((r) => ({
-        presence_id: r.presence_id,
-        date: r.date,
-        statut: r.statut,
-        motif: r.motif,
-        eleve_id: r.eleve_id,
-        studentName: r.studentName,
-        studentPrenom: r.studentPrenom,
-        is_read: Boolean(Number(r.is_read)),
-        viewed_at: r.viewed_at,
-      })),
-      alertMessages,
+    const absenceNotifications = rows.map((r) => ({
+      type: 'absence',
+      presence_id: r.presence_id,
+      date: r.date,
+      statut: r.statut,
+      motif: r.motif,
+      eleve_id: r.eleve_id,
+      studentName: r.studentName,
+      studentPrenom: r.studentPrenom,
+      is_read: Boolean(Number(r.is_read)),
+      viewed_at: r.viewed_at,
+    }));
+
+    // ✅ Devoirs récents (donnés à la classe d'un des enfants de ce parent),
+    // même principe de "vu" que les absences (table devoir_vue_parent).
+    const [devoirRows] = await req.db.execute(
+      `
+      SELECT
+        d.id AS devoir_id,
+        d.titre,
+        d.description,
+        d.date_limite,
+        d.created_at AS date,
+        m.nom AS matiereNom,
+        e.id AS eleve_id,
+        e.nom AS studentName,
+        e.prenom AS studentPrenom,
+        CASE WHEN dvp.id IS NULL THEN 0 ELSE 1 END AS is_read
+      FROM devoirs d
+      JOIN eleve e ON e.classe_id = d.classe_id
+      LEFT JOIN matieres m ON m.id = d.matiere_id
+      LEFT JOIN devoir_vue_parent dvp
+        ON dvp.devoir_id = d.id
+       AND dvp.parent_id = ?
+      WHERE e.Parents_id = ?
+        AND d.etablissement_id = ?
+        AND d.annee_scolaire_id = ?
+        AND d.created_at >= (NOW() - INTERVAL 21 DAY)
+      ORDER BY d.created_at DESC
+      `,
+      [parentId, parentId, etablissementId, anneeScolaireId]
+    );
+
+    const devoirToInsert = devoirRows
+      .filter((n) => Number(n.is_read) === 0)
+      .map((n) => [parentId, n.devoir_id]);
+
+    if (devoirToInsert.length > 0) {
+      await req.db.query(
+        `INSERT IGNORE INTO devoir_vue_parent (parent_id, devoir_id) VALUES ?`,
+        [devoirToInsert]
+      );
+    }
+
+    const devoirNotifications = devoirRows.map((d) => ({
+      type: 'devoir',
+      devoir_id: d.devoir_id,
+      date: d.date,
+      titre: d.titre,
+      description: d.description,
+      date_limite: d.date_limite,
+      matiereNom: d.matiereNom,
+      eleve_id: d.eleve_id,
+      studentName: d.studentName,
+      studentPrenom: d.studentPrenom,
+      is_read: Boolean(Number(d.is_read)),
+    }));
+
+    devoirRows.forEach((d) => {
+      const prefix = Number(d.is_read) === 0 ? "[NOUVELLE] " : "";
+      alertMessages.push(
+        `${prefix}Votre enfant ${d.studentName} ${d.studentPrenom} a un nouveau devoir de ${d.matiereNom || ""} : ${d.titre}.`
+      );
     });
+
+    // Si rien à afficher (ni absence, ni devoir), on renvoie vide sans 404 (UX mieux)
+    if (!absenceNotifications.length && !devoirNotifications.length) {
+      return res.json({ notifications: [], alertMessages: [] });
+    }
+
+    // ✅ Réponse finale : absences + devoirs, plus récents en premier
+    const notifications = [...absenceNotifications, ...devoirNotifications].sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
+    return res.json({ notifications, alertMessages });
   } catch (error) {
     console.error("❌ Erreur lors de la récupération des notifications :", error);
     return res.status(500).json({ message: "Erreur serveur lors de la récupération des données." });
