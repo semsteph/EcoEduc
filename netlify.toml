@@ -8,19 +8,7 @@
   # testé et confirmé nécessaire (crash "JavaScript heap out of memory" sans).
   NODE_OPTIONS = "--max-old-space-size=4096"
 
-# Proxy toutes les requêtes /api/* vers le backend Express hébergé sur Railway.
-# Grâce à cette redirection, aucun composant Vue n'a besoin d'être modifié :
-# ils continuent d'appeler des chemins relatifs comme "/api/eleves".
-[[redirects]]
-  from = "/api/*"
-  to = "https://ecoeduc-production.up.railway.app/api/:splat"
-  status = 200
-  force = true
-
-# Les fichiers uploadés (photos, preuves de paiement) sont servis par le
-# backend, pas par Netlify : même principe de proxy.
-[[redirects]]
-  from = "/uploads/*"
-  to = "https://ecoeduc-production.up.railway.app/uploads/:splat"
-  status = 200
-  force = true
+# Le proxy vers le backend (/api, /uploads) est géré par Nuxt lui-même via
+# routeRules dans nuxt.config.ts (API_BACKEND_URL) — pas ici : les redirects
+# netlify.toml sont court-circuités par le catch-all SSR généré par le preset
+# Netlify de Nitro, testé et confirmé non fonctionnel pour ce cas précis.

@@ -1,5 +1,9 @@
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 
+// URL publique du backend Express (Railway en prod, localhost en dev).
+// À définir sur Netlify : Site settings > Environment variables > API_BACKEND_URL.
+const backendUrl = process.env.API_BACKEND_URL || 'http://localhost:8080'
+
 export default defineNuxtConfig({
 
   devtools: { enabled: true },
@@ -63,6 +67,14 @@ css: [
   // Déploiement sur Netlify (SSR classique via Netlify Functions).
   nitro: {
     preset: 'netlify',
+  },
+
+  // Proxy /api et /uploads vers le backend Express — géré par Nitro lui-même
+  // (contrairement aux redirects netlify.toml, ça fonctionne de façon fiable
+  // même quand le preset Netlify génère son propre catch-all SSR).
+  routeRules: {
+    '/api/**': { proxy: `${backendUrl}/api/**` },
+    '/uploads/**': { proxy: `${backendUrl}/uploads/**` },
   },
 
   compatibilityDate: '2024-07-08',
