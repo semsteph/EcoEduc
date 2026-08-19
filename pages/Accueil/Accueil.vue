@@ -16,8 +16,9 @@
               :src="logoSrc"
               alt="Logo EchoEducation"
               class="brand-logo"
-              width="160"
-              cover
+              width="42"
+              height="46"
+              contain
             />
             <div class="brand-text d-none d-md-flex">
               <div class="brand-title">EchoEducation</div>
@@ -297,8 +298,10 @@ const loginDialog = ref(false);
 const activeButton = ref("about");
 const aboutSection = ref(null);
 
-// ✅ Logo (garde ton asset)
-const logoSrc = computed(() => new URL("@/assets/administration/logooff.png", import.meta.url).href);
+// Pictogramme seul (fond transparent), détouré depuis logooff.png pour
+// s'afficher proprement dans la barre bleue — logooff.png (avec le texte
+// "EchoEducation" et un fond blanc opaque) reste utilisé ailleurs tel quel.
+const logoSrc = computed(() => new URL("@/assets/administration/logo-icon.png", import.meta.url).href);
 
 const showLoginDialog = () => {
   activeButton.value = "login";
@@ -699,7 +702,8 @@ const goHome = () => {
     height: 64px !important;
   }
   .brand-logo {
-    width: 130px !important;
+    width: 36px !important;
+    height: 40px !important;
   }
   .top-btn {
     padding: 0 10px;

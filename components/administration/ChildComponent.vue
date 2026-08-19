@@ -123,7 +123,11 @@ export default {
     async fetchSemestreData(semestreNom) {
       this.loading = true;
       try {
-        const response = await axios.get(`/api/presence/${this.studentId}/${semestreNom}/${this.anneeScolaireId}`);
+        const token = localStorage.getItem('token');
+        const response = await axios.get(
+          `/api/presence/${this.studentId}/${semestreNom}/${this.anneeScolaireId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         const sem = this.semestre.find(s => s.nom === semestreNom);
         if (sem) {
           sem.data = response.data;

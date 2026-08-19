@@ -199,11 +199,13 @@ export default {
 
     async fetchProgrammes() {
       try {
+        const token = localStorage.getItem('token');
         const res = await axios.get(`${API}/programmes/${this.classId}`, {
           params: {
             etablissementId: this.etablissementId,
             anneeScolaireId: this.anneeScolaireId,
           },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         const programmes = Array.isArray(res.data) ? res.data : [];
@@ -266,7 +268,10 @@ export default {
           matiere_id: matiereId,
         };
 
-        await axios.post(`${API}/programme`, payload);
+        const token = localStorage.getItem('token');
+        await axios.post(`${API}/programme`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         this.notify("Ajouté avec succès", "success");
         this.fermerDialog();
@@ -278,6 +283,7 @@ export default {
 
     async supprimerProgramme(matiereId, jour) {
       try {
+        const token = localStorage.getItem('token');
         await axios.delete(`${API}/programme`, {
           data: {
             classId: this.classId,
@@ -287,6 +293,7 @@ export default {
             matiereId,
             matiere_id: matiereId,
           },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         this.notify("Supprimé", "black");

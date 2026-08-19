@@ -280,8 +280,10 @@ const fetchAnneeScolaire = async () => {
 const fetchPermissions = async () => {
   if (!etablissementId.value || !anneeScolaireId.value) return;
   try {
+    const token = localStorage.getItem("token");
     const response = await axios.get(
-      `${API_BASE}/api/permissions/${etablissementId.value}/${anneeScolaireId.value}`
+      `${API_BASE}/api/permissions/${etablissementId.value}/${anneeScolaireId.value}`,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
     const now = new Date();
     const filtered = (response.data || []).filter((p) => {

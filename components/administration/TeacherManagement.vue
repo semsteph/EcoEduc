@@ -530,10 +530,11 @@ export default {
     async handleAddSubject() {
       if (!this.newSubject.name) return;
       try {
+        const token = localStorage.getItem("token");
         await axios.post("/api/Matieres", {
           name: this.newSubject.name,
           etablissementId: this.etablissementId,
-        });
+        }, { headers: { Authorization: `Bearer ${token}` } });
         this.showAddSubjectForm = false;
         this.newSubject.name = "";
         await this.fetchData();
