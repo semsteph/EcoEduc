@@ -12,8 +12,12 @@
 const mysql = require('mysql2/promise');
 
 function buildConfigFromEnv() {
-  if (process.env.DATABASE_URL) {
-    const url = new URL(process.env.DATABASE_URL);
+  // .trim() : certains hébergeurs (ex: référence de variable mal résolue sur
+  // Railway) peuvent injecter une chaîne blanche plutôt qu'une vraie URL —
+  // on l'ignore proprement au lieu de laisser `new URL(' ')` planter le process.
+  const databaseUrl = (process.env.DATABASE_URL || '').trim();
+  if (databaseUrl) {
+    const url = new URL(databaseUrl);
     return {
       host: url.hostname,
       port: url.port ? Number(url.port) : 3306,
