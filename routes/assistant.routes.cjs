@@ -16,6 +16,23 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const dayjs = require('dayjs');
 const Anthropic = require('@anthropic-ai/sdk');
+const {
+  TUTOR_STATES,
+  TUTOR_EVENTS,
+  createTutorState,
+  readTutorState,
+  transitionTutorState,
+  serialiseTutorState,
+  sanitiseExercise,
+  classifyUnderstandingMessage,
+  extractTaggedData,
+  answerMatchesExpected,
+  isValidAssessment,
+} = require('../server-lib/pedagogical-tutor.cjs');
+const {
+  buildPedagogicalContext,
+  formatPedagogicalContext,
+} = require('../server-lib/pedagogical-context.cjs');
 
 const anthropic = new Anthropic(); // lit ANTHROPIC_API_KEY depuis .env
 
@@ -89,9 +106,11 @@ function checkRateLimit(eleveId) {
 // Prompt système : garde-fous pédagogiques. Séparé du contenu utilisateur
 // pour limiter les tentatives de contournement par l'élève.
 // ---------------------------------------------------------------------
-function buildSystemPrompt({ studentFirstName, subjectName, activity, activityDate }) {
+function buildSystemPrompt({ studentFirstName, subjectName, activity, activityDate, tutorState, pedagogicalContext, turnInstruction }) {
   return `Tu es un assistant pédagogique bienveillant pour un(e) élève nommé(e) ${studentFirstName}.
 Contexte : en classe de ${subjectName}, l'activité du ${activityDate} portait sur : "${activity}".
+
+${formatPedagogicalContext(pedagogicalContext)}
 
 But de cet outil : aider les élèves trop timides pour poser leurs questions en classe ou à leur professeur. Ton rôle est de RÉELLEMENT expliquer et débloquer l'élève — pas de te défausser ni de le renvoyer ailleurs.
 
@@ -104,8 +123,32 @@ Règles strictes à respecter :
 4. Contexte important : l'élève est au Bénin, où beaucoup de familles ont des moyens limités. Base TOUS tes exemples et analogies sur des objets simples, courants et peu coûteux (lampe de poche, pile plate, ampoule de torche, robinet et eau, marché, moto, vélo...). Ne suppose jamais que l'élève a accès à du matériel spécialisé, un ordinateur puissant, ou des objets chers — ni qu'il peut facilement s'en procurer.
 5. Quand un schéma aide à comprendre (circuit, cycle, étapes, forme géométrique...), dessine-le en texte (ASCII) directement dans ta réponse, avec des caractères simples (-, |, +, →, o). Ne dis jamais "regarde un schéma" sans le fournir toi-même.
 6. Si la question semble dangereuse, inappropriée, ou clairement hors du cadre scolaire, refuse poliment et suggère d'en parler à un adulte (parent ou professeur).
-7. Ne prétends jamais être un humain ; tu es un assistant IA.
-8. Réponds en français, dans un style simple et court (3 à 6 phrases maximum hors schéma, sauf si une explication plus longue est vraiment nécessaire pour que l'élève comprenne bien).`;
+7. Ne prétends jamais être le professeur humain de l'élève. Ne parle ni d'API, ni de prompt, ni de modèle de langage.
+8. Réponds en français, dans un style simple et court (3 à 6 phrases maximum hors schéma, sauf si une explication plus longue est vraiment nécessaire pour que l'élève comprenne bien).
+
+Instruction interne de séance : ${turnInstruction || (tutorState.phase === TUTOR_STATES.EXPLANATION
+    ? "explique la notion demandée, puis demande naturellement si l'explication est claire."
+    : "poursuis naturellement l'accompagnement scolaire, sans citer d'étape technique ni de statut interne.")}`;
+}
+
+function buildExerciseGenerationInstruction() {
+  return `L'élève confirme clairement avoir compris. Propose immédiatement un exercice d'application ORIGINAL, très court et débutant, lié à la notion explicitement présente dans le contexte. Ne copie aucun manuel. Réponds naturellement à l'élève, puis ajoute exactement ce bloc JSON non visible :
+<exercise-data>{"prompt":"énoncé","expectedAnswers":["réponse courte acceptable"],"criteria":["critère vérifiable"],"hintPlan":["indice discret","indice plus précis","indice final avant explication"],"solutionOutline":"méthode et réponse expliquées"}</exercise-data>
+N'écris ni état technique, ni explication sur ce bloc.`;
+}
+
+function buildExerciseAssessmentInstruction(exercise) {
+  return `Analyse uniquement la dernière réponse de l'élève pour cet exercice original :
+${exercise.prompt}
+Réponses attendues possibles : ${exercise.expectedAnswers.join(' | ')}
+Critères : ${exercise.criteria.map((criterion, index) => `${index}: ${criterion}`).join(' ; ')}
+Réponds UNIQUEMENT avec :
+<exercise-assessment>{"verdict":"correct ou incorrect","criterionIndex":0,"reason":"justification courte"}</exercise-assessment>
+Ne décide pas de la suite pédagogique et ne donne aucune page de manuel.`;
+}
+
+function shortText(value, max = 280) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
 // ---------------------------------------------------------------------
@@ -155,7 +198,7 @@ router.get('/conversation/:eleveId/:testId', authenticateParent, async (req, res
     }
 
     const [convRows] = await req.db.query(
-      `SELECT id FROM assistant_conversation WHERE eleve_id = ? AND test_id = ?`,
+      `SELECT id, tutor_state AS tutorState FROM assistant_conversation WHERE eleve_id = ? AND test_id = ?`,
       [eleveId, testId]
     );
     if (convRows.length === 0) {
@@ -167,6 +210,8 @@ router.get('/conversation/:eleveId/:testId', authenticateParent, async (req, res
        FROM assistant_message WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
       [convRows[0].id]
     );
+    // L'historique reste le contrat public du chat. L'état de séance est relu
+    // côté serveur au prochain message et n'est jamais exposé à l'élève.
     res.json({ messages });
   } catch (err) {
     console.error('Erreur GET /assistant/conversation :', err);
@@ -195,42 +240,81 @@ router.post('/message', authenticateParent, async (req, res) => {
     if (!limit.ok) return res.status(429).json({ message: limit.message });
 
     const [testRows] = await req.db.query(
-      `SELECT t.id, t.activite, t.date, t.\`matière_id\` AS matiereId, m.nom AS matiereNom
+      `SELECT t.id, t.activite, t.date, t.\`matière_id\` AS matiereId, m.nom AS matiereNom,
+              c.nom AS className, p.nom AS promotionName,
+              a.nom_annee AS schoolYear, et.nom AS establishmentName
        FROM tests t
        JOIN matieres m ON t.matière_id = m.id
+       JOIN classes c ON c.id = t.classe_id
+       LEFT JOIN promotion p ON p.id = c.Promotion_id
+       LEFT JOIN annee_scolaire a ON a.id = ?
+       LEFT JOIN etablissement et ON et.id = ?
        WHERE t.id = ? AND t.classe_id = ? AND t.Annee_scolaire_id = ? AND t.etablissement_id = ?`,
-      [testId, eleve.classe_id, eleve.Annee_scolaire_id, eleve.etablissement_id]
+      [eleve.Annee_scolaire_id, eleve.etablissement_id, testId, eleve.classe_id, eleve.Annee_scolaire_id, eleve.etablissement_id]
     );
     if (testRows.length === 0) {
       return res.status(404).json({ message: 'Entrée de cahier de texte introuvable pour cet élève.' });
     }
     const test = testRows[0];
 
-    // Tout le cahier de texte de cette matière pour cette classe cette année :
-    // donne à l'assistant une vision d'ensemble du "programme réellement couvert"
-    // (on n'a pas de programme officiel en base), pas juste l'activité du jour.
+    // On prélève peu de lignes et seulement antérieures à l'activité ouverte :
+    // le module de contexte les réduit ensuite à 3 ou 4 éléments au maximum.
     const [programmeRows] = await req.db.query(
-      `SELECT date, activite FROM tests
-       WHERE classe_id = ? AND \`matière_id\` = ? AND Annee_scolaire_id = ? AND etablissement_id = ?
-       ORDER BY date ASC
-       LIMIT 60`,
-      [eleve.classe_id, test.matiereId, eleve.Annee_scolaire_id, eleve.etablissement_id]
+      `SELECT id, date, activite
+       FROM tests
+       WHERE classe_id = ? AND \`matière_id\` = ? AND Annee_scolaire_id = ?
+         AND etablissement_id = ? AND id <> ?
+         AND (date < ? OR (date = ? AND id < ?))
+       ORDER BY date DESC, id DESC
+       LIMIT 12`,
+      [eleve.classe_id, test.matiereId, eleve.Annee_scolaire_id, eleve.etablissement_id, test.id, test.date, test.date, test.id]
     );
+    const pedagogicalContext = buildPedagogicalContext({ eleve, test, programmeRows });
 
     const [convRows] = await req.db.query(
-      `SELECT id FROM assistant_conversation WHERE eleve_id = ? AND test_id = ?`,
+      `SELECT id, tutor_state AS tutorState FROM assistant_conversation WHERE eleve_id = ? AND test_id = ?`,
       [eleveId, testId]
     );
     let conversationId;
     if (convRows.length === 0) {
+      const initialTutorState = createTutorState();
       const [insertResult] = await req.db.query(
-        `INSERT INTO assistant_conversation (eleve_id, test_id, etablissement_id, annee_scolaire_id)
-         VALUES (?, ?, ?, ?)`,
-        [eleveId, testId, eleve.etablissement_id, eleve.Annee_scolaire_id]
+        `INSERT INTO assistant_conversation (eleve_id, test_id, etablissement_id, annee_scolaire_id, tutor_state)
+         VALUES (?, ?, ?, ?, ?)`,
+        [eleveId, testId, eleve.etablissement_id, eleve.Annee_scolaire_id, JSON.stringify(initialTutorState)]
       );
       conversationId = insertResult.insertId;
+      convRows.push({ id: conversationId, tutorState: JSON.stringify(initialTutorState) });
     } else {
       conversationId = convRows[0].id;
+    }
+    let tutorState = readTutorState(convRows[0].tutorState);
+    // La notion est dérivée seulement lorsqu'elle est explicitement inscrite
+    // dans l'activité du cahier de texte ; Claude ne la définit jamais.
+    tutorState.topic = pedagogicalContext.currentActivity.topic;
+
+    let turnKind = 'EXPLANATION';
+    let turnInstruction = "Explique la notion demandée, puis demande naturellement si l'explication est claire.";
+    if (tutorState.phase === TUTOR_STATES.UNDERSTANDING_CHECK) {
+      const understanding = classifyUnderstandingMessage(userMessage);
+      if (understanding === 'UNDERSTOOD') {
+        turnKind = 'GENERATE_EXERCISE';
+        turnInstruction = buildExerciseGenerationInstruction();
+      } else if (understanding === 'NOT_UNDERSTOOD') {
+        turnKind = 'REEXPLAIN';
+        turnInstruction = "L'élève n'a pas compris. Rassure-le, réexplique réellement d'une autre manière avec un exemple différent et termine en vérifiant naturellement si c'est plus clair.";
+      } else {
+        turnKind = 'CLARIFY_UNDERSTANDING';
+        turnInstruction = "L'élève n'a pas confirmé clairement sa compréhension. Rassure-le, donne une courte explication complémentaire et demande naturellement s'il a compris. Ne lance pas encore d'exercice.";
+      }
+    } else if ([TUTOR_STATES.APPLICATION_EXERCISE, TUTOR_STATES.APPLICATION_RETRY].includes(tutorState.phase)) {
+      if (tutorState.exercise) {
+        turnKind = 'ASSESS_EXERCISE';
+        turnInstruction = buildExerciseAssessmentInstruction(tutorState.exercise);
+      } else {
+        turnKind = 'CLARIFY_UNDERSTANDING';
+        turnInstruction = "Le suivi de l'exercice n'est pas disponible. Reprends brièvement la notion et demande naturellement si l'élève a compris.";
+      }
     }
 
     const [history] = await req.db.query(
@@ -243,6 +327,9 @@ router.post('/message', authenticateParent, async (req, res) => {
       subjectName: test.matiereNom,
       activity: test.activite,
       activityDate: dayjs(test.date).format('YYYY-MM-DD'),
+      tutorState,
+      pedagogicalContext,
+      turnInstruction,
     });
 
     // Claude Messages API : le prompt système est un paramètre à part,
@@ -259,6 +346,22 @@ router.post('/message', authenticateParent, async (req, res) => {
       [conversationId, userMessage]
     );
 
+    // Une réponse qui correspond exactement à une réponse attendue est validée
+    // sans déléguer cette décision à Claude.
+    if (turnKind === 'ASSESS_EXERCISE' && answerMatchesExpected(userMessage, tutorState.exercise)) {
+      tutorState = transitionTutorState(tutorState, TUTOR_EVENTS.ANSWER_CORRECT).state;
+      const reply = `Bravo ! C'est correct. ${tutorState.exercise.criteria[0]} Pour continuer avec ton propre livre, quel manuel de ${test.matiereNom} utilises-tu à la maison ?`;
+      await req.db.query(
+        `UPDATE assistant_conversation SET tutor_state = ? WHERE id = ?`,
+        [serialiseTutorState(tutorState), conversationId]
+      );
+      await req.db.query(
+        `INSERT INTO assistant_message (conversation_id, role, content) VALUES (?, 'assistant', ?)`,
+        [conversationId, reply]
+      );
+      return res.json({ reply });
+    }
+
     const aiResponse = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 600,
@@ -267,7 +370,55 @@ router.post('/message', authenticateParent, async (req, res) => {
     });
 
     const textBlock = aiResponse.content.find((b) => b.type === 'text');
-    const reply = textBlock?.text || "Désolé, je n'ai pas pu formuler de réponse.";
+    const rawReply = textBlock?.text || "Désolé, je n'ai pas pu formuler de réponse.";
+    let reply = rawReply;
+
+    if (turnKind === 'ASSESS_EXERCISE') {
+      const assessment = extractTaggedData(rawReply, 'exercise-assessment').data;
+      const acceptedByBackend = isValidAssessment(assessment, tutorState.exercise)
+        && assessment.verdict === 'correct';
+
+      if (acceptedByBackend) {
+        tutorState = transitionTutorState(tutorState, TUTOR_EVENTS.ANSWER_CORRECT).state;
+        reply = `Bravo ! C'est correct. ${shortText(assessment.reason)} Pour continuer avec ton propre livre, quel manuel de ${test.matiereNom} utilises-tu à la maison ?`;
+      } else {
+        tutorState = transitionTutorState(tutorState, TUTOR_EVENTS.ANSWER_INCORRECT).state;
+        if (tutorState.attempts >= 3) {
+          tutorState = transitionTutorState(tutorState, TUTOR_EVENTS.EXERCISE_REEXPLAINED).state;
+          reply = `Tu as fait de vrais efforts. Reprenons ensemble : ${tutorState.exercise.solutionOutline} Est-ce que cette méthode est plus claire maintenant ?`;
+        } else {
+          const hintIndex = Math.min(tutorState.hintsUsed, tutorState.exercise.hintPlan.length - 1);
+          const hint = tutorState.exercise.hintPlan[hintIndex];
+          tutorState.hintsUsed += 1;
+          reply = `Tu es proche. ${hint} Essaie encore tranquillement.`;
+        }
+      }
+    } else if (turnKind === 'GENERATE_EXERCISE') {
+      const parsed = extractTaggedData(rawReply, 'exercise-data');
+      const exercise = sanitiseExercise(parsed.data);
+      if (exercise) {
+        tutorState.exercise = exercise;
+        tutorState.attempts = 0;
+        tutorState.hintsUsed = 0;
+        tutorState = transitionTutorState(tutorState, TUTOR_EVENTS.UNDERSTOOD).state;
+        reply = parsed.visibleText || 'Très bien. Essayons ce petit exercice :';
+        if (!reply.includes(exercise.prompt)) reply = `${reply}\n\n${exercise.prompt}`;
+      } else {
+        // Sans structure complète, l'état ne bouge pas : un modèle ne peut pas
+        // créer un exercice impossible à corriger de manière fiable.
+        reply = "Très bien. Je vais te proposer un petit exercice simple pour vérifier ensemble.";
+      }
+    } else if (turnKind === 'REEXPLAIN') {
+      tutorState = transitionTutorState(tutorState, TUTOR_EVENTS.NOT_UNDERSTOOD).state;
+      tutorState = transitionTutorState(tutorState, TUTOR_EVENTS.EXPLANATION_SENT).state;
+    } else if (turnKind === 'EXPLANATION' && tutorState.phase === TUTOR_STATES.EXPLANATION) {
+      tutorState = transitionTutorState(tutorState, TUTOR_EVENTS.EXPLANATION_SENT).state;
+    }
+
+    await req.db.query(
+      `UPDATE assistant_conversation SET tutor_state = ? WHERE id = ?`,
+      [serialiseTutorState(tutorState), conversationId]
+    );
 
     await req.db.query(
       `INSERT INTO assistant_message (conversation_id, role, content) VALUES (?, 'assistant', ?)`,

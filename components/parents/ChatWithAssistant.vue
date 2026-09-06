@@ -11,7 +11,7 @@
           <div class="assistant-avatar avatar-sm">
             <v-icon size="16">mdi-account</v-icon>
           </div>
-          <div class="title">Assistant {{ subjectName }}</div>
+          <div class="title">Tuteur {{ subjectName }}</div>
         </div>
         <div class="subtitle" v-if="activity">{{ activity }}</div>
       </div>
@@ -72,7 +72,7 @@
       <div class="composer">
         <v-textarea
           v-model="userMessage"
-          placeholder="Écris ta question ici…"
+          :placeholder="composerPlaceholder"
           rows="1"
           auto-grow
           max-rows="4"
@@ -123,6 +123,7 @@ export default {
       loadError: null,
       sending: false,
       sendError: null,
+      tutorState: null,
     };
   },
   created() {
@@ -154,7 +155,7 @@ export default {
     formatInitialMessage() {
       const firstName = this.childName.split(" ")[0] || this.childName;
       const activityText = this.activity || "une activité";
-      return `${this.getGreeting()} ${firstName}, je suis ton assistant en ${this.subjectName}. Vous avez fait ${activityText} (${this.getTimeDescription()}). Qu'est-ce que tu n'as pas compris, ou qu'aimerais-tu comprendre davantage ?`;
+      return `${this.getGreeting()} ${firstName}. Nous allons reprendre ${activityText} en ${this.subjectName} (${this.getTimeDescription()}). Qu'est-ce que tu n'as pas compris, ou qu'aimerais-tu mieux comprendre ?`;
     },
 
     async fetchHistory() {
@@ -178,6 +179,7 @@ export default {
         } else {
           this.messages = history.map((m) => ({ role: m.role, content: m.content }));
         }
+        this.tutorState = response.data?.tutorState || null;
       } catch (err) {
         console.error("Erreur lors du chargement de la conversation :", err);
         this.loadError =
@@ -207,6 +209,7 @@ export default {
         );
 
         this.messages.push({ role: "assistant", content: response.data.reply });
+        this.tutorState = response.data?.tutorState || this.tutorState;
       } catch (err) {
         console.error("Erreur lors de l'envoi du message :", err);
         this.sendError =
@@ -223,6 +226,15 @@ export default {
         const el = this.$refs.messagesEl;
         if (el) el.scrollTop = el.scrollHeight;
       });
+    },
+  },
+  computed: {
+    composerPlaceholder() {
+      if (this.tutorState?.phase === "BOOK_SELECTION") return "Écris le nom de ton manuel…";
+      if (["APPLICATION_EXERCISE", "APPLICATION_RETRY"].includes(this.tutorState?.phase)) {
+        return "Écris ta réponse ou ta méthode…";
+      }
+      return "Écris ta question ici…";
     },
   },
 };

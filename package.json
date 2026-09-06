@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare",
     "start": "nodemon server.cjs",
     "start:prod": "node server.cjs",
+    "test:tutor": "node tests/pedagogical-tutor.test.cjs",
     "dev:concurrent": "concurrently \"npm run dev\" \"npm run start\""
   },
   "dependencies": {
