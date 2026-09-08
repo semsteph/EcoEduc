@@ -444,7 +444,7 @@ export default {
 /* States */
 .state-card {
   border-radius: 20px !important;
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 16px 60px rgba(11, 46, 74, 0.12);
 }
@@ -486,14 +486,14 @@ export default {
 .list-shell {
   border-radius: 22px !important;
   overflow: hidden;
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 18px 70px rgba(11, 46, 74, 0.12);
 }
 .list-accent {
   height: 6px;
   width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25, 118, 210, 0.22), #1976d2);
+  background: linear-gradient(90deg, #0d9488, rgba(13, 148, 136, 0.22), #0d9488);
   opacity: 0.95;
 }
 .list-content {
@@ -537,7 +537,7 @@ export default {
   width: 100%;
   border-radius: 18px !important;
   overflow: hidden;
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 .child-card:hover {
@@ -566,7 +566,7 @@ export default {
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(25, 118, 210, 0.16);
+  border: 1px solid rgba(13, 148, 136, 0.16);
   color: #0b2e4a;
   font-weight: 900;
   font-size: 0.85rem;

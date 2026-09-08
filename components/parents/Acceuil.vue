@@ -112,9 +112,9 @@ export default {
 /* ✅ Background harmonisé avec ton dashboard */
 .accueil-page {
   background:
-    radial-gradient(900px 500px at 20% 15%, rgba(25, 118, 210, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 20% 15%, rgba(13, 148, 136, 0.16), transparent 60%),
     radial-gradient(700px 500px at 80% 10%, rgba(11, 46, 74, 0.10), transparent 55%),
-    linear-gradient(180deg, #eaf2ff 0%, #ffffff 45%, #f6f9ff 100%);
+    linear-gradient(180deg, #fdf6ec 0%, #ffffff 45%, #f7f7f5 100%);
 }
 
 /* ✅ Hero */
@@ -126,7 +126,7 @@ export default {
   max-width: 1100px;
   margin: 0 auto;
   background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   border-radius: 22px;
   padding: 22px 18px;
   box-shadow: 0 16px 60px rgba(11, 46, 74, 0.12);
@@ -139,8 +139,8 @@ export default {
   gap: 8px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(25, 118, 210, 0.10);
-  border: 1px solid rgba(25, 118, 210, 0.18);
+  background: rgba(13, 148, 136, 0.10);
+  border: 1px solid rgba(13, 148, 136, 0.18);
   color: #0b2e4a;
   font-weight: 900;
   font-size: 0.82rem;
@@ -187,7 +187,7 @@ export default {
   border-radius: 20px !important;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   box-shadow: 0 18px 70px rgba(11, 46, 74, 0.12);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
@@ -200,7 +200,7 @@ export default {
 .card-accent {
   height: 6px;
   width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25, 118, 210, 0.22), #1976d2);
+  background: linear-gradient(90deg, #0d9488, rgba(13, 148, 136, 0.22), #0d9488);
   opacity: 0.95;
 }
 
@@ -214,8 +214,8 @@ export default {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: rgba(25, 118, 210, 0.10);
-  border: 1px solid rgba(25, 118, 210, 0.14);
+  background: rgba(13, 148, 136, 0.10);
+  border: 1px solid rgba(13, 148, 136, 0.14);
   margin-bottom: 10px;
 }
 

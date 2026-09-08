@@ -415,7 +415,7 @@ onUnmounted(() => {
 
 /* Charte: bleu/blanc + petit noir */
 :root {
-  --blue: #1976d2;
+  --blue: #0d9488;
   --blue-dark: #0b2e4a;
   --black-soft: rgba(0, 0, 0, 0.55);
 }
@@ -435,8 +435,8 @@ onUnmounted(() => {
 .app-overlay {
   position: fixed;
   inset: 0;
-  background: radial-gradient(900px 500px at 20% 10%, rgba(25, 118, 210, 0.22), transparent 55%),
-    radial-gradient(800px 500px at 80% 0%, rgba(25, 118, 210, 0.16), transparent 55%),
+  background: radial-gradient(900px 500px at 20% 10%, rgba(13, 148, 136, 0.22), transparent 55%),
+    radial-gradient(800px 500px at 80% 0%, rgba(13, 148, 136, 0.16), transparent 55%),
     linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.88));
   z-index: -1;
 }
@@ -540,7 +540,7 @@ onUnmounted(() => {
   z-index: 30;
   backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 0.88);
-  border-bottom: 1px solid rgba(25, 118, 210, 0.12);
+  border-bottom: 1px solid rgba(13, 148, 136, 0.12);
 }
 
 .topbar-inner {
@@ -566,7 +566,7 @@ onUnmounted(() => {
 /* Sections */
 .section-card {
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   box-shadow: 0 18px 60px rgba(11, 46, 74, 0.10);
   border-radius: 18px;
   padding: 14px;

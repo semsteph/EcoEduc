@@ -141,7 +141,7 @@ export default {
   width: 100%;
   border-radius: 18px !important;
   overflow: hidden;
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   background: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
@@ -150,7 +150,7 @@ export default {
 .card-accent {
   height: 6px;
   width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25,118,210,0.22), #1976d2);
+  background: linear-gradient(90deg, #0d9488, rgba(13,148,136,0.22), #0d9488);
 }
 
 .card-body {
@@ -169,8 +169,8 @@ export default {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: rgba(25, 118, 210, 0.08);
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  background: rgba(13, 148, 136, 0.08);
+  border: 1px solid rgba(13, 148, 136, 0.12);
 }
 
 .card-title {
@@ -185,7 +185,7 @@ export default {
   align-items: center;
   gap: 6px;
   font-weight: 800;
-  color: #1976d2;
+  color: #0d9488;
   opacity: 0.95;
   font-size: 0.9rem;
 }
@@ -194,11 +194,11 @@ export default {
 .label-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 18px 55px rgba(11, 46, 74, 0.16) !important;
-  border-color: rgba(25, 118, 210, 0.22);
+  border-color: rgba(13, 148, 136, 0.22);
 }
 .label-card.active {
-  border-color: rgba(25, 118, 210, 0.45);
-  box-shadow: 0 18px 60px rgba(25, 118, 210, 0.18) !important;
+  border-color: rgba(13, 148, 136, 0.45);
+  box-shadow: 0 18px 60px rgba(13, 148, 136, 0.18) !important;
 }
 
 /* Bouton */

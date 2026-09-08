@@ -390,9 +390,9 @@ export default {
   overflow: hidden;
 
   background:
-    radial-gradient(900px 500px at 20% 15%, rgba(25, 118, 210, 0.22), transparent 60%),
-    radial-gradient(700px 500px at 80% 10%, rgba(25, 118, 210, 0.14), transparent 55%),
-    linear-gradient(180deg, #eaf2ff 0%, #ffffff 45%, #f6f9ff 100%);
+    radial-gradient(900px 500px at 20% 15%, rgba(13, 148, 136, 0.22), transparent 60%),
+    radial-gradient(700px 500px at 80% 10%, rgba(13, 148, 136, 0.14), transparent 55%),
+    linear-gradient(180deg, #fdf6ec 0%, #ffffff 45%, #f7f7f5 100%);
 }
 
 /* décor */
@@ -409,7 +409,7 @@ export default {
   height: 280px;
   top: -90px;
   left: -110px;
-  background: rgba(25, 118, 210, 0.22);
+  background: rgba(13, 148, 136, 0.22);
 }
 .orb-2 {
   width: 240px;
@@ -422,8 +422,8 @@ export default {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(25, 118, 210, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(25, 118, 210, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(13, 148, 136, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(13, 148, 136, 0.06) 1px, transparent 1px);
   background-size: 34px 34px;
   mask-image: radial-gradient(closest-side, rgba(0,0,0,0.55), transparent 70%);
   pointer-events: none;
@@ -444,9 +444,9 @@ export default {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: rgba(25, 118, 210, 0.12);
-  border: 1px solid rgba(25, 118, 210, 0.18);
-  color: #1976d2;
+  background: rgba(13, 148, 136, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  color: #0d9488;
 }
 .welcome-title {
   font-size: clamp(1.35rem, 2.2vw, 1.7rem);
@@ -461,21 +461,21 @@ export default {
 }
 .brand-name {
   font-weight: 900;
-  color: #1976d2;
+  color: #0d9488;
 }
 
 /* Card */
 .card {
   border-radius: 20px !important;
   background: rgba(255, 255, 255, 0.94) !important;
-  border: 1px solid rgba(25, 118, 210, 0.14);
+  border: 1px solid rgba(13, 148, 136, 0.14);
   box-shadow: 0 18px 60px rgba(11, 46, 74, 0.14);
   overflow: hidden;
 }
 .card-accent {
   height: 6px;
   width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25, 118, 210, 0.2), #1976d2);
+  background: linear-gradient(90deg, #0d9488, rgba(13, 148, 136, 0.2), #0d9488);
   opacity: 0.9;
 }
 
@@ -525,15 +525,15 @@ export default {
   background: #cfd8dc;
 }
 .step.active {
-  color: #1976d2;
+  color: #0d9488;
 }
 .step.active .dot {
-  background: #1976d2;
+  background: #0d9488;
 }
 .line {
   flex: 1;
   height: 2px;
-  background: rgba(25, 118, 210, 0.14);
+  background: rgba(13, 148, 136, 0.14);
   border-radius: 999px;
 }
 
@@ -558,7 +558,7 @@ export default {
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(25, 118, 210, 0.16);
+  border: 1px solid rgba(13, 148, 136, 0.16);
   box-shadow: 0 16px 40px rgba(11, 46, 74, 0.16);
 }
 .overlay-text {

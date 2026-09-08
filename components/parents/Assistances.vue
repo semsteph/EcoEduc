@@ -161,14 +161,14 @@ export default {
 <style scoped>
 /* ===== Page (charte bleue, cohérente avec Presence.vue / Scolarite.vue) ===== */
 .assist-page {
-  --primary: #2563eb;
-  --primary-600: #1d4ed8;
-  --primary-50: #eff6ff;
+  --primary: #0d9488;
+  --primary-600: #0b7a70;
+  --primary-50: #f0faf9;
   --text: #0f172a;
   --muted: #64748b;
   --border: rgba(15, 23, 42, 0.1);
   --card: #ffffff;
-  --bg: #f6f8fc;
+  --bg: #f7f7f5;
 
   min-height: 100vh;
   background: radial-gradient(1200px 480px at 50% -20%, var(--primary-50), transparent 60%),
@@ -247,9 +247,9 @@ export default {
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
-  background: rgba(37, 99, 235, 0.1);
+  background: rgba(13, 148, 136, 0.1);
   color: var(--primary-600);
-  border: 1px solid rgba(37, 99, 235, 0.22);
+  border: 1px solid rgba(13, 148, 136, 0.22);
 }
 .empty-title {
   font-size: 1.05rem;
@@ -285,7 +285,7 @@ export default {
   align-items: center;
   gap: 14px;
   background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(37, 99, 235, 0.14);
+  border: 1px solid rgba(13, 148, 136, 0.14);
   border-radius: 18px;
   box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
   padding: 14px 14px;
@@ -305,7 +305,7 @@ export default {
   place-items: center;
   background: linear-gradient(135deg, var(--primary), var(--primary-600));
   color: #fff;
-  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 3px 8px rgba(13, 148, 136, 0.35);
   flex: 0 0 auto;
 }
 .subject-info {

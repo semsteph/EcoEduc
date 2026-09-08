@@ -539,7 +539,7 @@ const semestreChartOptions = computed(() => ({
 /* Empty state */
 .empty-card {
   border-radius: 20px !important;
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   background: rgba(255, 255, 255, 0.9);
   max-width: 560px;
   margin: 24px auto;
@@ -555,9 +555,9 @@ const semestreChartOptions = computed(() => ({
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
-  background: rgba(25, 118, 210, 0.1);
-  color: #1976d2;
-  border: 1px solid rgba(25, 118, 210, 0.2);
+  background: rgba(13, 148, 136, 0.1);
+  color: #0d9488;
+  border: 1px solid rgba(13, 148, 136, 0.2);
 }
 .empty-title {
   font-weight: 900;
@@ -573,7 +573,7 @@ const semestreChartOptions = computed(() => ({
 /* KPI */
 .kpi-card {
   border-radius: 18px !important;
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   background: rgba(255, 255, 255, 0.92);
   padding: 16px;
 }
@@ -612,14 +612,14 @@ const semestreChartOptions = computed(() => ({
 .child-card {
   border-radius: 18px !important;
   overflow: hidden;
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   background: rgba(255, 255, 255, 0.92);
   height: 100%;
 }
 .child-card-accent {
   height: 5px;
   width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25, 118, 210, 0.22), #1976d2);
+  background: linear-gradient(90deg, #0d9488, rgba(13, 148, 136, 0.22), #0d9488);
 }
 .child-card-body {
   padding: 16px !important;
@@ -635,8 +635,8 @@ const semestreChartOptions = computed(() => ({
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: rgba(25, 118, 210, 0.1);
-  border: 1px solid rgba(25, 118, 210, 0.16);
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.16);
   flex: 0 0 auto;
 }
 .child-name-wrap {
@@ -662,8 +662,8 @@ const semestreChartOptions = computed(() => ({
 }
 .child-stat {
   text-align: center;
-  background: rgba(25, 118, 210, 0.05);
-  border: 1px solid rgba(25, 118, 210, 0.1);
+  background: rgba(13, 148, 136, 0.05);
+  border: 1px solid rgba(13, 148, 136, 0.1);
   border-radius: 12px;
   padding: 8px 4px;
 }
@@ -717,7 +717,7 @@ const semestreChartOptions = computed(() => ({
 /* Chart card */
 .chart-card {
   border-radius: 18px !important;
-  border: 1px solid rgba(25, 118, 210, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.12);
   background: rgba(255, 255, 255, 0.92);
   padding: 18px;
   height: 100%;

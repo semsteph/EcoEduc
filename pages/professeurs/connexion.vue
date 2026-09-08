@@ -449,9 +449,9 @@ export default {
   min-height: 100vh;
   padding: 14px;
   background:
-    radial-gradient(900px 500px at 20% 15%, rgba(25, 118, 210, 0.22), transparent 60%),
-    radial-gradient(700px 500px at 80% 10%, rgba(25, 118, 210, 0.14), transparent 55%),
-    linear-gradient(180deg, #eaf2ff 0%, #ffffff 45%, #f6f9ff 100%);
+    radial-gradient(900px 500px at 20% 15%, rgba(13, 148, 136, 0.22), transparent 60%),
+    radial-gradient(700px 500px at 80% 10%, rgba(13, 148, 136, 0.14), transparent 55%),
+    linear-gradient(180deg, #fdf6ec 0%, #ffffff 45%, #f7f7f5 100%);
   position: relative;
   overflow: hidden;
 }
@@ -475,9 +475,9 @@ export default {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: rgba(25, 118, 210, 0.12);
-  border: 1px solid rgba(25, 118, 210, 0.18);
-  color: #1976d2;
+  background: rgba(13, 148, 136, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  color: #0d9488;
 }
 
 .welcome-title {
@@ -498,7 +498,7 @@ export default {
 .login-card {
   border-radius: 18px !important;
   background: rgba(255, 255, 255, 0.92) !important;
-  border: 1px solid rgba(25, 118, 210, 0.14);
+  border: 1px solid rgba(13, 148, 136, 0.14);
   box-shadow: 0 18px 60px rgba(11, 46, 74, 0.12);
   padding: 18px;
 }
@@ -567,11 +567,11 @@ export default {
 }
 
 .step.active {
-  color: #1976d2;
+  color: #0d9488;
 }
 
 .step.active .dot {
-  background: #1976d2;
+  background: #0d9488;
 }
 
 .line {

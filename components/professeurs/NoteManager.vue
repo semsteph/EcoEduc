@@ -799,7 +799,7 @@ export default {
 
 /* Bouton actif */
 .v-btn--active {
-  background-color: #1976d2 !important;
+  background-color: #0d9488 !important;
   color: white !important;
 }
 </style>
