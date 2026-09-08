@@ -388,8 +388,8 @@ Ne termine jamais ta réponse sans ce bloc.`;
     };
   }
 
-  // Dernier filet de sécurité : uniquement si nous connaissons une notion
-  // pour laquelle le backend possède un exercice sûr et déterministe.
+  // Filet de sécurité déterministe : uniquement si nous connaissons une
+  // notion pour laquelle le backend possède un exercice sûr et fiable.
   const fallbackExercise = buildFallbackExercise({
     subjectName,
     topic,
@@ -404,10 +404,39 @@ Ne termine jamais ta réponse sans ce bloc.`;
     };
   }
 
+  // Dernier palier : un exercice est dû dès que l'élève a confirmé sa
+  // compréhension, ce n'est pas une option. Si le modèle rapide échoue
+  // deux fois, on escalade vers un modèle plus capable.
+  const escalatedResponse = await anthropic.messages.create({
+    model: 'claude-sonnet-5',
+    max_tokens: 700,
+    system: strictSystemPrompt,
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Génère maintenant un seul exercice d'application débutant sur la notion "${
+            cleanBookName(topic || activity || 'notion étudiée', 150)
+          }" en ${cleanBookName(subjectName, 80)}. `
+          + 'Retourne obligatoirement le bloc <exercise-data> demandé, avec un JSON valide.',
+      },
+    ],
+  });
+
+  const escalatedTextBlock = escalatedResponse.content.find(
+    (block) => block.type === 'text'
+  );
+  const escalatedRawReply = escalatedTextBlock?.text || '';
+  const escalatedParsed = extractTaggedData(escalatedRawReply, 'exercise-data');
+  const escalatedExercise = sanitiseExercise(escalatedParsed.data);
+
   return {
-    rawReply: retryRawReply || firstRawReply,
-    visibleText: retryParsed.visibleText || firstParsed.visibleText,
-    exercise: null,
+    rawReply: escalatedRawReply || retryRawReply || firstRawReply,
+    visibleText:
+      escalatedParsed.visibleText
+      || retryParsed.visibleText
+      || firstParsed.visibleText,
+    exercise: escalatedExercise,
   };
 }
 
@@ -2444,11 +2473,13 @@ router.post(
               `${reply}\n\n${exercise.prompt}`;
           }
         } else {
-          // Sans structure complète, l'état ne bouge pas :
-          // le backend ne peut pas corriger de manière fiable
-          // un exercice mal structuré.
+          // Sans structure complète, l'état ne bouge pas : le backend ne
+          // peut pas corriger de manière fiable un exercice mal structuré.
+          // Le message reste honnête : il ne promet jamais un exercice qui
+          // n'arrivera pas, pour ne pas laisser l'élève bloqué en silence.
           reply =
-            "J'ai bien compris que tu as compris. Je prépare un petit exercice adapté à cette notion, puis on le fera ensemble.";
+            "Je n'arrive pas à préparer un exercice fiable sur cette notion pour l'instant. "
+            + 'Tu peux me redemander un exercice dans un instant, ou continuer à me poser des questions sur la notion.';
         }
       }
 
