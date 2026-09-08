@@ -22,7 +22,7 @@
           </div>
 
           <div class="title">
-            Tuteur {{ subjectName }}
+            Assistant {{ subjectName }}
           </div>
         </div>
 
