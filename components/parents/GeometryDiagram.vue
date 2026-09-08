@@ -122,17 +122,24 @@
           <polygon
             v-else-if="['triangle','right-triangle','rectangle','square','parallelogram'].includes(element.type) && element.points"
             :points="element.points"
-            class="shape-fill"
+            :class="element.filled === false ? 'shape' : 'shape-fill'"
           />
 
           <!-- cercle -->
-          <circle
-            v-else-if="element.type === 'circle' && element.center"
-            :cx="element.center.x"
-            :cy="element.center.y"
-            :r="element.radius"
-            class="shape"
-          />
+          <template v-else-if="element.type === 'circle' && element.center">
+            <circle
+              :cx="element.center.x"
+              :cy="element.center.y"
+              :r="element.radius"
+              :class="element.filled === true ? 'shape-fill' : 'shape'"
+            />
+            <circle
+              :cx="element.center.x"
+              :cy="element.center.y"
+              r="4"
+              class="point"
+            />
+          </template>
 
           <!-- angle -->
           <polyline
@@ -155,14 +162,32 @@
           :cx="circleCenter.x"
           :cy="circleCenter.y"
           :r="circleRadius"
-          class="shape"
+          :class="diagram.filled === true ? 'shape-fill' : 'shape'"
+        />
+
+        <!-- Rayon : segment du centre vers le point du bord, quand fourni. -->
+        <line
+          v-if="orderedPoints.length >= 2"
+          :x1="circleCenter.x"
+          :y1="circleCenter.y"
+          :x2="orderedPoints[1].x"
+          :y2="orderedPoints[1].y"
+          class="radius-line"
+        />
+
+        <!-- Centre : toujours marqué, même sans second point. -->
+        <circle
+          :cx="circleCenter.x"
+          :cy="circleCenter.y"
+          r="4"
+          class="point"
         />
       </g>
 
       <g
         v-if="
           diagram &&
-          !['point', 'circle', 'coordinate-plane', 'comparison'].includes(diagram.type)
+          !['point', 'circle', 'coordinate-plane'].includes(diagram.type)
         "
       >
         <line
@@ -194,7 +219,7 @@
         <polygon
           v-else
           :points="polygonPoints"
-          class="shape-fill"
+          :class="diagram.filled === false ? 'shape' : 'shape-fill'"
         />
 
         <path
@@ -212,18 +237,6 @@
           :cy="p.y"
           r="5"
           class="point"
-        />
-      </g>
-
-      <g v-if="diagram && diagram.type === 'comparison'">
-        <line
-          v-for="item in comparisonLines"
-          :key="item.id"
-          :x1="item.x1"
-          :y1="item.y1"
-          :x2="item.x2"
-          :y2="item.y2"
-          class="shape"
         />
       </g>
 
@@ -298,7 +311,6 @@ export default {
         'square',
         'circle',
         'coordinate-plane',
-        'comparison',
         'composite',
       ].includes(type);
     },
@@ -444,25 +456,6 @@ export default {
       );
     },
 
-    comparisonLines() {
-      return [
-        {
-          id: 1,
-          x1: 80,
-          y1: 100,
-          x2: 250,
-          y2: 100,
-        },
-        {
-          id: 2,
-          x1: 80,
-          y1: 210,
-          x2: 330,
-          y2: 210,
-        },
-      ];
-    },
-
     compositeElements() {
       const elements = Array.isArray(this.diagram?.elements)
         ? this.diagram.elements
@@ -539,7 +532,8 @@ export default {
 
           return {
             type,
-            points: points.map((p) => `${p.x},${p.y}`).join(' ')
+            points: points.map((p) => `${p.x},${p.y}`).join(' '),
+            filled: element.filled === false ? false : true
           };
         }
 
@@ -563,7 +557,8 @@ export default {
               x: Number(center.x),
               y: Number(center.y)
             },
-            radius: Math.min(radius, 140)
+            radius: Math.min(radius, 140),
+            filled: element.filled === true
           };
         }
 
@@ -714,6 +709,12 @@ export default {
   fill: none;
   stroke: var(--dia-navy);
   stroke-width: 2;
+}
+
+.radius-line {
+  stroke: var(--dia-purple);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
 }
 
 .diagram-stroke {

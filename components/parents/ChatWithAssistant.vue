@@ -672,6 +672,10 @@ export default {
     formatMessage(content) {
       const raw = String(content || "")
         .replace(/```[\s\S]*?```/g, "")
+        // Filet de sécurité : un tableau markdown ne s'affiche pas
+        // correctement en texte brut (barres verticales visibles).
+        .replace(/^\s*\|.*\|\s*$/gm, "")
+        .replace(/\n{3,}/g, "\n\n")
         .trim();
 
       const escaped = raw

@@ -218,8 +218,18 @@ Règles strictes à respecter :
    Si UNE SEULE figure doit montrer plusieurs formes ensemble (une comparaison côte à côte, par
    exemple), utilise un diagramme "composite" avec un élément par forme, chacun avec ses propres
    points décalés pour ne pas se chevaucher (ex: un triangle vers x=60-180, un carré vers x=220-320).
+   Pour distinguer un contour d'une forme remplie (ex: cercle vs disque, carré vide vs carré plein),
+   ajoute "filled":true (rempli) ou "filled":false (contour) sur la forme concernée.
+   Pour un cercle, fournis toujours au moins deux points dans "points" : le centre ET un point du
+   bord (ex: {"O":{...centre...},"A":{...bord...}}), avec la mesure du rayon dans "measurements"
+   (ex: {"O-A":"rayon = 4 cm"}). Sans ces deux points, le rayon et le centre ne peuvent pas être
+   dessinés alors que ton texte en parle : le schéma doit toujours correspondre exactement à ce que
+   tu expliques dans le texte (même vocabulaire, mêmes éléments).
    Dans tous les cas, un schéma est dû : ne termine jamais une notion représentable sans son schéma.
-   Pour une notion non géométrique, utilise aussi un schéma/tableau/représentation structurée lorsqu'elle est pédagogiquement nécessaire.
+   N'utilise JAMAIS un tableau en markdown (barres verticales |...|) pour comparer ou lister des
+   notions : notre interface ne les affiche pas correctement. Utilise soit un schéma "composite"
+   quand c'est visuel, soit des phrases courtes avec du texte en gras, une idée par ligne.
+   Pour une notion non géométrique, utilise aussi un schéma structuré lorsqu'elle est pédagogiquement nécessaire.
 
 6. Si la question semble dangereuse, inappropriée, ou clairement hors du cadre scolaire, refuse poliment et suggère d'en parler à un adulte (parent ou professeur).
 
@@ -235,8 +245,10 @@ Règles strictes à respecter :
    Si ta réponse explique plusieurs notions distinctes, ajoute PLUSIEURS blocs <explanation-data>,
    un par notion, chacun juste après le texte correspondant (jamais tous regroupés à la fin).
    Pour une réexplication, utilise un nouveau schéma ou une représentation plus simple si cela améliore la compréhension.
-   Format :
+   Format (segment) :
    <explanation-data>{"diagram":{"type":"segment","points":{"A":{"x":80,"y":160},"B":{"x":380,"y":160}},"labels":true,"measurements":{},"annotations":["Le segment [AB] a deux extrémités : A et B."]}}</explanation-data>
+   Format (cercle avec centre, rayon et remplissage) :
+   <explanation-data>{"diagram":{"type":"circle","points":{"O":{"x":250,"y":150},"A":{"x":330,"y":150}},"labels":true,"measurements":{"O-A":"rayon"},"filled":false}}</explanation-data>
    N'inclus jamais de SVG, HTML, CSS ou JavaScript dans ce bloc.
 
 Instruction interne de séance :
@@ -635,7 +647,6 @@ function sanitiseExplanationDiagram(value) {
     'square',
     'circle',
     'coordinate-plane',
-    'comparison',
     'composite',
   ]);
 
@@ -810,6 +821,7 @@ function sanitiseExplanationDiagram(value) {
           type: elementType,
           points: cleanPoints,
           label: clean(element.label, 80),
+          filled: typeof element.filled === 'boolean' ? element.filled : null,
         });
 
         continue;
@@ -843,6 +855,7 @@ function sanitiseExplanationDiagram(value) {
           },
           radius: Math.min(Math.round(radius), 140),
           label: clean(element.label, 80),
+          filled: typeof element.filled === 'boolean' ? element.filled : null,
         });
       }
     }
@@ -939,6 +952,11 @@ function sanitiseExplanationDiagram(value) {
     type,
     points,
     labels: value.labels !== false,
+    // Permet de distinguer un contour (cercle, forme vide) d'une forme
+    // remplie (disque, forme pleine) — vital pour ce genre de distinction.
+    // null = pas précisé, le frontend applique alors l'apparence par
+    // défaut habituelle de la forme.
+    filled: typeof value.filled === 'boolean' ? value.filled : null,
     measurements,
     annotations,
   };
@@ -958,6 +976,9 @@ function cleanExplanationText(text) {
     // Filet de sécurité : la règle interdit tout schéma en ASCII, mais un
     // modèle peut malgré tout produire un bloc de code (triple backticks).
     .replace(/```[\s\S]*?```/g, '')
+    // Filet de sécurité : les tableaux markdown ne sont pas gérés par
+    // l'interface et s'afficheraient comme du texte brut illisible.
+    .replace(/^\s*\|.*\|\s*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -1057,17 +1078,22 @@ Le JSON doit être complet et tenir sur une seule ligne.
 
 Le diagramme doit utiliser UNIQUEMENT l'un de ces types :
 point, line, segment, angle, triangle, right-triangle, parallelogram,
-rectangle, square, circle, coordinate-plane, comparison, composite.
+rectangle, square, circle, coordinate-plane, composite.
+Il n'existe PAS de type "tableau" ou "comparison" : pour comparer, utilise composite.
 
-N'utilise AUCUN autre type.
+N'utilise AUCUN autre type. N'utilise JAMAIS de tableau markdown (|...|).
 Si plusieurs éléments doivent apparaître dans le même schéma, utilise :
 {"type":"composite","elements":[...]}
 Pour composite :
 - point : {"type":"point","coordinates":{"x":100,"y":100},"label":"A"}
 - segment : {"type":"segment","points":{"A":{"x":100,"y":100},"B":{"x":300,"y":100}}}
 - line : {"type":"line","points":{"A":{"x":100,"y":200},"B":{"x":300,"y":200}}}
-- une forme (triangle, right-triangle, parallelogram, rectangle, square) :
-  {"type":"triangle","points":{"A":{"x":60,"y":220},"B":{"x":60,"y":100},"C":{"x":170,"y":220}}}
+- une forme (triangle, right-triangle, parallelogram, rectangle, square), "filled":false pour un contour vide :
+  {"type":"triangle","points":{"A":{"x":60,"y":220},"B":{"x":60,"y":100},"C":{"x":170,"y":220}},"filled":true}
+- un cercle, avec son centre et un point du bord pour que le rayon soit dessinable :
+  {"type":"circle","center":{"x":260,"y":150},"radius":60,"filled":false}
+Pour un cercle isolé (pas dans un composite), utilise plutôt le format "points" avec centre + bord
+(voir l'exemple du cercle plus haut dans tes instructions) pour que le rayon s'affiche.
 Exemple pour comparer DEUX formes côte à côte dans un seul schéma :
 {"diagram":{"type":"composite","elements":[
 {"type":"triangle","points":{"A":{"x":60,"y":220},"B":{"x":60,"y":100},"C":{"x":170,"y":220}}},
