@@ -226,9 +226,11 @@ Règles strictes à respecter :
    dessinés alors que ton texte en parle : le schéma doit toujours correspondre exactement à ce que
    tu expliques dans le texte (même vocabulaire, mêmes éléments).
    Dans tous les cas, un schéma est dû : ne termine jamais une notion représentable sans son schéma.
-   N'utilise JAMAIS un tableau en markdown (barres verticales |...|) pour comparer ou lister des
-   notions : notre interface ne les affiche pas correctement. Utilise soit un schéma "composite"
-   quand c'est visuel, soit des phrases courtes avec du texte en gras, une idée par ligne.
+   Un tableau markdown (barres verticales |...|) reste possible, mais UNIQUEMENT pour des données
+   réellement tabulaires (table de multiplication, tableau de conjugaison, liste de valeurs) — il est
+   alors correctement affiché. Pour comparer des formes ou une notion géométrique/visuelle, préfère
+   toujours un schéma "composite" à un tableau : une image se comprend mieux qu'un tableau pour ce
+   genre de notion. N'utilise jamais de tableau pour remplacer un schéma que tu devrais produire.
    Pour une notion non géométrique, utilise aussi un schéma structuré lorsqu'elle est pédagogiquement nécessaire.
 
 6. Si la question semble dangereuse, inappropriée, ou clairement hors du cadre scolaire, refuse poliment et suggère d'en parler à un adulte (parent ou professeur).
@@ -976,9 +978,6 @@ function cleanExplanationText(text) {
     // Filet de sécurité : la règle interdit tout schéma en ASCII, mais un
     // modèle peut malgré tout produire un bloc de code (triple backticks).
     .replace(/```[\s\S]*?```/g, '')
-    // Filet de sécurité : les tableaux markdown ne sont pas gérés par
-    // l'interface et s'afficheraient comme du texte brut illisible.
-    .replace(/^\s*\|.*\|\s*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -1026,6 +1025,32 @@ function extractExplanationSegments(rawText) {
   }
 
   return segments;
+}
+
+// ---------------------------------------------------------------------
+// Relit les tronçons texte + schéma stockés en base pour un message.
+// Ne fait jamais confiance au contenu brut : un JSON invalide ou une
+// forme inattendue retombe simplement sur "pas de schéma".
+// ---------------------------------------------------------------------
+
+function parseStoredSegments(rawValue) {
+  if (!rawValue) return [];
+
+  try {
+    const parsed = JSON.parse(rawValue);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((segment) => segment && typeof segment === 'object' && !Array.isArray(segment))
+      .map((segment) => ({
+        text: typeof segment.text === 'string' ? segment.text : '',
+        diagram: sanitiseExplanationDiagram(segment.diagram),
+      }))
+      .slice(0, 20);
+  } catch (_) {
+    return [];
+  }
 }
 
 // Un segment sans schéma est acceptable seulement pour une remarque de
@@ -1079,9 +1104,10 @@ Le JSON doit être complet et tenir sur une seule ligne.
 Le diagramme doit utiliser UNIQUEMENT l'un de ces types :
 point, line, segment, angle, triangle, right-triangle, parallelogram,
 rectangle, square, circle, coordinate-plane, composite.
-Il n'existe PAS de type "tableau" ou "comparison" : pour comparer, utilise composite.
+Il n'existe PAS de type "tableau" ou "comparison" dans le schéma : pour comparer, utilise composite
+(un tableau markdown reste possible ailleurs dans ta réponse pour des données tabulaires, mais pas ici).
 
-N'utilise AUCUN autre type. N'utilise JAMAIS de tableau markdown (|...|).
+N'utilise AUCUN autre type pour ce diagramme.
 Si plusieurs éléments doivent apparaître dans le même schéma, utilise :
 {"type":"composite","elements":[...]}
 Pour composite :
@@ -1620,10 +1646,11 @@ router.get(
 
       const inputMode = getPublicTutorMode(tutorState);
 
-      const [messages] = await req.db.query(
+      const [messageRows] = await req.db.query(
         `SELECT
            role,
            content,
+           explanation_segments AS explanationSegments,
            created_at AS createdAt
          FROM assistant_message
          WHERE conversation_id = ?
@@ -1631,13 +1658,18 @@ router.get(
         [convRows[0].id]
       );
 
+      const messages = messageRows.map((row) => ({
+        role: row.role,
+        content: row.content,
+        segments: parseStoredSegments(row.explanationSegments),
+      }));
+
       // L'état interne reste côté serveur.
       // Le frontend reçoit uniquement un mode public.
       res.json({
         messages,
         inputMode,
         exercise: tutorState.exercise || null,
-        explanationSegments: tutorState.explanationSegments || [],
       });
     } catch (err) {
       console.error(
@@ -2574,23 +2606,6 @@ router.post(
       }
 
       // ---------------------------------------------------------------
-      // 20. Sauvegarde des schémas d'explication
-      // ---------------------------------------------------------------
-      //
-      // Les schémas appartiennent à la réponse pédagogique courante.
-      // Ils sont conservés dans tutor_state pour pouvoir être renvoyés
-      // lors du rechargement de la conversation.
-      // ---------------------------------------------------------------
-
-      if (explanationSegments.length) {
-        tutorState.explanationSegments = explanationSegments;
-      } else if (turnKind !== 'EXPLANATION'
-        && turnKind !== 'REEXPLAIN'
-        && turnKind !== 'EXAMPLE_REQUEST') {
-        tutorState.explanationSegments = [];
-      }
-
-      // ---------------------------------------------------------------
       // 21. Sauvegarde de l'état pédagogique
       // ---------------------------------------------------------------
 
@@ -2615,12 +2630,16 @@ router.post(
            (
              conversation_id,
              role,
-             content
+             content,
+             explanation_segments
            )
-         VALUES (?, 'assistant', ?)`,
+         VALUES (?, 'assistant', ?, ?)`,
         [
           conversationId,
           reply,
+          explanationSegments.length
+            ? JSON.stringify(explanationSegments)
+            : null,
         ]
       );
 

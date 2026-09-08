@@ -81,19 +81,19 @@
           class="message-item"
         >
           <!-- ====================================================== -->
-          <!-- DERNIER MESSAGE ASSISTANT AVEC SCHÉMAS SEGMENTÉS      -->
+          <!-- MESSAGE ASSISTANT AVEC SCHÉMAS SEGMENTÉS              -->
           <!-- Chaque notion garde son propre schéma, à sa place,   -->
-          <!-- plutôt qu'un schéma unique regroupé à la fin.        -->
+          <!-- plutôt qu'un schéma unique regroupé à la fin. Persisté -->
+          <!-- par message : reste visible même après un rechargement. -->
           <!-- ====================================================== -->
           <template
             v-if="
               message.role !== 'user' &&
-              index === messages.length - 1 &&
-              explanationSegments.length
+              message.segments && message.segments.length
             "
           >
             <div
-              v-for="(segment, segIndex) in explanationSegments"
+              v-for="(segment, segIndex) in message.segments"
               :key="'segment-' + segIndex"
             >
               <div
@@ -331,7 +331,6 @@ export default {
        */
       inputMode: "question",
       currentExercise: null,
-      explanationSegments: [],
     };
   },
 
@@ -473,6 +472,9 @@ export default {
           this.messages = history.map((message) => ({
             role: message.role,
             content: message.content,
+            segments: Array.isArray(message.segments)
+              ? message.segments
+              : [],
           }));
         }
 
@@ -498,12 +500,6 @@ export default {
 
         this.currentExercise =
           response.data?.exercise || null;
-
-        this.explanationSegments = Array.isArray(
-          response.data?.explanationSegments
-        )
-          ? response.data.explanationSegments
-          : [];
       } catch (err) {
         console.error(
           "Erreur lors du chargement de la conversation :",
@@ -532,10 +528,6 @@ export default {
       }
 
       this.sendError = null;
-
-      // Les schémas appartiennent à la dernière réponse de l'assistant.
-      // On les retire immédiatement lorsqu'une nouvelle question est envoyée.
-      this.explanationSegments = [];
 
       // ----------------------------------------------------------
       // Affichage immédiat du message utilisateur
@@ -598,6 +590,9 @@ export default {
             role: "assistant",
             content:
               response.data.reply,
+            segments: Array.isArray(response.data?.explanationSegments)
+              ? response.data.explanationSegments
+              : [],
           });
         }
 
@@ -622,12 +617,6 @@ export default {
 
         this.currentExercise =
           response.data?.exercise || null;
-
-        this.explanationSegments = Array.isArray(
-          response.data?.explanationSegments
-        )
-          ? response.data.explanationSegments
-          : [];
       } catch (err) {
         console.error(
           "Erreur lors de l'envoi du message :",
@@ -672,9 +661,6 @@ export default {
     formatMessage(content) {
       const raw = String(content || "")
         .replace(/```[\s\S]*?```/g, "")
-        // Filet de sécurité : un tableau markdown ne s'affiche pas
-        // correctement en texte brut (barres verticales visibles).
-        .replace(/^\s*\|.*\|\s*$/gm, "")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
 
@@ -683,9 +669,76 @@ export default {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
-      return escaped
+      const withTables = this.renderMarkdownTables(escaped);
+
+      return withTables
         .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
         .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>");
+    },
+
+    // ==============================================================
+    // TABLEAUX MARKDOWN
+    // ==============================================================
+    //
+    // Certaines notions sont légitimement tabulaires (table de
+    // multiplication, conjugaison...) : on les affiche en vrai tableau
+    // HTML plutôt que de les supprimer ou de laisser les barres
+    // verticales brutes à l'écran. Attend un texte déjà échappé.
+    // ==============================================================
+
+    renderMarkdownTables(escapedText) {
+      const isSeparatorRow = (line) =>
+        /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/.test(line.trim());
+
+      const parseRow = (line) => {
+        const cells = line.trim().replace(/^\||\|$/g, "").split("|");
+        return cells.map((cell) => cell.trim());
+      };
+
+      const lines = escapedText.split("\n");
+      const output = [];
+      let i = 0;
+
+      while (i < lines.length) {
+        const headerLine = lines[i];
+
+        if (
+          headerLine.includes("|") &&
+          i + 1 < lines.length &&
+          isSeparatorRow(lines[i + 1])
+        ) {
+          const headers = parseRow(headerLine);
+          let j = i + 2;
+          const rows = [];
+
+          while (j < lines.length && lines[j].trim().includes("|")) {
+            rows.push(parseRow(lines[j]));
+            j++;
+          }
+
+          let html = '<table class="msg-table"><thead><tr>';
+          headers.forEach((h) => {
+            html += `<th>${h}</th>`;
+          });
+          html += "</tr></thead><tbody>";
+          rows.forEach((row) => {
+            html += "<tr>";
+            row.forEach((cell) => {
+              html += `<td>${cell}</td>`;
+            });
+            html += "</tr>";
+          });
+          html += "</tbody></table>";
+
+          output.push(html);
+          i = j;
+        } else {
+          output.push(headerLine);
+          i++;
+        }
+      }
+
+      return output.join("\n");
     },
   },
 
@@ -990,6 +1043,34 @@ export default {
   box-shadow: 0 3px 12px rgba(42, 42, 60, 0.05);
 
   border-bottom-left-radius: 6px;
+}
+
+/* ================================================================= */
+/* TABLEAUX (dans les messages)                                     */
+/* ================================================================= */
+
+.bubble :deep(.msg-table) {
+  width: 100%;
+  margin: 8px 0;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.bubble :deep(.msg-table th),
+.bubble :deep(.msg-table td) {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.bubble :deep(.msg-table th) {
+  background: var(--accent-50);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.bubble :deep(.msg-table tr:nth-child(even) td) {
+  background: rgba(13, 148, 136, 0.04);
 }
 
 /* ================================================================= */

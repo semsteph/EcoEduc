@@ -399,7 +399,6 @@ function extractTaggedData(rawText, tagName) {
   const visibleText = source
     .replace(expression, '')
     .replace(/```[\s\S]*?```/g, '')
-    .replace(/^\s*\|.*\|\s*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
