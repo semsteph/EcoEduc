@@ -191,7 +191,7 @@ export default {
 .student-accent {
   height: 6px;
   width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25,118,210,0.22), #1976d2);
+  background: linear-gradient(90deg, #0d9488, rgba(25,118,210,0.22), #0d9488);
 }
 .student-img {
   height: 200px;
@@ -244,7 +244,7 @@ export default {
 .shell-accent {
   height: 6px;
   width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25,118,210,0.18), #1976d2);
+  background: linear-gradient(90deg, #0d9488, rgba(25,118,210,0.18), #0d9488);
 }
 .shell-body {
   padding: 16px !important;
@@ -291,9 +291,15 @@ export default {
   background: rgba(255, 255, 255, 0.95);
 }
 .action-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-3px) scale(1.02);
   box-shadow: 0 18px 55px rgba(11, 46, 74, 0.16) !important;
-  border-color: rgba(25, 118, 210, 0.22);
+  border-color: rgba(13, 148, 136, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-card:hover {
+    transform: none;
+  }
 }
 .action-accent {
   height: 6px;
@@ -326,13 +332,13 @@ export default {
   display: inline-flex;
   align-items: center;
   font-weight: 800;
-  color: #1976d2;
+  color: #0d9488;
   font-size: 0.9rem;
 }
 
 /* Tones (couleurs cohérentes sans casser la charte) */
-.accent-blue { background: linear-gradient(90deg, #1976d2, rgba(25,118,210,0.22), #1976d2); }
-.icon-blue { background: rgba(25,118,210,0.08); color: #1976d2; }
+.accent-blue { background: linear-gradient(90deg, #0d9488, rgba(25,118,210,0.22), #0d9488); }
+.icon-blue { background: rgba(25,118,210,0.08); color: #0d9488; }
 
 .accent-blue2 { background: linear-gradient(90deg, #0b2e4a, rgba(11,46,74,0.18), #0b2e4a); }
 .icon-blue2 { background: rgba(11,46,74,0.08); color: #0b2e4a; }
