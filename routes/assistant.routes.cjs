@@ -937,52 +937,16 @@ function stripExplanationTag(raw) {
     .trim();
 }
 
-function buildGeometryBasicsFallback() {
-  return {
-    type: 'composite',
-    elements: [
-      {
-        type: 'point',
-        coordinates: { x: 100, y: 80 },
-        label: 'A',
-      },
-      {
-        type: 'point',
-        coordinates: { x: 300, y: 80 },
-        label: 'B',
-      },
-      {
-        type: 'segment',
-        points: {
-          A: { x: 100, y: 80 },
-          B: { x: 300, y: 80 },
-        },
-        label: '[AB]',
-      },
-      {
-        type: 'line',
-        points: {
-          A: { x: 100, y: 220 },
-          B: { x: 300, y: 220 },
-        },
-        label: 'droite',
-      },
-    ],
-    labels: true,
-    measurements: {},
-    annotations: [
-      'Un segment a deux extrémités.',
-      'Une droite continue dans les deux directions.',
-    ],
-  };
-}
-
 async function generateStructuredExplanation({
   systemPrompt,
   messages,
   subjectName,
   topic,
 }) {
+  const lastUserMessage = [...(messages || [])]
+    .reverse()
+    .find((message) => message.role === 'user')?.content || '';
+
   const firstResponse = await anthropic.messages.create({
     model: 'claude-haiku-4-5',
     max_tokens: 900,
@@ -1027,13 +991,22 @@ Pour composite :
 - point : {"type":"point","coordinates":{"x":100,"y":100},"label":"A"}
 - segment : {"type":"segment","points":{"A":{"x":100,"y":100},"B":{"x":300,"y":100}}}
 - line : {"type":"line","points":{"A":{"x":100,"y":200},"B":{"x":300,"y":200}}}
+- une forme (triangle, right-triangle, parallelogram, rectangle, square) :
+  {"type":"triangle","points":{"A":{"x":60,"y":220},"B":{"x":60,"y":100},"C":{"x":170,"y":220}}}
+Exemple pour comparer DEUX formes côte à côte dans un seul schéma :
+{"diagram":{"type":"composite","elements":[
+{"type":"triangle","points":{"A":{"x":60,"y":220},"B":{"x":60,"y":100},"C":{"x":170,"y":220}}},
+{"type":"square","points":{"A":{"x":230,"y":120},"B":{"x":320,"y":120},"C":{"x":320,"y":210},"D":{"x":230,"y":210}}}
+],"labels":true}}
 Ne génère jamais SVG, HTML, CSS ou JavaScript.
 Ne laisse jamais le bloc <explanation-data> ouvert ou tronqué.`,
     messages: [
       {
         role: 'user',
         content:
-          `Réexplique "${topic || 'la notion étudiée'}" en ${subjectName} avec un exemple concret et un schéma valide.`,
+          `Réexplique "${topic || 'la notion étudiée'}" en ${subjectName} avec un exemple concret et un schéma valide. `
+          + `La question précise de l'élève à laquelle il faut répondre était : `
+          + `${JSON.stringify(String(lastUserMessage || '').slice(0, 500))}`,
       },
     ],
   });
@@ -1054,27 +1027,10 @@ Ne laisse jamais le bloc <explanation-data> ouvert ou tronqué.`,
     };
   }
 
-  // Dernier filet de sécurité pour les bases de géométrie :
-  // le frontend dispose d'un schéma sûr et complet.
-  const normalizedTopic = normaliseBookText(topic || '');
-  const normalizedSubject = normaliseBookText(subjectName || '');
-
-  if (
-    normalizedSubject.includes('math')
-    && (
-      normalizedTopic.includes('geometr')
-      || normalizedTopic.includes('base')
-    )
-  ) {
-    return {
-      rawReply: firstRaw || strictRaw,
-      visibleText:
-        stripExplanationTag(firstRaw || strictRaw)
-        || 'Je vais reprendre les bases de la géométrie avec un exemple simple.',
-      diagram: buildGeometryBasicsFallback(),
-    };
-  }
-
+  // Aucun schéma valide n'a pu être obtenu après deux tentatives.
+  // Un schéma générique et sans rapport avec la notion réellement
+  // expliquée serait trompeur pour l'élève : mieux vaut une explication
+  // texte seule, honnête, qu'un mauvais schéma présenté comme fiable.
   return {
     rawReply: firstRaw || strictRaw,
     visibleText:
