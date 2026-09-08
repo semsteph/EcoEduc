@@ -1,0 +1,722 @@
+<template>
+  <div
+    v-if="isSupported"
+    class="geometry-diagram"
+    role="img"
+    aria-label="Schéma géométrique"
+  >
+    <div class="diagram-header">
+      <span class="diagram-badge">📐</span>
+      <span class="diagram-title">Schéma</span>
+    </div>
+
+    <svg
+      :viewBox="`0 0 ${width} ${height}`"
+      preserveAspectRatio="xMidYMid meet"
+      class="diagram-svg"
+    >
+      <defs>
+        <marker
+          id="arrow-end"
+          markerWidth="8"
+          markerHeight="8"
+          refX="7"
+          refY="4"
+          orient="auto"
+        >
+          <path d="M0,0 L8,4 L0,8 Z" class="diagram-stroke" />
+        </marker>
+
+        <marker
+          id="arrow-start"
+          markerWidth="8"
+          markerHeight="8"
+          refX="1"
+          refY="4"
+          orient="auto"
+        >
+          <path d="M8,0 L0,4 L8,8 Z" class="diagram-stroke" />
+        </marker>
+      </defs>
+
+      <g v-if="diagram && diagram.type === 'coordinate-plane'">
+        <line
+          v-for="x in gridX"
+          :key="'gx' + x"
+          :x1="x"
+          :y1="20"
+          :x2="x"
+          :y2="height - 30"
+          class="grid-line"
+        />
+
+        <line
+          v-for="y in gridY"
+          :key="'gy' + y"
+          :x1="30"
+          :y1="y"
+          :x2="width - 20"
+          :y2="y"
+          class="grid-line"
+        />
+
+        <line
+          :x1="30"
+          :y1="height / 2"
+          :x2="width - 20"
+          :y2="height / 2"
+          class="axis"
+          marker-end="url(#arrow-end)"
+        />
+
+        <line
+          :x1="width / 2"
+          :y1="height - 30"
+          :x2="width / 2"
+          :y2="20"
+          class="axis"
+          marker-end="url(#arrow-end)"
+        />
+      </g>
+
+      <!-- ========================================================== -->
+      <!-- COMPOSITE : plusieurs éléments dans un même schéma       -->
+      <!-- ========================================================== -->
+      <g v-if="diagram && diagram.type === 'composite'">
+        <template
+          v-for="(element, index) in compositeElements"
+          :key="'composite-' + index"
+        >
+          <!-- point -->
+          <circle
+            v-if="element.type === 'point'"
+            :cx="element.x"
+            :cy="element.y"
+            r="5"
+            class="point"
+          />
+
+          <!-- segment -->
+          <line
+            v-else-if="element.type === 'segment' && element.start && element.end"
+            :x1="element.start.x"
+            :y1="element.start.y"
+            :x2="element.end.x"
+            :y2="element.end.y"
+            class="shape"
+          />
+
+          <!-- droite -->
+          <line
+            v-else-if="element.type === 'line' && element.start && element.end"
+            :x1="element.start.x"
+            :y1="element.start.y"
+            :x2="element.end.x"
+            :y2="element.end.y"
+            class="shape"
+            marker-start="url(#arrow-start)"
+            marker-end="url(#arrow-end)"
+          />
+
+          <!-- triangle / rectangle / carré / parallélogramme -->
+          <polygon
+            v-else-if="['triangle','right-triangle','rectangle','square','parallelogram'].includes(element.type) && element.points"
+            :points="element.points"
+            class="shape-fill"
+          />
+
+          <!-- cercle -->
+          <circle
+            v-else-if="element.type === 'circle' && element.center"
+            :cx="element.center.x"
+            :cy="element.center.y"
+            :r="element.radius"
+            class="shape"
+          />
+
+          <!-- angle -->
+          <polyline
+            v-else-if="element.type === 'angle' && element.points"
+            :points="element.points"
+            class="shape"
+          />
+
+          <text
+            v-if="element.label && element.x != null && element.y != null"
+            :x="Number(element.x) + 9"
+            :y="Number(element.y) - 9"
+            class="point-label"
+          >{{ element.label }}</text>
+        </template>
+      </g>
+
+      <g v-if="diagram && diagram.type === 'circle'">
+        <circle
+          :cx="circleCenter.x"
+          :cy="circleCenter.y"
+          :r="circleRadius"
+          class="shape"
+        />
+      </g>
+
+      <g
+        v-if="
+          diagram &&
+          !['point', 'circle', 'coordinate-plane', 'comparison'].includes(diagram.type)
+        "
+      >
+        <line
+          v-if="diagram.type === 'line'"
+          :x1="lineEnds.start.x"
+          :y1="lineEnds.start.y"
+          :x2="lineEnds.end.x"
+          :y2="lineEnds.end.y"
+          class="shape"
+          marker-start="url(#arrow-start)"
+          marker-end="url(#arrow-end)"
+        />
+
+        <line
+          v-else-if="diagram.type === 'segment'"
+          :x1="firstTwo.start.x"
+          :y1="firstTwo.start.y"
+          :x2="firstTwo.end.x"
+          :y2="firstTwo.end.y"
+          class="shape"
+        />
+
+        <polyline
+          v-else-if="diagram.type === 'angle'"
+          :points="anglePoints"
+          class="shape"
+        />
+
+        <polygon
+          v-else
+          :points="polygonPoints"
+          class="shape-fill"
+        />
+
+        <path
+          v-if="diagram.type === 'right-triangle'"
+          :d="rightAngleMark"
+          class="right-mark"
+        />
+      </g>
+
+      <g v-if="diagram && diagram.type === 'point'">
+        <circle
+          v-for="(p, label) in validPoints"
+          :key="label"
+          :cx="p.x"
+          :cy="p.y"
+          r="5"
+          class="point"
+        />
+      </g>
+
+      <g v-if="diagram && diagram.type === 'comparison'">
+        <line
+          v-for="item in comparisonLines"
+          :key="item.id"
+          :x1="item.x1"
+          :y1="item.y1"
+          :x2="item.x2"
+          :y2="item.y2"
+          class="shape"
+        />
+      </g>
+
+      <g v-if="diagram && diagram.labels">
+        <text
+          v-for="(p, label) in validPoints"
+          :key="'label-' + label"
+          :x="p.x + 9"
+          :y="p.y - 9"
+          class="point-label"
+        >
+          {{ label }}
+        </text>
+      </g>
+
+      <g v-if="diagram">
+        <text
+          v-for="(value, key) in diagram.measurements || {}"
+          :key="'m-' + key"
+          :x="measurementPosition(key).x"
+          :y="measurementPosition(key).y"
+          class="measurement"
+        >
+          {{ value }}
+        </text>
+      </g>
+
+      <g
+        v-if="
+          diagram &&
+          diagram.annotations &&
+          diagram.annotations.length
+        "
+      >
+        <text
+          v-for="(text, index) in diagram.annotations"
+          :key="'a-' + index"
+          x="20"
+          :y="height - 12 - ((diagram.annotations.length - 1 - index) * 18)"
+          class="annotation"
+        >
+          {{ text }}
+        </text>
+      </g>
+    </svg>
+  </div>
+</template>
+
+<script>
+export default {
+  name: "GeometryDiagram",
+
+  props: {
+    diagram: {
+      type: Object,
+      default: null,
+    },
+  },
+
+  computed: {
+    isSupported() {
+      const type = this.diagram?.type;
+      return [
+        'point',
+        'line',
+        'segment',
+        'angle',
+        'triangle',
+        'right-triangle',
+        'parallelogram',
+        'rectangle',
+        'square',
+        'circle',
+        'coordinate-plane',
+        'comparison',
+        'composite',
+      ].includes(type);
+    },
+
+    width() {
+      return 520;
+    },
+
+    height() {
+      return 330;
+    },
+
+    validPoints() {
+      const source = this.diagram?.points || {};
+
+      return Object.fromEntries(
+        Object.entries(source).filter(([, point]) =>
+          point &&
+          Number.isFinite(Number(point.x)) &&
+          Number.isFinite(Number(point.y))
+        )
+      );
+    },
+
+    orderedPoints() {
+      return Object.entries(this.validPoints).map(
+        ([label, point]) => ({
+          label,
+          x: Number(point.x),
+          y: Number(point.y),
+        })
+      );
+    },
+
+    firstTwo() {
+      const points = this.orderedPoints;
+
+      return {
+        start: points[0] || { x: 80, y: 160 },
+        end: points[1] || { x: 420, y: 160 },
+      };
+    },
+
+    lineEnds() {
+      const { start, end } = this.firstTwo;
+
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const len = Math.hypot(dx, dy) || 1;
+
+      const ux = dx / len;
+      const uy = dy / len;
+      const distance = 650;
+
+      return {
+        start: {
+          x: start.x - ux * distance,
+          y: start.y - uy * distance,
+        },
+        end: {
+          x: end.x + ux * distance,
+          y: end.y + uy * distance,
+        },
+      };
+    },
+
+    polygonPoints() {
+      return this.orderedPoints
+        .map((point) => `${point.x},${point.y}`)
+        .join(" ");
+    },
+
+    anglePoints() {
+      const points = this.orderedPoints;
+
+      if (points.length >= 3) {
+        return `${points[0].x},${points[0].y} ${points[1].x},${points[1].y} ${points[2].x},${points[2].y}`;
+      }
+
+      return "120,230 260,150 400,230";
+    },
+
+    rightAngleMark() {
+      const points = this.orderedPoints;
+
+      if (points.length < 3) {
+        return "M140 220 L140 190 L170 190";
+      }
+
+      const a = points[0];
+      const b = points[1];
+      const c = points[2];
+
+      const ab = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      const cb = Math.hypot(c.x - b.x, c.y - b.y) || 1;
+
+      const ux = (a.x - b.x) / ab;
+      const uy = (a.y - b.y) / ab;
+      const vx = (c.x - b.x) / cb;
+      const vy = (c.y - b.y) / cb;
+
+      const s = 22;
+
+      return `M ${b.x + ux * s} ${b.y + uy * s}
+              L ${b.x + ux * s + vx * s} ${b.y + uy * s + vy * s}
+              L ${b.x + vx * s} ${b.y + vy * s}`;
+    },
+
+    circleCenter() {
+      return this.orderedPoints[0] || {
+        x: 260,
+        y: 155,
+      };
+    },
+
+    circleRadius() {
+      const points = this.orderedPoints;
+
+      if (points.length >= 2) {
+        return Math.min(
+          125,
+          Math.hypot(
+            points[1].x - points[0].x,
+            points[1].y - points[0].y
+          )
+        );
+      }
+
+      return 100;
+    },
+
+    gridX() {
+      return Array.from(
+        { length: 10 },
+        (_, index) => 50 + index * 50
+      );
+    },
+
+    gridY() {
+      return Array.from(
+        { length: 6 },
+        (_, index) => 40 + index * 50
+      );
+    },
+
+    comparisonLines() {
+      return [
+        {
+          id: 1,
+          x1: 80,
+          y1: 100,
+          x2: 250,
+          y2: 100,
+        },
+        {
+          id: 2,
+          x1: 80,
+          y1: 210,
+          x2: 330,
+          y2: 210,
+        },
+      ];
+    },
+
+    compositeElements() {
+      const elements = Array.isArray(this.diagram?.elements)
+        ? this.diagram.elements
+        : [];
+
+      return elements.slice(0, 20).map((element) => {
+        const type = String(element?.type || '').toLowerCase();
+
+        if (type === 'point') {
+          const source = element.coordinates || element.point || element;
+          const x = Number(source?.x);
+          const y = Number(source?.y);
+
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+          return {
+            type: 'point',
+            x,
+            y,
+            label: typeof element.label === 'string'
+              ? element.label.slice(0, 20)
+              : ''
+          };
+        }
+
+        if (type === 'segment' || type === 'line') {
+          const source = element.points || {};
+          const entries = Object.entries(source).slice(0, 2);
+
+          if (entries.length < 2) return null;
+
+          const start = {
+            x: Number(entries[0][1]?.x),
+            y: Number(entries[0][1]?.y)
+          };
+          const end = {
+            x: Number(entries[1][1]?.x),
+            y: Number(entries[1][1]?.y)
+          };
+
+          if (
+            !Number.isFinite(start.x) ||
+            !Number.isFinite(start.y) ||
+            !Number.isFinite(end.x) ||
+            !Number.isFinite(end.y)
+          ) {
+            return null;
+          }
+
+          return {
+            type,
+            start,
+            end,
+            label: typeof element.label === 'string'
+              ? element.label.slice(0, 60)
+              : ''
+          };
+        }
+
+        if (
+          ['triangle','right-triangle','rectangle','square','parallelogram']
+            .includes(type)
+        ) {
+          const source = element.points || {};
+          const points = Object.values(source)
+            .slice(0, 4)
+            .map((p) => ({
+              x: Number(p?.x),
+              y: Number(p?.y)
+            }))
+            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+
+          if (points.length < 3) return null;
+
+          return {
+            type,
+            points: points.map((p) => `${p.x},${p.y}`).join(' ')
+          };
+        }
+
+        if (type === 'circle') {
+          const center = element.center || element.coordinates;
+          const radius = Number(element.radius);
+
+          if (
+            !center ||
+            !Number.isFinite(Number(center.x)) ||
+            !Number.isFinite(Number(center.y)) ||
+            !Number.isFinite(radius) ||
+            radius <= 0
+          ) {
+            return null;
+          }
+
+          return {
+            type,
+            center: {
+              x: Number(center.x),
+              y: Number(center.y)
+            },
+            radius: Math.min(radius, 140)
+          };
+        }
+
+        if (type === 'angle') {
+          const source = element.points || {};
+          const points = Object.values(source)
+            .slice(0, 3)
+            .map((p) => ({
+              x: Number(p?.x),
+              y: Number(p?.y)
+            }))
+            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+
+          if (points.length < 3) return null;
+
+          return {
+            type,
+            points: points.map((p) => `${p.x},${p.y}`).join(' ')
+          };
+        }
+
+        return null;
+      }).filter(Boolean);
+    },
+  },
+
+  methods: {
+    measurementPosition(key) {
+      const [a, b] = String(key).split("-");
+
+      const p1 = this.validPoints[a];
+      const p2 = this.validPoints[b];
+
+      if (!p1 || !p2) {
+        return {
+          x: 30,
+          y: 30,
+        };
+      }
+
+      return {
+        x: (Number(p1.x) + Number(p2.x)) / 2,
+        y: (Number(p1.y) + Number(p2.y)) / 2 - 12,
+      };
+    },
+  },
+};
+</script>
+
+<style scoped>
+.geometry-diagram {
+  --dia-teal: #0d9488;
+  --dia-teal-soft: rgba(13, 148, 136, 0.12);
+  --dia-coral: #f97316;
+  --dia-purple: #7c3aed;
+  --dia-purple-soft: rgba(124, 58, 237, 0.10);
+  --dia-navy: #27273f;
+
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+
+  background: linear-gradient(180deg, #fffaf3, #fffdf9);
+  border: 1px solid rgba(249, 115, 22, 0.18);
+  border-radius: 20px;
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.07);
+}
+
+.diagram-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.diagram-badge {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.diagram-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--dia-purple);
+}
+
+.diagram-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 220px;
+}
+
+.shape {
+  fill: none;
+  stroke: var(--dia-teal);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shape-fill {
+  fill: var(--dia-teal-soft);
+  stroke: var(--dia-teal);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+}
+
+.point {
+  fill: var(--dia-coral);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.point-label {
+  fill: var(--dia-navy);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.measurement {
+  fill: var(--dia-purple);
+  font-size: 14px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.annotation {
+  fill: #6b6b85;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.grid-line {
+  stroke: #f0e4d3;
+  stroke-width: 1;
+}
+
+.axis {
+  stroke: var(--dia-navy);
+  stroke-width: 2;
+}
+
+.right-mark {
+  fill: none;
+  stroke: var(--dia-navy);
+  stroke-width: 2;
+}
+
+.diagram-stroke {
+  fill: var(--dia-teal);
+}
+</style>
