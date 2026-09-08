@@ -39,7 +39,7 @@
       </v-card-text>
     </v-card>
 
-    <!-- ✅ Actions (2/ligne mobile, 3 md, 4 lg) + centré -->
+    <!-- ✅ Actions (2/ligne mobile, 3 md, 3 lg — jamais 4) + centré -->
     <v-card class="actions-shell" elevation="12">
       <div class="shell-accent" aria-hidden="true"></div>
 
@@ -65,7 +65,7 @@
               cols="6"
               sm="6"
               md="4"
-              lg="3"
+              lg="4"
               class="card-col"
             >
               <v-card

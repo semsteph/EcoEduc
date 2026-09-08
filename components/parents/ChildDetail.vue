@@ -15,14 +15,14 @@
       <!-- ✅ wrapper pour centrer le grid -->
       <div class="grid-center">
         <v-row class="cards-row" dense justify="center" align="stretch">
-          <!-- xs: 2 colonnes | sm: 2 | md: 3 | lg: 4 -->
+          <!-- xs: 2 colonnes | sm: 2 | md: 3 | lg: 3 (jamais 4) -->
           <v-col
             v-for="detail in details"
             :key="detail.label"
             cols="6"
             sm="6"
             md="4"
-            lg="3"
+            lg="4"
             class="card-col"
           >
             <v-card
