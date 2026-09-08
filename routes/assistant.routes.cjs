@@ -1440,7 +1440,7 @@ async function findVerifiedBookReference(req, {
          source_url AS sourceUrl,
          source_title AS sourceTitle,
          source_type AS sourceType,
-         source_independence_key AS sourceIndependenceKey
+         independent_source_key AS independentSourceKey
        FROM assistant_reference_evidence
        WHERE reference_id = ?
        ORDER BY id ASC`,
@@ -1452,14 +1452,14 @@ async function findVerifiedBookReference(req, {
     );
 
     const strongSource = validEvidence.some((evidence) =>
-      ['publisher', 'institutional', 'official', 'catalog'].includes(
-        normaliseBookText(evidence.sourceType)
+      ['publisher', 'institutional', 'library_catalog', 'bibliographic_catalog'].includes(
+        normaliseBookText(evidence.sourceType).replace(/ /g, '_')
       )
     );
 
     const independentSources = new Set(
       validEvidence
-        .map((evidence) => evidence.sourceIndependenceKey)
+        .map((evidence) => evidence.independentSourceKey)
         .filter(Boolean)
     );
 
@@ -1478,7 +1478,142 @@ async function findVerifiedBookReference(req, {
   return null;
 }
 
-async function createBookSearchJob(req, {
+// =====================================================================
+// Recherche et vérification réelle d'une référence de manuel.
+//
+// Utilise l'outil de recherche web natif de Claude. Le backend ne fait
+// JAMAIS confiance à un score de confiance déclaré par le modèle : il
+// calcule lui-même la confiance à partir des citations réellement
+// renvoyées par l'outil de recherche (URL, titre, extrait cité).
+// =====================================================================
+
+const KNOWN_PUBLISHER_HOSTS = [
+  'edicef.com',
+  'hachette.fr',
+  'hachette-education.com',
+  'nathan.fr',
+  'nathan.com',
+  'hatier.fr',
+  'bordas-espace-svt.fr',
+  'editions-hatier.fr',
+  'ciam-edu.org',
+];
+
+const KNOWN_CATALOG_HOSTS = [
+  'worldcat.org',
+  'sudoc.abes.fr',
+  'bnf.fr',
+  'openlibrary.org',
+];
+
+function classifySourceType(url) {
+  let host = '';
+
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch (_) {
+    return { type: 'other', host: '' };
+  }
+
+  if (host.endsWith('.gov') || host.endsWith('.edu') || host.includes('.gouv.')) {
+    return { type: 'institutional', host };
+  }
+
+  if (KNOWN_PUBLISHER_HOSTS.some((known) => host === known || host.endsWith(`.${known}`))) {
+    return { type: 'publisher', host };
+  }
+
+  if (KNOWN_CATALOG_HOSTS.some((known) => host === known || host.endsWith(`.${known}`))) {
+    return { type: 'bibliographic_catalog', host };
+  }
+
+  if (host.includes('bibliotheque') || host.includes('library')) {
+    return { type: 'library_catalog', host };
+  }
+
+  if (host.endsWith('.org') || host.includes('ecole') || host.includes('education')) {
+    return { type: 'educational', host };
+  }
+
+  return { type: 'other', host };
+}
+
+// Construit les preuves à partir des citations réellement renvoyées par
+// l'outil de recherche web (dédupliquées par URL).
+function buildEvidenceFromCitations(citations) {
+  const byUrl = new Map();
+
+  for (const citation of citations) {
+    if (
+      !citation
+      || citation.type !== 'web_search_result_location'
+      || !citation.url
+    ) {
+      continue;
+    }
+
+    if (byUrl.has(citation.url)) continue;
+
+    const { type: sourceType, host } = classifySourceType(citation.url);
+
+    if (!host) continue;
+
+    byUrl.set(citation.url, {
+      sourceUrl: citation.url.slice(0, 1000),
+      sourceTitle: cleanBookName(citation.title || host, 500),
+      sourceType,
+      sourceHost: host,
+      independentSourceKey: host,
+      evidenceExcerpt: cleanBookName(citation.cited_text || '', 500),
+    });
+  }
+
+  return [...byUrl.values()].slice(0, 10);
+}
+
+// Score déterministe, calculé par le backend — jamais déclaré par le modèle.
+// Reprend la politique documentée dans la migration 2026_09_tuteur_pedagogique.sql.
+function computeReferenceConfidence(evidence) {
+  const strongSource = evidence.some((e) =>
+    ['institutional', 'publisher', 'bibliographic_catalog'].includes(e.sourceType)
+  );
+
+  const independentCount = new Set(
+    evidence.map((e) => e.independentSourceKey)
+  ).size;
+
+  if (strongSource && evidence.length >= 1) return 92;
+  if (independentCount >= 2) return 87;
+  if (independentCount === 1) return 60;
+
+  return 0;
+}
+
+async function findOrCreateBook(req, bookName) {
+  const normalizedTitle = normaliseBookText(bookName);
+
+  const [existing] = await req.db.query(
+    `SELECT b.id
+     FROM assistant_books b
+     LEFT JOIN assistant_book_aliases ba ON ba.book_id = b.id
+     WHERE b.normalized_title = ?
+        OR ba.normalized_alias = ?
+     LIMIT 1`,
+    [normalizedTitle, normalizedTitle]
+  );
+
+  if (existing.length) return existing[0].id;
+
+  const [result] = await req.db.query(
+    `INSERT INTO assistant_books (title, normalized_title)
+     VALUES (?, ?)`,
+    [cleanBookName(bookName, 255), normalizedTitle]
+  );
+
+  return result.insertId;
+}
+
+async function searchAndVerifyBookReference(req, {
   conversationId,
   bookName,
   subjectName,
@@ -1487,7 +1622,8 @@ async function createBookSearchJob(req, {
   activity,
   topic,
 }) {
-  const query = buildBookSearchTerms({
+  const normalizedDeclaredBookName = normaliseBookText(bookName);
+  const queryText = buildBookSearchTerms({
     book: bookName,
     subjectName,
     level,
@@ -1496,24 +1632,235 @@ async function createBookSearchJob(req, {
     topic,
   });
 
+  let searchJobId = null;
+
   try {
-    const [result] = await req.db.query(
+    const [jobResult] = await req.db.query(
       `INSERT INTO assistant_book_search_jobs
        (
          conversation_id,
-         query,
-         status
+         declared_book_name,
+         normalized_declared_book_name,
+         class_label,
+         series_label,
+         subject_name,
+         current_activity,
+         topic,
+         status,
+         provider,
+         query_text
        )
-       VALUES (?, ?, 'pending')`,
-      [conversationId, query]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'searching', 'anthropic_web_search', ?)`,
+      [
+        conversationId,
+        cleanBookName(bookName, 255),
+        normalizedDeclaredBookName,
+        cleanBookName(level, 100),
+        series ? cleanBookName(series, 100) : null,
+        cleanBookName(subjectName, 100),
+        cleanBookName(activity || topic || 'notion étudiée', 255),
+        cleanBookName(topic || activity || 'notion étudiée', 255),
+        queryText,
+      ]
     );
 
-    return result.insertId;
+    searchJobId = jobResult.insertId;
   } catch (error) {
-    console.error(
-      'Impossible de créer le job de recherche du manuel :',
-      error.message
+    console.error('Impossible de créer le job de recherche du manuel :', error.message);
+  }
+
+  const markJob = async (status, errorMessage) => {
+    if (!searchJobId) return;
+    try {
+      await req.db.query(
+        `UPDATE assistant_book_search_jobs
+         SET status = ?, error_message = ?, completed_at = NOW()
+         WHERE id = ?`,
+        [status, errorMessage ? cleanBookName(errorMessage, 500) : null, searchJobId]
+      );
+    } catch (_) {
+      // Le suivi du job est secondaire : une erreur ici ne doit jamais
+      // empêcher de répondre à l'élève.
+    }
+  };
+
+  let response;
+
+  try {
+    response = await anthropic.messages.create({
+      model: 'claude-sonnet-5',
+      max_tokens: 1000,
+      tools: [
+        {
+          type: 'web_search_20250305',
+          name: 'web_search',
+          max_uses: 5,
+        },
+      ],
+      system:
+        `Tu es un module de recherche documentaire strict pour une plateforme scolaire. `
+        + `Tu dois trouver, dans un manuel scolaire précis, la page et le numéro d'exercice qui `
+        + `correspondent à une notion donnée — en te basant UNIQUEMENT sur des sources trouvées `
+        + `par la recherche web. N'invente RIEN : si les sources ne permettent pas de confirmer `
+        + `une page et un exercice précis pour CE manuel exact (titre, niveau, matière), dis-le `
+        + `clairement plutôt que de deviner.\n\n`
+        + `Termine TOUJOURS ta réponse par exactement un bloc sur une seule ligne :\n`
+        + `<book-reference>{"page":"12","exercise":"4","found":true}</book-reference>\n`
+        + `ou, si tu n'as rien trouvé de fiable :\n`
+        + `<book-reference>{"found":false}</book-reference>`,
+      messages: [
+        {
+          role: 'user',
+          content:
+            `Manuel déclaré par l'élève : "${cleanBookName(bookName, 180)}"\n`
+            + `Niveau : ${cleanBookName(level, 60)}${series ? ` ${cleanBookName(series, 40)}` : ''}\n`
+            + `Matière : ${cleanBookName(subjectName, 80)}\n`
+            + `Notion à localiser : "${cleanBookName(topic || activity || 'notion étudiée', 180)}"\n\n`
+            + `Cherche la page et le numéro d'exercice correspondants dans ce manuel précis.`,
+        },
+      ],
+    });
+  } catch (error) {
+    console.error('Erreur recherche web manuel :', error.message);
+    await markJob('failed', error.message);
+    return null;
+  }
+
+  const textBlocks = response.content.filter((block) => block.type === 'text');
+  const finalText = textBlocks.map((block) => block.text).join('\n');
+  const citations = textBlocks.flatMap((block) => block.citations || []);
+
+  const tagMatch = finalText.match(/<book-reference>([\s\S]*?)<\/book-reference>/);
+
+  let claimed = null;
+  try {
+    claimed = tagMatch ? JSON.parse(tagMatch[1]) : null;
+  } catch (_) {
+    claimed = null;
+  }
+
+  const page = claimed?.found ? cleanBookName(String(claimed.page || ''), 50) : '';
+  const exerciseNumber = claimed?.found ? cleanBookName(String(claimed.exercise || ''), 50) : '';
+  const pageAsNumber = Number(page);
+
+  // La page doit être un entier positif exploitable pour la navigation :
+  // un intervalle ("12-13") ou une valeur non numérique n'est pas assez
+  // précis pour orienter l'élève de façon fiable.
+  if (!page || !exerciseNumber || !Number.isInteger(pageAsNumber) || pageAsNumber <= 0) {
+    await markJob('needs_clarification', "Aucune page/exercice fiable trouvée par la recherche.");
+    return null;
+  }
+
+  const evidence = buildEvidenceFromCitations(citations);
+  const confidenceScore = computeReferenceConfidence(evidence);
+
+  const strongSource = evidence.some((e) =>
+    ['institutional', 'publisher', 'bibliographic_catalog'].includes(e.sourceType)
+  );
+  const independentCount = new Set(evidence.map((e) => e.independentSourceKey)).size;
+
+  if (confidenceScore < 85 || (!strongSource && independentCount < 2)) {
+    await markJob('needs_clarification', `Confiance insuffisante (${confidenceScore}).`);
+    return null;
+  }
+
+  try {
+    const bookId = await findOrCreateBook(req, bookName);
+
+    const normalizedTopic = normaliseBookText(topic || activity || 'notion étudiée');
+
+    const [refResult] = await req.db.query(
+      `INSERT INTO assistant_book_references
+       (
+         search_job_id,
+         book_id,
+         class_label,
+         series_label,
+         subject_name,
+         current_activity,
+         topic,
+         normalized_topic,
+         page,
+         exercise_number,
+         status,
+         confidence_score,
+         validation_reason,
+         verified_by,
+         verified_at
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified', ?, ?, 'anthropic_web_search', NOW())`,
+      [
+        searchJobId,
+        bookId,
+        cleanBookName(level, 100),
+        series ? cleanBookName(series, 100) : null,
+        cleanBookName(subjectName, 100),
+        cleanBookName(activity, 255) || null,
+        cleanBookName(topic || activity || 'notion étudiée', 255),
+        normalizedTopic,
+        page,
+        exerciseNumber,
+        confidenceScore,
+        `${evidence.length} source(s), ${independentCount} indépendante(s), source forte: ${strongSource}`,
+      ]
     );
+
+    const referenceId = refResult.insertId;
+
+    for (const e of evidence) {
+      await req.db.query(
+        `INSERT INTO assistant_reference_evidence
+         (
+           reference_id,
+           source_url,
+           source_title,
+           source_type,
+           source_host,
+           independent_source_key,
+           searched_at,
+           evidence_excerpt,
+           reported_page,
+           reported_exercise_number,
+           metadata_match_score
+         )
+         VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)`,
+        [
+          referenceId,
+          e.sourceUrl,
+          e.sourceTitle,
+          e.sourceType,
+          e.sourceHost,
+          e.independentSourceKey,
+          e.evidenceExcerpt,
+          page,
+          exerciseNumber,
+          confidenceScore,
+        ]
+      );
+    }
+
+    await markJob('completed', null);
+
+    const [bookRows] = await req.db.query(
+      `SELECT title, publisher FROM assistant_books WHERE id = ?`,
+      [bookId]
+    );
+
+    return {
+      referenceId,
+      bookId,
+      bookTitle: bookRows[0]?.title || bookName,
+      publisher: bookRows[0]?.publisher || null,
+      pageNumber: page,
+      exerciseNumber,
+      confidenceScore,
+      navigation: getReferenceNavigation({ pageNumber: page, exerciseNumber }),
+      evidenceCount: evidence.length,
+      independentSourceCount: independentCount,
+    };
+  } catch (error) {
+    console.error('Erreur persistance référence manuel :', error.message);
+    await markJob('failed', error.message);
     return null;
   }
 }
@@ -1981,7 +2328,19 @@ router.post(
           const level = pedagogicalContext.level || selectedBook.level || null;
           const series = pedagogicalContext.series || selectedBook.series || null;
 
-          const reference = await findVerifiedBookReference(req, {
+          const cachedReference = await findVerifiedBookReference(req, {
+            bookName: selectedBook.name,
+            subjectName: test.matiereNom,
+            level,
+            series,
+            activity: test.activite,
+            topic: tutorState.topic,
+          });
+
+          // Aucune référence déjà vérifiée en base : on cherche réellement
+          // maintenant plutôt que d'abandonner immédiatement.
+          const reference = cachedReference || await searchAndVerifyBookReference(req, {
+            conversationId,
             bookName: selectedBook.name,
             subjectName: test.matiereNom,
             level,
@@ -2032,15 +2391,9 @@ router.post(
             });
           }
 
-          await createBookSearchJob(req, {
-            conversationId,
-            bookName: selectedBook.name,
-            subjectName: test.matiereNom,
-            level,
-            series,
-            activity: test.activite,
-            topic: tutorState.topic,
-          });
+          // La recherche vient d'être tentée (searchAndVerifyBookReference
+          // ci-dessus) et n'a rien donné d'assez fiable : le job est déjà
+          // tracé dans assistant_book_search_jobs avec le détail.
 
           tutorState =
             transitionTutorState(
