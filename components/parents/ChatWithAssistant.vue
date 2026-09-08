@@ -97,24 +97,25 @@
               :key="'segment-' + segIndex"
             >
               <div
-                v-if="segment.text"
+                v-if="segment.text || segment.diagram"
                 class="bubble-row row-assistant"
               >
                 <div class="assistant-avatar avatar-sm">
                   <v-icon size="16">mdi-account</v-icon>
                 </div>
 
-                <div
-                  class="bubble bubble-assistant"
-                  v-html="formatMessage(segment.text)"
-                ></div>
-              </div>
+                <div class="bubble bubble-assistant">
+                  <div
+                    v-if="segment.text"
+                    v-html="formatMessage(segment.text)"
+                  ></div>
 
-              <div
-                v-if="segment.diagram"
-                class="explanation-diagram-wrap"
-              >
-                <GeometryDiagram :diagram="segment.diagram" />
+                  <GeometryDiagram
+                    v-if="segment.diagram"
+                    :diagram="segment.diagram"
+                    class="bubble-diagram"
+                  />
+                </div>
               </div>
             </div>
           </template>
@@ -1286,21 +1287,27 @@ export default {
   gap: 0;
 }
 
-.explanation-diagram-wrap {
-  width: min(100%, 560px);
-  margin: 0 0 10px 32px;
-  align-self: flex-start;
+/* Le schéma vit DANS la bulle, avec le même fond/bordure que le texte —
+   pas dans une carte à part — et reste compact, adapté à la taille du
+   texte plutôt que de prendre toute la largeur disponible. */
+.bubble :deep(.bubble-diagram.geometry-diagram) {
+  width: min(100%, 260px);
+  margin: 8px 0 0;
+  padding: 8px 10px 10px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  border-top: 1px dashed rgba(124, 58, 237, 0.18);
 }
 
-.explanation-diagram-wrap :deep(.geometry-diagram) {
-  width: 100%;
+.bubble :deep(.bubble-diagram.geometry-diagram .diagram-svg) {
+  min-height: 140px;
 }
 
 @media (max-width: 600px) {
-  .explanation-diagram-wrap {
-    width: calc(100% - 32px);
-    margin-left: 32px;
-    margin-right: 0;
+  .bubble :deep(.bubble-diagram.geometry-diagram) {
+    width: min(100%, 220px);
   }
 }
 </style>
