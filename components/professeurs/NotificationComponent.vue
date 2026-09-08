@@ -291,7 +291,7 @@ export default {
 }
 
 .unread {
-  border-left: 4px solid #0d9488;
+  border-left: 4px solid #1976d2;
   background-color: #e3f2fd !important;
 }
 

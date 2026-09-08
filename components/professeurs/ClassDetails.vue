@@ -63,7 +63,7 @@ export default {
 .dc-header {
   margin-bottom: 14px;
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(13, 148, 136, 0.12);
+  border: 1px solid rgba(25, 118, 210, 0.12);
   border-radius: 16px;
   padding: 14px;
   box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
@@ -88,7 +88,7 @@ export default {
   border-radius: 18px !important;
   overflow: hidden;
   position: relative;
-  border: 1px solid rgba(13, 148, 136, 0.12);
+  border: 1px solid rgba(25, 118, 210, 0.12);
   background: rgba(255, 255, 255, 0.95);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -101,7 +101,7 @@ export default {
 
 .dc-card-top {
   height: 44px;
-  background: linear-gradient(90deg, #0d9488, #0b2e4a);
+  background: linear-gradient(90deg, #1976d2, #0b2e4a);
   display: flex;
   align-items: center;
   padding: 0 14px;
@@ -134,8 +134,8 @@ export default {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: rgba(13, 148, 136, 0.10);
-  border: 1px solid rgba(13, 148, 136, 0.14);
+  background: rgba(25, 118, 210, 0.10);
+  border: 1px solid rgba(25, 118, 210, 0.14);
 }
 
 @media (max-width: 600px) {

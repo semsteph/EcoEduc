@@ -249,7 +249,7 @@ export default {
 /* Respect charte: on s'appuie sur primary de Vuetify + surfaces propres */
 .programme-page {
   min-height: 100vh;
-  background: #f7f7f5;
+  background: #f6f8fc;
 }
 
 /* Topbar */
@@ -373,7 +373,7 @@ export default {
   width: fit-content;
   padding: 6px 10px;
   border-radius: 12px;
-  background: rgba(13, 148, 136, 0.08); /* proche du primary (Vuetify) */
+  background: rgba(25, 118, 210, 0.08); /* proche du primary (Vuetify) */
   color: #111827;
   font-weight: 700;
   font-size: 12px;

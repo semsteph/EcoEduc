@@ -215,10 +215,10 @@ export default {
 <style scoped>
 /* Charte: bleu / blanc / petit noir */
 :root {
-  --blue: #0d9488;
+  --blue: #1976d2;
   --blue-dark: #0b2e4a;
   --black-soft: rgba(0, 0, 0, 0.55);
-  --border: rgba(13, 148, 136, 0.15);
+  --border: rgba(25, 118, 210, 0.15);
   --bg: rgba(255, 255, 255, 0.92);
 }
 

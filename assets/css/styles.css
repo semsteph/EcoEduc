@@ -11,16 +11,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
 
 :root {
-  --ee-primary: #0d9488;
-  --ee-primary-dark: #0b7a70;
-  --ee-secondary: #d97706;
-  --ee-accent: #7c3aed;
-  --ee-success: #16a34a;
-  --ee-bg: #f7f7f5;
+  --ee-primary: #1976d2;
+  --ee-primary-dark: #0b2e4a;
+  --ee-secondary: #0b2e4a;
+  --ee-accent: #1976d2;
+  --ee-success: #2e7d32;
+  --ee-bg: #ffffff;
   --ee-surface: #ffffff;
-  --ee-text: #0f172a;
+  --ee-text: #0b2e4a;
   --ee-muted: #64748b;
-  --ee-border: rgba(15, 23, 42, 0.08);
+  --ee-border: rgba(25, 118, 210, 0.12);
 
   --ee-radius-lg: 20px;
   --ee-radius-md: 14px;

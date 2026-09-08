@@ -563,9 +563,9 @@ export default {
   margin: 0 auto;
   padding: 14px;
   padding-bottom: 86px;
-  background: radial-gradient(900px 500px at 20% 10%, rgba(13,148,136,.14), transparent 55%),
+  background: radial-gradient(900px 500px at 20% 10%, rgba(25,118,210,.14), transparent 55%),
               radial-gradient(800px 500px at 85% 0%, rgba(11,46,74,.10), transparent 55%),
-              linear-gradient(180deg, #f0faf9 0%, #f7f7f5 45%, #ffffff 100%);
+              linear-gradient(180deg, #eef6ff 0%, #f7fbff 45%, #ffffff 100%);
   border-radius: 18px;
 }
 
@@ -576,7 +576,7 @@ export default {
   align-items: center;
   padding: 14px;
   border-radius: 18px;
-  background: linear-gradient(90deg, #0d9488 0%, #0b2e4a 100%);
+  background: linear-gradient(90deg, #1976d2 0%, #0b2e4a 100%);
   box-shadow: 0 16px 50px rgba(11, 46, 74, 0.18);
   border: 1px solid rgba(255,255,255,.12);
   margin-bottom: 14px;
@@ -627,7 +627,7 @@ export default {
 .cm-card {
   border-radius: 18px !important;
   overflow: hidden;
-  border: 1px solid rgba(13,148,136,.16);
+  border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.90);
   backdrop-filter: blur(10px);
   margin-bottom: 14px;
@@ -639,11 +639,11 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  background: linear-gradient(90deg, #0d9488, #0b2e4a);
+  background: linear-gradient(90deg, #1976d2, #0b2e4a);
 }
 
 .cm-card-head--alt {
-  background: linear-gradient(90deg, #0b2e4a, #0d9488);
+  background: linear-gradient(90deg, #0b2e4a, #1976d2);
 }
 
 .cm-card-head-title {
@@ -675,7 +675,7 @@ export default {
 }
 
 .cm-sem-chip--active {
-  box-shadow: 0 10px 22px rgba(13,148,136,.25);
+  box-shadow: 0 10px 22px rgba(25,118,210,.25);
 }
 
 /* Tools */
@@ -700,7 +700,7 @@ export default {
 
 .cm-info-chip {
   font-weight: 900;
-  border: 1px solid rgba(13,148,136,.16);
+  border: 1px solid rgba(25,118,210,.16);
 }
 
 .cm-truncate {
@@ -764,7 +764,7 @@ export default {
 
 .cm-mobile-card {
   border-radius: 16px !important;
-  border: 1px solid rgba(13,148,136,.16);
+  border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.94);
   padding: 12px;
   margin-bottom: 10px;
@@ -829,7 +829,7 @@ export default {
   z-index: 30;
   padding: 10px 12px;
   background: rgba(255,255,255,.88);
-  border-top: 1px solid rgba(13,148,136,.16);
+  border-top: 1px solid rgba(25,118,210,.16);
   backdrop-filter: blur(10px);
   display: flex;
   align-items: center;

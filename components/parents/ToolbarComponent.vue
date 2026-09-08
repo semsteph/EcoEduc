@@ -82,7 +82,7 @@ export default {
 </script>
 
 <style scoped>
-.app-toolbar { background-color: #0d9488; }
+.app-toolbar { background-color: #1976d2; }
 
 .toolbar-title {
   font-family: "Roboto", sans-serif;

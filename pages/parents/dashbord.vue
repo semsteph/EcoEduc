@@ -494,9 +494,9 @@ export default {
 .main-background {
   min-height: 100vh;
   background:
-    radial-gradient(900px 500px at 20% 15%, rgba(13, 148, 136, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 20% 15%, rgba(25, 118, 210, 0.16), transparent 60%),
     radial-gradient(700px 500px at 80% 10%, rgba(11, 46, 74, 0.10), transparent 55%),
-    linear-gradient(180deg, #fdf6ec 0%, #ffffff 45%, #f7f7f5 100%);
+    linear-gradient(180deg, #eaf2ff 0%, #ffffff 45%, #f6f9ff 100%);
 }
 
 .page-shell {
@@ -505,7 +505,7 @@ export default {
 
 .content-container {
   background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(13, 148, 136, 0.12);
+  border: 1px solid rgba(25, 118, 210, 0.12);
   border-radius: 22px;
   padding: 28px;
   max-width: 1200px;

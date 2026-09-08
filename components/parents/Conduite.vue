@@ -287,14 +287,14 @@ export default {
 <style scoped>
 /* ===== Page (charte bleue) ===== */
 .conduite-page {
-  --primary: #0d9488;
-  --primary-600: #0b7a70;
-  --primary-50: #f0faf9;
+  --primary: #2563eb;
+  --primary-600: #1d4ed8;
+  --primary-50: #eff6ff;
   --text: #0f172a;
   --muted: #64748b;
   --border: rgba(15, 23, 42, 0.10);
   --card: #ffffff;
-  --bg: #f7f7f5;
+  --bg: #f6f8fc;
 
   min-height: 100vh;
   background:
@@ -382,9 +382,9 @@ export default {
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
-  background: rgba(13, 148, 136, 0.10);
+  background: rgba(37, 99, 235, 0.10);
   color: var(--primary-600);
-  border: 1px solid rgba(13, 148, 136, 0.22);
+  border: 1px solid rgba(37, 99, 235, 0.22);
 }
 .empty-title {
   font-size: 1.05rem;
@@ -441,9 +441,9 @@ export default {
 .chip-soft {
   border-radius: 999px;
   font-weight: 900;
-  background: rgba(13, 148, 136, 0.08);
+  background: rgba(37, 99, 235, 0.08);
   color: var(--primary-600);
-  border: 1px solid rgba(13, 148, 136, 0.18);
+  border: 1px solid rgba(37, 99, 235, 0.18);
 }
 
 /* ===== Panels ===== */
@@ -456,7 +456,7 @@ export default {
 .semestre-panel {
   border-radius: 18px;
   overflow: hidden;
-  border: 1px solid rgba(13, 148, 136, 0.14);
+  border: 1px solid rgba(37, 99, 235, 0.14);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
 }
@@ -478,9 +478,9 @@ export default {
   border-radius: 14px;
   display: grid;
   place-items: center;
-  background: rgba(13, 148, 136, 0.10);
+  background: rgba(37, 99, 235, 0.10);
   color: var(--primary-600);
-  border: 1px solid rgba(13, 148, 136, 0.22);
+  border: 1px solid rgba(37, 99, 235, 0.22);
   flex: 0 0 auto;
 }
 
@@ -543,7 +543,7 @@ export default {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: linear-gradient(180deg, rgba(13, 148, 136, 0.14), rgba(13, 148, 136, 0.08));
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.14), rgba(37, 99, 235, 0.08));
   color: var(--text);
   font-weight: 950;
   font-size: 0.86rem;
@@ -586,7 +586,7 @@ export default {
 }
 .th-sticky-left {
   z-index: 4;
-  background: linear-gradient(180deg, rgba(13, 148, 136, 0.14), rgba(13, 148, 136, 0.08));
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.14), rgba(37, 99, 235, 0.08));
 }
 .td-sticky-left {
   border-right: 1px solid rgba(15, 23, 42, 0.06);
@@ -599,9 +599,9 @@ export default {
   border-radius: 999px;
   font-weight: 900;
   font-size: 0.82rem;
-  background: rgba(13, 148, 136, 0.10);
+  background: rgba(37, 99, 235, 0.10);
   color: var(--primary-600);
-  border: 1px solid rgba(13, 148, 136, 0.22);
+  border: 1px solid rgba(37, 99, 235, 0.22);
 }
 
 .table-hint {
@@ -633,9 +633,9 @@ export default {
 .btn-secondary {
   flex: 1;
   border-radius: 14px;
-  background: rgba(13, 148, 136, 0.08);
+  background: rgba(37, 99, 235, 0.08);
   color: var(--primary-600);
-  border: 1px solid rgba(13, 148, 136, 0.18);
+  border: 1px solid rgba(37, 99, 235, 0.18);
   font-weight: 950;
   text-transform: none;
 }

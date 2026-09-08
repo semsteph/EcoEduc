@@ -5,31 +5,27 @@ import '@mdi/font/css/materialdesignicons.css'; // Importez les icônes Material
 import { createVuetify } from 'vuetify';
 
 // =====================================================================
-// Thème EchoEducation.
-//
-// Palette "education" (teal principal + ambre accent + vert réussite),
-// choisie via le skill de design ui-ux-pro-max pour rester cohérente
-// avec le thème déjà utilisé dans l'assistant IA (ChatWithAssistant.vue).
+// Thème EchoEducation — charte bleu / blanc d'origine.
 // =====================================================================
 
 const echoEducationTheme = {
   dark: false,
   colors: {
-    primary: '#0D9488',
-    'primary-darken-1': '#0B7A70',
-    secondary: '#D97706',
-    'secondary-darken-1': '#B45F04',
-    accent: '#7C3AED',
-    success: '#16A34A',
-    warning: '#D97706',
+    primary: '#1976D2',
+    'primary-darken-1': '#0B2E4A',
+    secondary: '#0B2E4A',
+    'secondary-darken-1': '#082032',
+    accent: '#1976D2',
+    success: '#2E7D32',
+    warning: '#ED6C02',
     error: '#DC2626',
-    info: '#0EA5E9',
-    background: '#F7F7F5',
+    info: '#1976D2',
+    background: '#FFFFFF',
     surface: '#FFFFFF',
     'on-primary': '#FFFFFF',
     'on-secondary': '#FFFFFF',
-    'on-background': '#0F172A',
-    'on-surface': '#0F172A',
+    'on-background': '#0B2E4A',
+    'on-surface': '#0B2E4A',
   },
 };
 
