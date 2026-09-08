@@ -210,10 +210,15 @@ Règles strictes à respecter :
    ni dans un bloc de code entre triples apostrophes inverses, ni en SVG, HTML, CSS ou JavaScript.
    Le texte visible ne doit contenir AUCUN dessin : uniquement des phrases et, si besoin,
    du texte en gras avec **...**. Le frontend transforme les données structurées en véritable schéma visuel.
-   S'il faut montrer PLUSIEURS formes en même temps (ex: triangle, carré, rectangle côte à côte),
-   utilise un seul diagramme "composite" avec un élément par forme, chacun avec ses propres
-   points décalés pour ne pas se chevaucher (ex: un triangle vers x=60-180, un carré vers x=220-320,
-   un rectangle vers x=360-480) plutôt que de renoncer au schéma.
+   Si tu expliques PLUSIEURS notions ou formes dans la même réponse (ex: le carré, puis le triangle),
+   NE REGROUPE PAS tous les schémas à la fin : insère un bloc <explanation-data> séparé juste après
+   CHAQUE notion, immédiatement à l'endroit du texte où elle vient d'être expliquée. L'élève doit
+   voir le schéma du carré juste après avoir lu l'explication du carré, puis le schéma du triangle
+   juste après l'explication du triangle, etc.
+   Si UNE SEULE figure doit montrer plusieurs formes ensemble (une comparaison côte à côte, par
+   exemple), utilise un diagramme "composite" avec un élément par forme, chacun avec ses propres
+   points décalés pour ne pas se chevaucher (ex: un triangle vers x=60-180, un carré vers x=220-320).
+   Dans tous les cas, un schéma est dû : ne termine jamais une notion représentable sans son schéma.
    Pour une notion non géométrique, utilise aussi un schéma/tableau/représentation structurée lorsqu'elle est pédagogiquement nécessaire.
 
 6. Si la question semble dangereuse, inappropriée, ou clairement hors du cadre scolaire, refuse poliment et suggère d'en parler à un adulte (parent ou professeur).
@@ -224,8 +229,11 @@ Règles strictes à respecter :
 8. Réponds en français avec une explication réellement compréhensible par un élève de ce niveau.
    La clarté est prioritaire sur la brièveté. Utilise des phrases courtes, des étapes numérotées et des exemples concrets lorsque cela aide.
 
-9. Pour toute explication géométrique, ajoute exactement un bloc <explanation-data> avec un JSON valide sur une seule ligne.
+9. Pour toute explication géométrique, ajoute un bloc <explanation-data> avec un JSON valide sur une seule ligne,
+   placé directement après le passage de texte qu'il illustre.
    CE BLOC EST OBLIGATOIRE, même si l'élève demande seulement une explication générale.
+   Si ta réponse explique plusieurs notions distinctes, ajoute PLUSIEURS blocs <explanation-data>,
+   un par notion, chacun juste après le texte correspondant (jamais tous regroupés à la fin).
    Pour une réexplication, utilise un nouveau schéma ou une représentation plus simple si cela améliore la compréhension.
    Format :
    <explanation-data>{"diagram":{"type":"segment","points":{"A":{"x":80,"y":160},"B":{"x":380,"y":160}},"labels":true,"measurements":{},"annotations":["Le segment [AB] a deux extrémités : A et B."]}}</explanation-data>
@@ -914,27 +922,68 @@ function sanitiseExplanationDiagram(value) {
 // tentative structurée avant de rendre le texte.
 // ---------------------------------------------------------------------
 
-function stripExplanationTag(raw) {
-  const text = String(raw || '');
-
-  // Bloc complet.
-  const complete = text.replace(
-    /<explanation-data>[\s\S]*?<\/explanation-data>/gi,
-    ''
-  );
-
-  const withoutTag = complete !== text
-    ? complete
+function cleanExplanationText(text) {
+  return String(text || '')
     // Bloc commencé mais tronqué : on supprime tout ce qui suit.
-    : text.replace(/<explanation-data>[\s\S]*$/gi, '');
-
-  // Filet de sécurité : la règle interdit tout schéma en ASCII, mais un
-  // modèle peut malgré tout produire un bloc de code (triple backticks).
-  // On le retire plutôt que de l'afficher tel quel à l'élève.
-  return withoutTag
+    .replace(/<explanation-data>[\s\S]*$/gi, '')
+    // Filet de sécurité : la règle interdit tout schéma en ASCII, mais un
+    // modèle peut malgré tout produire un bloc de code (triple backticks).
     .replace(/```[\s\S]*?```/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+// ---------------------------------------------------------------------
+// Découpe la réponse de Claude en tronçons texte + schéma, dans l'ordre
+// où ils apparaissent. Chaque notion expliquée doit garder son propre
+// schéma à sa place, plutôt qu'un schéma unique regroupé à la fin.
+// ---------------------------------------------------------------------
+
+function extractExplanationSegments(rawText) {
+  const source = String(rawText || '');
+  const tagExpression = /<explanation-data>\s*([\s\S]*?)\s*<\/explanation-data>/gi;
+
+  const segments = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = tagExpression.exec(source)) !== null) {
+    const text = cleanExplanationText(
+      source.slice(lastIndex, match.index)
+    );
+
+    let diagram = null;
+
+    try {
+      diagram = sanitiseExplanationDiagram(
+        JSON.parse(match[1])?.diagram
+      );
+    } catch (_) {
+      diagram = null;
+    }
+
+    if (text || diagram) {
+      segments.push({ text, diagram });
+    }
+
+    lastIndex = tagExpression.lastIndex;
+  }
+
+  const trailingText = cleanExplanationText(source.slice(lastIndex));
+
+  if (trailingText || segments.length === 0) {
+    segments.push({ text: trailingText, diagram: null });
+  }
+
+  return segments;
+}
+
+// Un segment sans schéma est acceptable seulement pour une remarque de
+// clôture qui n'a rien à représenter visuellement. Dès qu'une notion
+// visuelle (géométrie, forme, figure) est présente, elle doit avoir son
+// schéma : c'est une exigence pédagogique, pas une option.
+function hasUsableDiagram(segments) {
+  return segments.some((segment) => segment.diagram);
 }
 
 async function generateStructuredExplanation({
@@ -958,15 +1007,12 @@ async function generateStructuredExplanation({
     (block) => block.type === 'text'
   );
   const firstRaw = firstTextBlock?.text || '';
+  const firstSegments = extractExplanationSegments(firstRaw);
 
-  let parsed = extractTaggedData(firstRaw, 'explanation-data');
-  let diagram = sanitiseExplanationDiagram(parsed.data?.diagram);
-
-  if (diagram) {
+  if (hasUsableDiagram(firstSegments)) {
     return {
       rawReply: firstRaw,
-      visibleText: stripExplanationTag(firstRaw),
-      diagram,
+      segments: firstSegments,
     };
   }
 
@@ -1015,28 +1061,60 @@ Ne laisse jamais le bloc <explanation-data> ouvert ou tronqué.`,
     (block) => block.type === 'text'
   );
   const strictRaw = strictTextBlock?.text || '';
+  const strictSegments = extractExplanationSegments(strictRaw);
 
-  parsed = extractTaggedData(strictRaw, 'explanation-data');
-  diagram = sanitiseExplanationDiagram(parsed.data?.diagram);
-
-  if (diagram) {
+  if (hasUsableDiagram(strictSegments)) {
     return {
       rawReply: strictRaw,
-      visibleText: stripExplanationTag(strictRaw),
-      diagram,
+      segments: strictSegments,
     };
   }
 
-  // Aucun schéma valide n'a pu être obtenu après deux tentatives.
+  // Troisième et dernier palier : un schéma est une exigence pédagogique,
+  // pas une option. Si le modèle rapide échoue deux fois, on escalade
+  // vers un modèle plus capable plutôt que d'abandonner le schéma.
+  const escalatedResponse = await anthropic.messages.create({
+    model: 'claude-sonnet-5',
+    max_tokens: 900,
+    system: systemPrompt,
+    messages: [
+      ...messages,
+      {
+        role: 'user',
+        content:
+          'Réponds à nouveau à ma question précédente. Le schéma est obligatoire '
+          + "si la notion peut être représentée visuellement : n'oublie pas le "
+          + 'bloc <explanation-data> avec un JSON valide.',
+      },
+    ],
+  });
+
+  const escalatedTextBlock = escalatedResponse.content.find(
+    (block) => block.type === 'text'
+  );
+  const escalatedRaw = escalatedTextBlock?.text || '';
+  const escalatedSegments = extractExplanationSegments(escalatedRaw);
+
+  if (hasUsableDiagram(escalatedSegments)) {
+    return {
+      rawReply: escalatedRaw,
+      segments: escalatedSegments,
+    };
+  }
+
+  // Aucun schéma valide n'a pu être obtenu après trois tentatives.
   // Un schéma générique et sans rapport avec la notion réellement
   // expliquée serait trompeur pour l'élève : mieux vaut une explication
   // texte seule, honnête, qu'un mauvais schéma présenté comme fiable.
+  const fallbackSegments = escalatedSegments.length
+    ? escalatedSegments
+    : (strictSegments.length ? strictSegments : firstSegments);
+
   return {
-    rawReply: firstRaw || strictRaw,
-    visibleText:
-      stripExplanationTag(firstRaw || strictRaw)
-      || "Je vais reprendre l'explication autrement.",
-    diagram: null,
+    rawReply: escalatedRaw || strictRaw || firstRaw,
+    segments: fallbackSegments.length
+      ? fallbackSegments
+      : [{ text: "Je vais reprendre l'explication autrement.", diagram: null }],
   };
 }
 
@@ -1504,7 +1582,7 @@ router.get(
         messages,
         inputMode,
         exercise: tutorState.exercise || null,
-        explanationVisual: tutorState.explanationVisual || null,
+        explanationSegments: tutorState.explanationSegments || [],
       });
     } catch (err) {
       console.error(
@@ -2181,7 +2259,7 @@ router.post(
       let rawReply = '';
       let reply = '';
       let generatedExercise = null;
-      let explanationVisual = null;
+      let explanationSegments = [];
 
       if (turnKind === 'GENERATE_EXERCISE') {
         const generated = await generateStructuredExercise({
@@ -2210,12 +2288,17 @@ router.post(
         rawReply =
           generatedExplanation.rawReply || '';
 
-        reply =
-          generatedExplanation.visibleText
-          || "Désolé, je n'ai pas pu formuler de réponse.";
+        explanationSegments =
+          generatedExplanation.segments?.length
+            ? generatedExplanation.segments
+            : [{ text: "Désolé, je n'ai pas pu formuler de réponse.", diagram: null }];
 
-        explanationVisual =
-          generatedExplanation.diagram || null;
+        // Le texte complet reste nécessaire pour l'historique de la
+        // conversation renvoyé à Claude aux tours suivants.
+        reply = explanationSegments
+          .map((segment) => segment.text)
+          .filter(Boolean)
+          .join('\n\n');
       }
 
       // ---------------------------------------------------------------
@@ -2434,20 +2517,20 @@ router.post(
       }
 
       // ---------------------------------------------------------------
-      // 20. Sauvegarde du schéma d'explication
+      // 20. Sauvegarde des schémas d'explication
       // ---------------------------------------------------------------
       //
-      // Le schéma appartient à la réponse pédagogique courante.
-      // Il est conservé dans tutor_state pour pouvoir être renvoyé
+      // Les schémas appartiennent à la réponse pédagogique courante.
+      // Ils sont conservés dans tutor_state pour pouvoir être renvoyés
       // lors du rechargement de la conversation.
       // ---------------------------------------------------------------
 
-      if (explanationVisual) {
-        tutorState.explanationVisual = explanationVisual;
+      if (explanationSegments.length) {
+        tutorState.explanationSegments = explanationSegments;
       } else if (turnKind !== 'EXPLANATION'
         && turnKind !== 'REEXPLAIN'
         && turnKind !== 'EXAMPLE_REQUEST') {
-        tutorState.explanationVisual = null;
+        tutorState.explanationSegments = [];
       }
 
       // ---------------------------------------------------------------
@@ -2500,7 +2583,7 @@ router.post(
             tutorState
           ),
         exercise: tutorState.exercise || null,
-        explanationVisual,
+        explanationSegments,
       });
     } catch (err) {
       console.error(

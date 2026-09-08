@@ -80,7 +80,50 @@
           :key="index"
           class="message-item"
         >
+          <!-- ====================================================== -->
+          <!-- DERNIER MESSAGE ASSISTANT AVEC SCHÉMAS SEGMENTÉS      -->
+          <!-- Chaque notion garde son propre schéma, à sa place,   -->
+          <!-- plutôt qu'un schéma unique regroupé à la fin.        -->
+          <!-- ====================================================== -->
+          <template
+            v-if="
+              message.role !== 'user' &&
+              index === messages.length - 1 &&
+              explanationSegments.length
+            "
+          >
+            <div
+              v-for="(segment, segIndex) in explanationSegments"
+              :key="'segment-' + segIndex"
+            >
+              <div
+                v-if="segment.text"
+                class="bubble-row row-assistant"
+              >
+                <div class="assistant-avatar avatar-sm">
+                  <v-icon size="16">mdi-robot-happy-outline</v-icon>
+                </div>
+
+                <div
+                  class="bubble bubble-assistant"
+                  v-html="formatMessage(segment.text)"
+                ></div>
+              </div>
+
+              <div
+                v-if="segment.diagram"
+                class="explanation-diagram-wrap"
+              >
+                <GeometryDiagram :diagram="segment.diagram" />
+              </div>
+            </div>
+          </template>
+
+          <!-- ====================================================== -->
+          <!-- MESSAGE NORMAL (utilisateur, ou historique)          -->
+          <!-- ====================================================== -->
           <div
+            v-else
             class="bubble-row"
             :class="message.role === 'user' ? 'row-user' : 'row-assistant'"
           >
@@ -100,21 +143,6 @@
               :class="message.role === 'user' ? 'bubble-user' : 'bubble-assistant'"
               v-html="formatMessage(message.content)"
             ></div>
-          </div>
-
-          <!-- ====================================================== -->
-          <!-- SCHÉMA D'EXPLICATION                                  -->
-          <!-- Il reste dans la portée de message/index.             -->
-          <!-- ====================================================== -->
-          <div
-            v-if="
-              message.role !== 'user' &&
-              index === messages.length - 1 &&
-              explanationVisual
-            "
-            class="explanation-diagram-wrap"
-          >
-            <GeometryDiagram :diagram="explanationVisual" />
           </div>
         </div>
 
@@ -303,7 +331,7 @@ export default {
        */
       inputMode: "question",
       currentExercise: null,
-      explanationVisual: null,
+      explanationSegments: [],
     };
   },
 
@@ -471,8 +499,11 @@ export default {
         this.currentExercise =
           response.data?.exercise || null;
 
-        this.explanationVisual =
-          response.data?.explanationVisual || null;
+        this.explanationSegments = Array.isArray(
+          response.data?.explanationSegments
+        )
+          ? response.data.explanationSegments
+          : [];
       } catch (err) {
         console.error(
           "Erreur lors du chargement de la conversation :",
@@ -502,9 +533,9 @@ export default {
 
       this.sendError = null;
 
-      // Le schéma appartient à la dernière réponse de l'assistant.
-      // On le retire immédiatement lorsqu'une nouvelle question est envoyée.
-      this.explanationVisual = null;
+      // Les schémas appartiennent à la dernière réponse de l'assistant.
+      // On les retire immédiatement lorsqu'une nouvelle question est envoyée.
+      this.explanationSegments = [];
 
       // ----------------------------------------------------------
       // Affichage immédiat du message utilisateur
@@ -592,8 +623,11 @@ export default {
         this.currentExercise =
           response.data?.exercise || null;
 
-        this.explanationVisual =
-          response.data?.explanationVisual || null;
+        this.explanationSegments = Array.isArray(
+          response.data?.explanationSegments
+        )
+          ? response.data.explanationSegments
+          : [];
       } catch (err) {
         console.error(
           "Erreur lors de l'envoi du message :",
