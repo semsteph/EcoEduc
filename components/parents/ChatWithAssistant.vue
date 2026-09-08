@@ -18,7 +18,7 @@
       <div class="topbar-title">
         <div class="title-row">
           <div class="assistant-avatar avatar-sm">
-            <v-icon size="16">mdi-robot-happy-outline</v-icon>
+            <v-icon size="16">mdi-account</v-icon>
           </div>
 
           <div class="title">
@@ -101,7 +101,7 @@
                 class="bubble-row row-assistant"
               >
                 <div class="assistant-avatar avatar-sm">
-                  <v-icon size="16">mdi-robot-happy-outline</v-icon>
+                  <v-icon size="16">mdi-account</v-icon>
                 </div>
 
                 <div
@@ -133,7 +133,7 @@
               class="assistant-avatar avatar-sm"
             >
               <v-icon size="16">
-                mdi-robot-happy-outline
+                mdi-account
               </v-icon>
             </div>
 
@@ -179,7 +179,7 @@
         >
           <div class="assistant-avatar avatar-sm">
             <v-icon size="16">
-              mdi-robot-happy-outline
+              mdi-account
             </v-icon>
           </div>
 
