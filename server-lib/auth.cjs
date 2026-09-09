@@ -49,6 +49,16 @@ const requireEtablissement = (req, res, next) => {
   next();
 };
 
+// Réservé au personnel d'administration (fondateur/directeur OU collaborateur
+// administration avec un compte "administrations"). Utilisé pour les actions
+// d'administration qui n'ont pas besoin d'être restreintes au seul fondateur.
+const requireAdminStaff = (req, res, next) => {
+  if (!req.user || (req.user.type !== 'etablissement' && req.user.type !== 'administration')) {
+    return res.status(403).json({ message: "Accès réservé à l'administration." });
+  }
+  next();
+};
+
 // Vérifie que l'élève appartient bien au parent authentifié (req.user.id),
 // renvoie l'élève si oui, sinon répond 404/403 et renvoie null.
 // Même pattern que getEleveDuParentOr403() dans routes/scolarite.routes.cjs.
@@ -69,4 +79,4 @@ async function getEleveDuParentOr403(req, res, eleveId) {
   return rows[0];
 }
 
-module.exports = { authenticateJWT, requireEtablissement, getEleveDuParentOr403, JWT_SECRET };
+module.exports = { authenticateJWT, requireEtablissement, requireAdminStaff, getEleveDuParentOr403, JWT_SECRET };

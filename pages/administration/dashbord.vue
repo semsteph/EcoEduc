@@ -93,6 +93,24 @@
         </v-badge>
       </v-btn>
 
+      <v-btn
+        icon
+        @click="showNoteRequests"
+        :class="{ 'note-alert-shake': noteRequestCount > 0 && currentComponent !== 'NoteModificationRequests' }"
+      >
+        <v-badge
+          :content="noteRequestCount"
+          :model-value="noteRequestCount > 0 && currentComponent !== 'NoteModificationRequests'"
+          color="red-darken-2"
+          overlap
+          class="note-alert-badge"
+        >
+          <v-icon :color="noteRequestCount > 0 && currentComponent !== 'NoteModificationRequests' ? 'red-darken-2' : 'primary'">
+            mdi-shield-alert-outline
+          </v-icon>
+        </v-badge>
+      </v-btn>
+
       <v-btn icon @click="showLogoutDialog">
         <v-icon color="red darken-1">mdi-logout</v-icon>
       </v-btn>
@@ -122,6 +140,7 @@
             @back="currentComponent = previousComponent || 'Dashboard'"
             @update-notification-count="fetchNotificationCount"
             @update-permission-count="fetchPermissions"
+            @update-request-count="setNoteRequestCount"
           />
         </div>
       </v-container>
@@ -141,6 +160,7 @@ import axios from "axios";
 import ParentManagement from "@/components/administration/ParentManagement.vue";
 import MessageComponent from "@/components/administration/MessageComponent.vue";
 import NotificationComponent from "@/components/administration/NotificationComponent.vue";
+import NoteModificationRequests from "@/components/administration/NoteModificationRequests.vue";
 import LogoutDialog from "@/components/administration/LogoutDialog.vue";
 import ClassManagement from "@/components/administration/ClassManagement.vue";
 import StudentManagement from "@/components/administration/StudentManagement.vue";
@@ -174,14 +194,119 @@ const anneeScolaireId = ref(null);
 
 const permissionCount = ref(0);
 const notificationCount = ref(0);
+const noteRequestCount = ref(0);
 const filteredPermissions = ref([]);
 const logoutDialogComp = ref(null);
+
+// ===== ALERTE FORTE "demande de modification de note" =====
+// Le but : qu'une nouvelle demande (potentiellement une note supprimée/modifiée
+// sans validation si l'admin ne réagit pas) soit IMPOSSIBLE à manquer :
+// bip sonore, icône qui pulse/tremble, titre d'onglet clignotant, notification
+// système du navigateur. Tout s'arrête dès que l'admin ouvre la liste des
+// demandes (setNoteRequestCount(0) est appelé à ce moment-là).
+const ORIGINAL_TITLE = "EchoEducation";
+let audioCtx = null;
+let audioUnlocked = false;
+let titleBlinkInterval = null;
+let titleBlinkOn = false;
+let lastKnownNoteRequestCount = 0;
+
+const unlockAudio = () => {
+  if (audioUnlocked) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioUnlocked = true;
+  } catch (e) {
+    // Web Audio indisponible : tant pis, les autres alertes (visuelles) restent actives.
+  }
+};
+
+// Bip d'alarme synthétisé (aucun fichier audio à charger) : trois tonalités
+// courtes et montantes, façon "sonnerie" — volontairement difficile à ignorer.
+const playAlertSound = () => {
+  if (!audioCtx) return;
+  try {
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const notes = [880, 1046, 1318]; // La5, Do6, Mi6 : sonnerie ascendante
+    notes.forEach((freq, i) => {
+      const start = audioCtx.currentTime + i * 0.16;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.35, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.14);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(start);
+      osc.stop(start + 0.15);
+    });
+  } catch (e) {
+    // silencieux : la sonnerie n'est qu'un renfort, pas critique si elle échoue
+  }
+};
+
+const startTitleBlink = () => {
+  if (titleBlinkInterval) return;
+  titleBlinkInterval = setInterval(() => {
+    titleBlinkOn = !titleBlinkOn;
+    document.title = titleBlinkOn
+      ? `🔴 (${noteRequestCount.value}) Demande de note à valider !`
+      : ORIGINAL_TITLE;
+  }, 900);
+};
+
+const stopTitleBlink = () => {
+  if (titleBlinkInterval) {
+    clearInterval(titleBlinkInterval);
+    titleBlinkInterval = null;
+  }
+  document.title = ORIGINAL_TITLE;
+};
+
+const notifyBrowser = (count) => {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  try {
+    const notif = new Notification("⚠️ Demande de modification de note", {
+      body: `${count} demande${count > 1 ? "s" : ""} en attente de votre validation.`,
+      icon: "/favicon.ico",
+      tag: "note-modification-request", // remplace la précédente au lieu d'empiler
+      requireInteraction: true, // reste affichée tant que l'admin ne l'a pas fermée
+    });
+    notif.onclick = () => {
+      window.focus();
+      showNoteRequests();
+      notif.close();
+    };
+  } catch (e) {
+    // API Notification non disponible/refusée : les autres alertes suffisent
+  }
+};
+
+// Déclenche toute la chaîne d'alerte quand le nombre de demandes en attente augmente.
+const handleNoteRequestCountChange = (newCount) => {
+  const increased = newCount > lastKnownNoteRequestCount;
+  lastKnownNoteRequestCount = newCount;
+  noteRequestCount.value = newCount;
+
+  if (newCount > 0) {
+    startTitleBlink();
+    if (increased) {
+      playAlertSound();
+      notifyBrowser(newCount);
+    }
+  } else {
+    stopTitleBlink();
+  }
+};
 
 // MAP DE TOUS LES COMPOSANTS POUR LE RENDU DYNAMIQUE
 const componentsMap = {
   ParentManagement,
   MessageComponent,
   NotificationComponent,
+  NoteModificationRequests,
   ClassManagement,
   StudentManagement,
   TeacherManagement,
@@ -245,6 +370,10 @@ const selectComponent = (component) => {
 
 const showMessages = () => changeComponent("MessageComponent");
 const showNotifications = () => changeComponent("NotificationComponent");
+const showNoteRequests = () => changeComponent("NoteModificationRequests");
+// Appelé par NoteModificationRequests quand l'admin ouvre/traite la liste :
+// on coupe immédiatement toute l'alerte (son, clignotement, badge).
+const setNoteRequestCount = (count) => { handleNoteRequestCountChange(count); };
 const showLogoutDialog = () => {
   logoutDialogComp.value.dialog = true;
 };
@@ -315,7 +444,22 @@ const syncNotifications = async () => {
   await fetchNotificationCount();
 };
 
-let permissionInterval, notificationInterval;
+const fetchNoteRequestCount = async () => {
+  if (!etablissementId.value || !anneeScolaireId.value) return;
+  try {
+    const token = localStorage.getItem("token");
+    const res = await axios.get(
+      `${API_BASE}/api/notes/modification-requests/count/${etablissementId.value}/${anneeScolaireId.value}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    handleNoteRequestCountChange(res.data.count || 0);
+  } catch (err) {
+    // erreur réseau ponctuelle : on ne remet pas le compteur à zéro pour ne
+    // pas couper une alerte en cours pour une simple requête ratée
+  }
+};
+
+let permissionInterval, notificationInterval, noteRequestInterval;
 
 onMounted(async () => {
   etablissementId.value = parseInt(route.query.etablissement_id, 10);
@@ -330,21 +474,37 @@ onMounted(async () => {
     }
   }
 
+  // Prépare la sonnerie d'alerte dès la première interaction (les navigateurs
+  // bloquent le son tant qu'il n'y a pas eu de clic sur la page).
+  document.addEventListener("click", unlockAudio, { once: true });
+  // Demande la permission d'afficher des notifications système : la plus
+  // forte des alertes, elle marche même si l'onglet n'est pas au premier plan.
+  if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+
   // 1) Charger l'année scolaire
   await fetchAnneeScolaire();
 
   // 2) Permissions + notif init
   fetchPermissions();
   await syncNotifications();
+  await fetchNoteRequestCount();
 
-  // 3) Polling régulier
+  // 3) Polling régulier — les demandes de modification de notes sont
+  // vérifiées bien plus souvent (10s) : c'est l'alerte la plus urgente,
+  // elle doit remonter très vite à l'administrateur.
   permissionInterval = setInterval(fetchPermissions, 30000);
   notificationInterval = setInterval(syncNotifications, 30000);
+  noteRequestInterval = setInterval(fetchNoteRequestCount, 10000);
 });
 
 onBeforeUnmount(() => {
   clearInterval(permissionInterval);
   clearInterval(notificationInterval);
+  clearInterval(noteRequestInterval);
+  stopTitleBlink();
+  document.removeEventListener("click", unlockAudio);
 });
 </script>
 
@@ -373,5 +533,29 @@ onBeforeUnmount(() => {
 header.v-app-bar.v-app-bar--fixed,
 nav.v-navigation-drawer--fixed {
   z-index: 1000 !important;
+}
+
+/* Alerte "demande de modification de note" : doit être impossible à manquer */
+.note-alert-shake {
+  animation: note-alert-shake 0.6s ease-in-out infinite;
+}
+
+@keyframes note-alert-shake {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-12deg); }
+  40% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+  80% { transform: rotate(6deg); }
+}
+
+.note-alert-badge :deep(.v-badge__badge) {
+  animation: note-alert-pulse 1s ease-in-out infinite;
+  box-shadow: 0 0 0 rgba(211, 47, 47, 0.6);
+}
+
+@keyframes note-alert-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(211, 47, 47, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
 }
 </style>

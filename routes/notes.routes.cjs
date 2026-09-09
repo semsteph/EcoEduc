@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { authenticateJWT, getEleveDuParentOr403 } = require('../server-lib/auth.cjs');
+const { authenticateJWT, requireAdminStaff, getEleveDuParentOr403 } = require('../server-lib/auth.cjs');
 const db = require('../server-lib/db.cjs');
 
 // Endpoint pour récupérer les notes d'une classe et d'une matière spécifiques
@@ -28,9 +28,10 @@ router.get('/notes/:classeId/:subjectId/:semesterId/:anneeScolaireId', authentic
     MAX(n.inter2) AS inter2, 
     MAX(n.inter3) AS inter3, 
     MAX(n.inter4) AS inter4, 
-    MAX(n.Dev1) AS Dev1, 
-    MAX(n.Dev2) AS Dev2 
-FROM eleve e 
+    MAX(n.Dev1) AS Dev1,
+    MAX(n.Dev2) AS Dev2,
+    MAX(n.moy) AS moySauvegardee
+FROM eleve e
 LEFT JOIN note n 
     ON e.id = n.Eleves_id 
     AND n.classe_id = ? 
@@ -59,7 +60,7 @@ GROUP BY e.id, e.nom, e.prenom;
 
     // Calcul des moyennes et ajout au résultat
     const updatedResults = results.map(student => {
-      const { inter1, inter2, inter3, inter4, Dev1, Dev2 } = student;
+      const { inter1, inter2, inter3, inter4, Dev1, Dev2, moySauvegardee } = student;
 
       // Convertir les notes en nombres
       const notes = [parseFloat(inter1), parseFloat(inter2), parseFloat(inter3), parseFloat(inter4)].filter(note => !isNaN(note));
@@ -78,6 +79,10 @@ GROUP BY e.id, e.nom, e.prenom;
         moyInter: Number(moyInter.toFixed(2)), // Arrondir à 2 décimales
         moy: Number(moy.toFixed(2)),           // Arrondir à 2 décimales
         coeff: Number(coeff.toFixed(2)),       // Arrondir à 2 décimales
+        // true seulement si le bouton « Sauvegarder » a déjà été cliqué pour
+        // cet élève (moyenne réellement persistée en base, pas juste calculée
+        // à la volée pour l'affichage) — sert au circuit de validation admin.
+        estDejaSauvegardee: moySauvegardee !== null && moySauvegardee !== undefined,
       };
     });
 
@@ -90,6 +95,16 @@ GROUP BY e.id, e.nom, e.prenom;
 });
 
 // code pour supprimer une ou plusieur note
+// ⚠️ Règle métier : tant que l'enseignant n'a pas cliqué sur « Sauvegarder »
+// (POST /notes/save, qui calcule et persiste moyInter/moy/moycoef dans la
+// table `note`), il reste libre de supprimer/corriger une note comme il veut.
+// Mais dès que la moyenne a été sauvegardée pour cet élève, la note est
+// considérée comme officiellement enregistrée : toute suppression doit
+// désormais passer par une demande soumise via
+// POST /api/notes/modification-requests, validée par l'administration via
+// PUT /api/notes/modification-requests/:id/approve (voir
+// routes/note-modification-requests.routes.cjs). L'administration, elle,
+// garde un accès direct dans tous les cas.
 router.post('/deleteNote', authenticateJWT, async (req, res) => {
   const { eleveId, semestreId, anneeScolaireId, classeId, etablissementId, noteType } = req.body;
 
@@ -107,7 +122,29 @@ router.post('/deleteNote', authenticateJWT, async (req, res) => {
       return res.status(400).json({ message: 'Type de note invalide.' });
   }
 
+  const isAdminStaff = req.user && (req.user.type === 'etablissement' || req.user.type === 'administration');
+
   try {
+      // Un enseignant (pas l'administration) ne peut supprimer directement que
+      // si la moyenne n'a jamais été sauvegardée pour cet élève dans ce
+      // contexte (classe/matière/semestre/année) : moy = NULL signifie que
+      // « Sauvegarder » n'a pas encore été cliqué.
+      if (!isAdminStaff) {
+        const [[noteRow]] = await db.execute(
+          `SELECT moy FROM note
+           WHERE Eleves_id = ? AND semestre_id = ? AND Annee_scolaire_id = ?
+           AND classe_id = ? AND etablissement_id = ?`,
+          [eleveId, semestreId, anneeScolaireId, classeId, etablissementId]
+        );
+
+        if (noteRow && noteRow.moy !== null) {
+          return res.status(409).json({
+            code: 'ADMIN_APPROVAL_REQUIRED',
+            message: "Les moyennes ont déjà été sauvegardées pour cet élève. Toute suppression doit désormais passer par une demande validée par l'administration.",
+          });
+        }
+      }
+
       const deleteQuery = `
           UPDATE note
           SET ${noteType} = NULL
@@ -196,7 +233,8 @@ router.post('/notes/save', authenticateJWT, async (req, res) => {
   }
 });
 
-  router.delete("/delete-note", async (req, res) => {
+  // ⚠️ Réservé à l'administration — voir la note au-dessus de POST /deleteNote.
+  router.delete("/delete-note", authenticateJWT, requireAdminStaff, async (req, res) => {
     const { eleveId, matiereId, semestreId, noteType } = req.body;
   
     if (!eleveId || !matiereId || !semestreId || !noteType) {

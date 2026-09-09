@@ -70,6 +70,7 @@ app.use('/api', require('./routes/auth.routes.cjs'));
 app.use('/api', require('./routes/export.routes.cjs'));
 app.use('/api', require('./routes/presence.routes.cjs'));
 app.use('/api', require('./routes/notes.routes.cjs'));
+app.use('/api', require('./routes/note-modification-requests.routes.cjs'));
 app.use('/api', require('./routes/parent-dashboard.routes.cjs'));
 app.use('/api', require('./routes/programme.routes.cjs'));
 app.use('/api', require('./routes/devoirs.routes.cjs'));
