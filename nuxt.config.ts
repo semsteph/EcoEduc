@@ -12,12 +12,24 @@ export default defineNuxtConfig({
     head: {
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=5' },
+        { name: 'theme-color', content: '#1976d2' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-title', content: 'EchoEducation' },
+      ],
+      // Application installable (écran d'accueil) : nécessaire aux
+      // notifications sur iPhone, utile partout.
+      link: [
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+        { rel: 'apple-touch-icon', href: '/icones/apple-touch-icon.png' },
       ],
     },
   },
 
 css: [
-    '@/assets/css/styles.css' // ➕ Ajout de ton fichier Tailwind CSS
+    '@/assets/css/styles.css', // ➕ Ajout de ton fichier Tailwind CSS
+    // Interface fine sur toutes les pages (champs, boutons, conteneurs ;
+    // champs deux par ligne sur téléphone).
+    '@/assets/css/interface-fine.css',
   ],
   
 

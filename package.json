@@ -10,8 +10,9 @@
     "postinstall": "nuxt prepare",
     "start": "nodemon server.cjs",
     "start:prod": "node server.cjs",
-    "test:tutor": "node tests/pedagogical-tutor.test.cjs",
-    "dev:concurrent": "concurrently \"npm run dev\" \"npm run start\""
+    "test:tutor": "node tests/pedagogical-tutor.test.cjs && node tests/tutor-visuals.test.cjs && node tests/tutor-visual-render.test.cjs && node tests/tutor-correction.test.cjs && node tests/tutor-scenario.test.cjs",
+    "dev:concurrent": "concurrently \"npm run dev\" \"npm run start\"",
+    "test:ecole": "node tests/ecole.test.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -34,14 +35,17 @@
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
+    "jszip": "^3.10.1",
     "mitt": "^3.0.1",
     "moment": "^2.30.1",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.10.3",
     "nodemailer": "^7.0.2",
     "nuxt": "^3.12.3",
+    "pdfjs-dist": "^5.6.205",
     "vue": "latest",
     "vue3-apexcharts": "^1.11.1",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -49,6 +53,7 @@
     "@nuxtjs/tailwindcss": "^6.12.0",
     "autoprefixer": "^10.4.21",
     "concurrently": "^8.2.2",
+    "playwright-core": "^1.63.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "vite-plugin-vuetify": "^2.0.3",

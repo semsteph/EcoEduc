@@ -1,7 +1,7 @@
 <template>
   <div class="cahier-container">
     <!-- Vue de sélection des classes -->
-    <v-card color="blue lighten-5" v-if="!selectedClassId" class="elevation-2 pa-4 main-card">
+    <v-card color="blue lighten-5" v-if="!selectedClassId" class="elevation-2 pa-3 main-card">
       <v-card-title class="title">
         <v-icon class="mr-2" color="blue darken-2">mdi-book-education</v-icon>
         Gestion des Cahiers de Texte
@@ -68,13 +68,25 @@ export default {
     anneeScolaireId: {
       type: Number,
       required: true
+    },
+    classeId: {
+      type: Number,
+      default: null
     }
   },
+  emits: ['back', 'ouvrir-classe'],
   data() {
     return {
       classes: [],
-      selectedClassId: null,
     };
+  },
+  computed: {
+    // Classe ouverte : donnée par la route (…/<classeId>). La changer émet
+    // « ouvrir-classe » et la page va vers la nouvelle adresse.
+    selectedClassId: {
+      get() { return this.classeId; },
+      set(id) { this.$emit('ouvrir-classe', id); }
+    }
   },
   methods: {
     fetchClasses() {
@@ -84,6 +96,10 @@ export default {
       })
         .then(response => {
           this.classes = response.data;
+          // Classe inconnue dans l'adresse : retour à la liste des classes.
+          if (this.classeId && !this.classes.some((c) => Number(c.id) === this.classeId)) {
+            this.selectedClassId = null;
+          }
         })
         .catch(error => {
           console.error('Erreur lors de la récupération des classes:', error);
@@ -127,7 +143,7 @@ export default {
 
 .class-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .class-title {

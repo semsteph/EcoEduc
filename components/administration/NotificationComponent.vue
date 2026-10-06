@@ -1,6 +1,6 @@
 <template>
   <div class="notification-wrapper">
-    <v-card :elevation="4" class="pa-4 card-style">
+    <v-card :elevation="0" class="pa-3 card-style">
       <v-card-title class="d-flex align-center justify-space-between">
         <span class="text-h6 text-md-h5 text-primary d-flex align-center">
           <v-icon color="primary" class="mr-2">mdi-bell-alert</v-icon>
@@ -25,7 +25,7 @@
             >
               <v-alert
                 :type="notif.isRead ? 'info' : 'warning'"
-                class="pa-4 alert-card"
+                class="pa-3 alert-card"
                 border="start"
                 :border-color="notif.isRead ? 'blue' : 'red'"
                 colored-border
@@ -218,7 +218,7 @@ export default {
 .card-style {
   width: 100%;
   max-width: 1000px;
-  border-radius: 16px;
+  border-radius: 10px;
   background-color: #f9fbff;
 }
 
@@ -237,7 +237,7 @@ export default {
 }
 
 .rounded-dialog {
-  border-radius: 20px;
+  border-radius: 10px;
   background-color: #ffffff;
 }
 

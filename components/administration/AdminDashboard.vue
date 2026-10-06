@@ -2,23 +2,23 @@
   <div class="dashboard-container">
     <v-row>
       <v-col cols="12" sm="6" md="3" v-for="(stat, i) in stats" :key="i">
-        <v-card class="rounded-xl pa-4" elevation="2">
+        <v-card class="rounded-lg pa-3" elevation="0">
           <div class="d-flex align-center">
-            <v-avatar :color="stat.color + ' lighten-4'" size="48" class="mr-4">
-              <v-icon :color="stat.color">{{ stat.icon }}</v-icon>
+            <v-avatar :color="stat.color + ' lighten-4'" size="32" class="mr-2">
+              <v-icon size="18" :color="stat.color">{{ stat.icon }}</v-icon>
             </v-avatar>
             <div>
               <div class="text-caption grey--text font-weight-bold text-uppercase">{{ stat.title }}</div>
-              <div class="text-h5 font-weight-black">{{ stat.value }}</div>
+              <div class="text-h6 font-weight-black">{{ stat.value }}</div>
             </div>
           </div>
         </v-card>
       </v-col>
     </v-row>
 
-    <v-row class="mt-6">
+    <v-row class="mt-3">
       <v-col cols="12" md="8">
-        <v-card class="rounded-xl pa-2 pa-sm-6" height="400" elevation="2">
+        <v-card class="rounded-lg pa-2 pa-sm-3" height="400" elevation="0">
           <v-card-title class="pa-0 mb-4 font-weight-bold">
             Aperçu des Présences
             <v-spacer></v-spacer>
@@ -34,7 +34,7 @@
       </v-col>
 
       <v-col cols="12" md="4">
-        <v-card class="rounded-xl pa-2 pa-sm-6" height="400" elevation="2">
+        <v-card class="rounded-lg pa-2 pa-sm-3" height="400" elevation="0">
           <v-card-title class="pa-0 mb-4 font-weight-bold">Dernières Actions</v-card-title>
           <v-timeline dense align-top>
             <v-timeline-item color="primary" small>

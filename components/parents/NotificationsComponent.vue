@@ -1,791 +1,317 @@
 <template>
-  <div class="notifications-page">
-    <!-- Top bar -->
-    <div class="topbar">
-      <v-btn icon class="back-btn" @click="goBack" aria-label="Retour">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
-
-      <div class="topbar-title">
-        <div class="title-row">
-          <span class="title">Notifications</span>
-          <v-chip v-if="unreadCount > 0" class="chip-unread" size="small" label>
-            {{ unreadCount }} nouveau{{ unreadCount > 1 ? "x" : "" }}
-          </v-chip>
+  <!-- Centre de notifications du parent : tout ce qui concerne ses enfants
+       (absences, notes, devoirs, permissions, punitions, bulletins, emploi
+       du temps), avec la vraie date, des filtres, et une action directe. -->
+  <div class="notifs-page">
+    <div class="notifs-tete">
+      <div>
+        <h2 class="notifs-titre">Notifications</h2>
+        <div class="notifs-sous">
+          <template v-if="nouvelles.size">{{ nouvelles.size }} nouvelle(s)</template>
+          <template v-else>Tout est lu</template>
         </div>
-        <div class="subtitle">Centre de notifications</div>
       </div>
-
-      <v-btn
-        icon
-        class="refresh-btn"
-        @click="fetchNotifications(true)"
-        :loading="loading"
-        aria-label="Rafraîchir"
-      >
-        <v-icon>mdi-refresh</v-icon>
-      </v-btn>
+      <v-btn variant="text" size="small" prepend-icon="mdi-refresh" :loading="chargement" @click="charger">Actualiser</v-btn>
     </div>
 
-    <!-- Content -->
-    <v-container fluid class="content">
-      <!-- Skeleton loader -->
-      <div v-if="loading && !notifications.length" class="skeleton-wrap">
-        <v-skeleton-loader
-          type="list-item-avatar-two-line, list-item-avatar-two-line, list-item-avatar-two-line"
-        />
-      </div>
-
-      <!-- Empty state -->
-      <v-card v-else-if="!notifications.length" class="empty-card" outlined>
-        <v-card-text class="empty-content">
-          <div class="empty-icon">
-            <v-icon size="42">mdi-bell-outline</v-icon>
-          </div>
-          <div class="empty-text">
-            <div class="empty-title">Aucune notification</div>
-            <div class="empty-subtitle">
-              Quand vous recevrez des alertes, elles s’afficheront ici.
-            </div>
-          </div>
-
-          <v-btn class="btn-primary mt-4" @click="fetchNotifications(true)" :loading="loading">
-            <v-icon start>mdi-refresh</v-icon>
-            Rafraîchir
-          </v-btn>
-        </v-card-text>
-      </v-card>
-
-      <!-- List -->
-      <div v-else class="list-wrap">
-        <div class="list-head">
-          <div class="list-meta">
-            <span class="meta-text">
-              {{ notifications.length }} notification{{ notifications.length > 1 ? "s" : "" }}
-            </span>
-            <span class="dot">•</span>
-            <span class="meta-text">Mise à jour : {{ lastUpdatedLabel }}</span>
-          </div>
-
-          <v-btn class="btn-soft" @click="markAllAsReadUI" :disabled="unreadCount === 0" size="small">
-            <v-icon start size="18">mdi-check-all</v-icon>
-            Tout marquer lu
-          </v-btn>
+    <!-- Alertes sur le téléphone et par SMS -->
+    <div class="alertes-carte">
+      <div class="alertes-ligne">
+        <v-icon color="primary">mdi-cellphone-message</v-icon>
+        <div class="alertes-texte">
+          <strong>Notifications sur ce téléphone</strong>
+          <span v-if="push === 'actif'">Activées : vous êtes prévenu même quand l’application est fermée.</span>
+          <span v-else-if="push === 'refuse'">Bloquées par le navigateur : autorisez les notifications pour ce site dans ses réglages.</span>
+          <span v-else-if="push === 'iphone-a-installer'">Sur iPhone : touchez <strong>Partager</strong> puis <strong>« Sur l’écran d’accueil »</strong>, ouvrez l’application depuis l’icône, puis revenez ici.</span>
+          <span v-else-if="push === 'non-supporte'">Ce navigateur ne permet pas les notifications. Essayez Chrome.</span>
+          <span v-else>Soyez prévenu d’une absence ou d’un bulletin même quand l’application est fermée.</span>
         </div>
-
-        <v-row dense>
-          <v-col cols="12" v-for="(notif, index) in notificationsUI" :key="notif.key || index">
-            <v-card
-              class="notif-card"
-              outlined
-              :class="{ 'is-new': notif.isNew }"
-              :elevation="notif.isNew ? 2 : 0"
-            >
-              <div class="notif-inner">
-                <div class="notif-icon" :class="{ 'icon-new': notif.isNew }">
-                  <v-icon v-if="notif.isDevoir" size="22">mdi-notebook-edit-outline</v-icon>
-                  <v-icon v-else size="22">
-                    {{ notif.isNew ? "mdi-bell-alert-outline" : "mdi-bell-outline" }}
-                  </v-icon>
-                </div>
-
-                <div class="notif-body">
-                  <div class="notif-title">
-                    <span class="notif-text">{{ notif.text }}</span>
-                    <span v-if="notif.isNew" class="pill-new">NOUVELLE</span>
-                  </div>
-
-                  <div class="notif-sub">
-                    <span class="time">
-                      <v-icon size="14" class="mr-1">mdi-clock-outline</v-icon>
-                      {{ notif.timeLabel }}
-                    </span>
-
-                    <span v-if="notif.hasMotif" class="motif-chip">
-                      <v-icon size="14" class="mr-1">mdi-check-circle</v-icon>
-                      Motif déjà renseigné
-                    </span>
-                  </div>
-
-                  <div v-if="!notif.isDevoir" class="notif-actions">
-                    <v-btn
-                      v-if="!notif.hasMotif"
-                      class="btn-link"
-                      variant="text"
-                      size="small"
-                      @click="openMotifDialog(notif)"
-                    >
-                      <v-icon start size="18">mdi-comment-text-outline</v-icon>
-                      Veuillez notifier la raison de son absence
-                    </v-btn>
-
-                    <v-btn
-                      v-else
-                      class="btn-link"
-                      variant="text"
-                      size="small"
-                      @click="openMotifDialog(notif)"
-                    >
-                      <v-icon start size="18">mdi-pencil</v-icon>
-                      Modifier le motif
-                    </v-btn>
-                  </div>
-                </div>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
-      </div>
-
-      <!-- ✅ Dialog Motif (FIX: bouton Envoyer visible) -->
-      <v-dialog v-model="motifDialog" max-width="520" scrollable>
-        <v-card class="motif-card" rounded="xl">
-          <!-- Header sticky -->
-          <div class="motif-header">
-            <div>
-              <div class="motif-title">Motif d’absence</div>
-              <div class="motif-subtitle">{{ motifHeaderLabel }}</div>
-            </div>
-
-            <v-btn
-              icon
-              variant="text"
-              class="close-x"
-              @click="closeMotifDialog"
-              :disabled="motifSubmitting"
-              aria-label="Fermer"
-            >
-              <v-icon>mdi-close</v-icon>
-            </v-btn>
-          </div>
-
-          <!-- Body scrollable -->
-          <v-card-text class="motif-body">
-            <v-textarea
-              v-model="motifForm.motif"
-              label="Motif"
-              placeholder="Ex: Rendez-vous médical, maladie, déplacement..."
-              :disabled="motifSubmitting"
-              auto-grow
-              rows="4"
-              density="comfortable"
-              variant="outlined"
-              counter="255"
-              maxlength="255"
-            />
-          </v-card-text>
-
-          <!-- Footer sticky (toujours visible) -->
-          <div class="motif-footer">
-            <v-btn variant="text" :disabled="motifSubmitting" @click="closeMotifDialog">
-              Annuler
-            </v-btn>
-
-            <!-- ✅ IMPORTANT: utiliser color/variant Vuetify (pas uniquement CSS) -->
-            <v-btn
-              color="primary"
-              variant="flat"
-              class="btn-submit"
-              :loading="motifSubmitting"
-              :disabled="motifSubmitting"
-              @click="submitMotif"
-            >
-              Envoyer
-              <v-icon end>mdi-send</v-icon>
-            </v-btn>
-          </div>
-        </v-card>
-      </v-dialog>
-
-      <!-- Snackbar -->
-      <v-snackbar v-model="snackbar.show" :timeout="2500">
-        {{ snackbar.text }}
-        <template #actions>
-          <v-btn variant="text" @click="snackbar.show = false">OK</v-btn>
+        <v-btn v-if="push === 'inactif'" color="primary" variant="flat" size="small" :loading="pushEnCours" @click="activerPush">Activer</v-btn>
+        <template v-else-if="push === 'actif'">
+          <v-btn variant="text" size="small" :loading="pushEnCours" @click="essaiPush">Tester</v-btn>
+          <v-btn variant="text" size="small" color="grey-darken-1" @click="desactiverPush">Désactiver</v-btn>
         </template>
-      </v-snackbar>
-    </v-container>
+      </div>
+      <div v-if="prefs && prefs.smsActifEcole" class="alertes-ligne">
+        <v-icon color="primary">mdi-message-text-outline</v-icon>
+        <div class="alertes-texte">
+          <strong>SMS de l’école</strong>
+          <span v-if="!prefs.numeroValide">Votre numéro ({{ prefs.telephone || 'non renseigné' }}) n’est pas valide : demandez à l’école de le corriger.</span>
+          <span v-else>Absences, réponses aux permissions et bulletins par SMS au {{ prefs.telephone }}.</span>
+        </div>
+        <v-switch v-model="prefs.sms" hide-details density="compact" color="primary" inset :disabled="!prefs.numeroValide" @update:model-value="changerSms" />
+      </div>
+    </div>
+
+    <div v-if="items.length" class="notifs-filtres">
+      <v-chip v-for="f in filtresVisibles" :key="f.value" size="small" :color="filtre === f.value ? 'primary' : undefined" :variant="filtre === f.value ? 'flat' : 'outlined'" @click="filtre = f.value">
+        {{ f.title }}<span v-if="f.value !== 'tout'">&nbsp;({{ compte(f.value) }})</span>
+      </v-chip>
+      <template v-if="enfants.length > 1">
+        <v-chip v-for="e in enfants" :key="e.id" size="small" :color="enfant === e.id ? 'teal' : undefined" :variant="enfant === e.id ? 'flat' : 'outlined'" @click="enfant = enfant === e.id ? null : e.id">{{ e.prenom }}</v-chip>
+      </template>
+    </div>
+
+    <div v-if="chargement && !items.length" class="notifs-etat"><v-progress-circular indeterminate color="primary" /></div>
+    <div v-else-if="!visibles.length" class="notifs-etat">
+      <v-icon size="40" color="grey-lighten-1">mdi-bell-check-outline</v-icon>
+      <div class="font-weight-bold">Aucune notification</div>
+      <div class="notifs-aide">Vous serez prévenu ici des absences, notes, devoirs, punitions, bulletins et réponses à vos demandes de permission.</div>
+    </div>
+
+    <template v-else>
+      <template v-for="g in groupes" :key="g.titre">
+        <div class="notifs-jour">{{ g.titre }}</div>
+        <div v-for="n in g.items" :key="n.id" class="notif" :class="[`t-${n.type}`, { 'is-nouveau': nouvelles.has(n.id) }]">
+          <div class="notif-icone"><v-icon size="20">{{ icone(n.type) }}</v-icon></div>
+          <div class="notif-corps">
+            <div class="notif-titre">
+              {{ n.titre }}
+              <span v-if="nouvelles.has(n.id)" class="notif-nouveau">nouveau</span>
+            </div>
+            <div class="notif-texte">{{ n.texte }}</div>
+            <div class="notif-pied">
+              <span>{{ heure(n.date) }}</span>
+              <span v-if="n.enfant && enfants.length > 1"> · {{ n.enfant }}</span>
+            </div>
+            <div class="notif-actions">
+              <template v-if="n.type === 'absence'">
+                <span v-if="n.motif" class="notif-motif"><v-icon size="14">mdi-check-circle</v-icon> Motif envoyé : {{ n.motif }}</span>
+                <v-btn v-else size="small" variant="tonal" color="error" prepend-icon="mdi-comment-text-outline" @click="ouvrirMotif(n)">Justifier l’absence</v-btn>
+              </template>
+              <v-btn v-else-if="n.lien" size="small" variant="text" color="primary" append-icon="mdi-chevron-right" @click="ouvrir(n)">{{ libelleLien(n.type) }}</v-btn>
+            </div>
+          </div>
+        </div>
+      </template>
+    </template>
+
+    <!-- Justification d'une absence -->
+    <v-dialog v-model="motif.ouvert" max-width="460">
+      <v-card v-if="motif.notif">
+        <v-card-title class="text-wrap">Justifier l’absence</v-card-title>
+        <v-card-text>
+          <p class="mb-2">{{ motif.notif.texte.split('. Si')[0] }}.</p>
+          <v-textarea v-model="motif.texte" label="Raison de l’absence (maladie, rendez-vous médical…)" rows="3" auto-grow variant="outlined" maxlength="255" counter />
+          <v-alert v-if="motif.erreur" type="error" variant="tonal" density="compact">{{ motif.erreur }}</v-alert>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="motif.envoi" @click="motif.ouvert = false">Annuler</v-btn>
+          <v-btn color="primary" variant="flat" :loading="motif.envoi" :disabled="!motif.texte.trim()" @click="envoyerMotif">Envoyer</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-snackbar v-model="snack.ouvert" :color="snack.couleur" timeout="3500" location="top">{{ snack.texte }}</v-snackbar>
   </div>
 </template>
 
 <script>
-import axios from "axios";
+import axios from 'axios';
+import { useNotificationsTelephone } from '@/composables/useNotificationsTelephone';
+
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const FILTRES = [
+  { title: 'Tout', value: 'tout' },
+  { title: 'Absences', value: 'absence' },
+  { title: 'Notes', value: 'note' },
+  { title: 'Devoirs', value: 'devoir' },
+  { title: 'Permissions', value: 'permission' },
+  { title: 'Conduite', value: 'punition' },
+  { title: 'Bulletins', value: 'bulletin' },
+  { title: 'Emploi du temps', value: 'programme' },
+];
 
 export default {
-  name: "NotificationsComponent",
+  name: 'NotificationsComponent',
   props: {
     etablissementId: Number,
     anneeScolaireId: Number,
   },
+  emits: ['notificationsOpened', 'showComponent'],
+  setup() {
+    return { telephone: useNotificationsTelephone() };
+  },
   data() {
     return {
-      notifications: [],
-      parentId: null,
-      loading: false,
-      lastUpdatedAt: null,
-      snackbar: { show: false, text: "" },
-
-      motifDialog: false,
-      motifSubmitting: false,
-      selectedNotif: null,
-      motifForm: { motif: "" },
+      items: [], chargement: false, filtre: 'tout', enfant: null, nouvelles: new Set(),
+      push: 'inactif', pushEnCours: false, prefs: null,
+      motif: { ouvert: false, notif: null, texte: '', envoi: false, erreur: '' },
+      snack: { ouvert: false, texte: '', couleur: 'success' },
     };
   },
   computed: {
-    unreadCount() {
-      return this.notifications.filter((n) => !this.toBool(n?.is_read)).length;
+    enfants() {
+      const vus = new Map();
+      this.items.forEach((n) => { if (n.eleveId && n.enfant) vus.set(n.eleveId, { id: n.eleveId, prenom: n.enfant }); });
+      return [...vus.values()];
     },
-    notificationsUI() {
-      return this.notifications.map((n, index) => {
-        const isNew = !this.toBool(n?.is_read);
-        const studentName = `${n?.studentName || ""} ${n?.studentPrenom || ""}`.trim();
-
-        if (n?.type === "devoir") {
-          const matiere = n?.matiereNom ? ` de ${n.matiereNom}` : "";
-          const text = studentName
-            ? `Votre enfant ${studentName} a un nouveau devoir${matiere} : ${n?.titre || ""}.`
-            : `Nouveau devoir${matiere} : ${n?.titre || ""}.`;
-
-          return {
-            key: `devoir-${n?.devoir_id ?? index}`,
-            type: "devoir",
-            devoir_id: n?.devoir_id,
-            date: n?.date,
-            isNew,
-            hasMotif: false,
-            isDevoir: true,
-            text,
-            timeLabel: this.fakeTime(index),
-          };
-        }
-
-        const dateLabel = this.relativeDateLabel(n?.date);
-        const text = studentName
-          ? `Votre enfant ${studentName} ${dateLabel}.`
-          : `Absence ${dateLabel}.`;
-
-        return {
-          key: `absence-${n?.presence_id ?? index}`,
-          type: "absence",
-          presence_id: n?.presence_id,
-          date: n?.date,
-          isNew,
-          hasMotif: Boolean(String(n?.motif || "").trim()),
-          motif: n?.motif || "",
-          isDevoir: false,
-          text,
-          timeLabel: this.fakeTime(index),
-        };
-      });
+    filtresVisibles() {
+      return FILTRES.filter((f) => f.value === 'tout' || this.compte(f.value) > 0);
     },
-    lastUpdatedLabel() {
-      if (!this.lastUpdatedAt) return "—";
-      try {
-        return this.lastUpdatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      } catch {
-        return "—";
+    visibles() {
+      return this.items.filter((n) => (this.filtre === 'tout' || n.type === this.filtre) && (!this.enfant || n.eleveId === this.enfant));
+    },
+    groupes() {
+      const out = [];
+      for (const n of this.visibles) {
+        const titre = this.jour(n.date);
+        let g = out[out.length - 1];
+        if (!g || g.titre !== titre) { g = { titre, items: [] }; out.push(g); }
+        g.items.push(n);
       }
+      return out;
     },
-    motifHeaderLabel() {
-      if (!this.selectedNotif) return "Renseignez le motif de l’absence.";
-      const student = this.selectedNotif.studentName
-        ? `${this.selectedNotif.studentName} ${this.selectedNotif.studentPrenom || ""}`.trim()
-        : "";
-      const d = this.selectedNotif.date ? this.formatDate(this.selectedNotif.date) : "";
-      if (student && d) return `Élève : ${student} • Date : ${d}`;
-      if (student) return `Élève : ${student}`;
-      if (d) return `Date : ${d}`;
-      return "Renseignez le motif de l’absence.";
-    },
+  },
+  async mounted() {
+    await this.charger();
+    this.push = await this.telephone.etat().catch(() => 'non-supporte');
+    this.chargerPrefs();
   },
   methods: {
-    toBool(v) {
-      return v === true || v === 1 || v === "1";
-    },
-
-    async fetchNotifications(showToast = false) {
-      const urlParams = new URLSearchParams(window.location.search);
-      this.parentId = urlParams.get("id");
-      const token = localStorage.getItem("token");
-
-      if (!this.parentId) {
-        this.notifications = [];
-        this.snackbar = { show: true, text: "Identifiant parent introuvable." };
-        return;
-      }
-
-      this.loading = true;
+    async charger() {
+      this.chargement = true;
       try {
-        const res = await axios.get(
-          `/api/notificationed/${this.parentId}/${this.etablissementId}/${this.anneeScolaireId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        this.notifications = Array.isArray(res?.data?.notifications) ? res.data.notifications : [];
-        this.lastUpdatedAt = new Date();
-        if (showToast) this.snackbar = { show: true, text: "Notifications mises à jour." };
-      } catch (error) {
-        console.error("❌ Erreur chargement notifications :", error?.response?.data || error);
-        this.notifications = [];
-        this.snackbar = { show: true, text: "Erreur de chargement des notifications." };
+        const { data } = await axios.get('/api/parent/notifications');
+        this.items = Array.isArray(data?.items) ? data.items : [];
+        // Ce qui était nouveau à l'ouverture reste signalé pendant la visite ;
+        // côté serveur, c'est maintenant « lu » (le parent l'a sous les yeux).
+        const nonLues = this.items.filter((n) => !n.lu).map((n) => n.id);
+        nonLues.forEach((id) => this.nouvelles.add(id));
+        this.nouvelles = new Set(this.nouvelles);
+        if (nonLues.length) {
+          await axios.put('/api/parent/notifications/lues', { ids: nonLues });
+          this.$emit('notificationsOpened');
+        }
+      } catch (e) {
+        this.notifier("Les notifications n'ont pas pu être chargées.", 'error');
       } finally {
-        this.loading = false;
+        this.chargement = false;
       }
     },
-
-    goBack() {
-      this.$emit("showComponent", "Acceuil");
+    async chargerPrefs() {
+      try { this.prefs = (await axios.get('/api/parent/alertes/preferences')).data; } catch (e) { this.prefs = null; }
     },
-
-    markAllAsReadUI() {
-      this.notifications = this.notifications.map((n) => ({ ...n, is_read: true }));
-      this.$emit("notificationsOpened");
-      this.snackbar = { show: true, text: "Toutes les notifications marquées comme lues." };
+    compte(type) {
+      return this.items.filter((n) => n.type === type && (!this.enfant || n.eleveId === this.enfant)).length;
     },
-
-    openMotifDialog(notifUI) {
-      const original = this.notifications.find((n) => n.presence_id === notifUI.presence_id);
-      this.selectedNotif =
-        original || { presence_id: notifUI.presence_id, date: notifUI.date };
-
-      this.motifForm.motif = String(this.selectedNotif?.motif || "").trim();
-      this.motifDialog = true;
+    icone(type) {
+      return {
+        absence: 'mdi-account-off-outline', note: 'mdi-file-document-edit-outline', devoir: 'mdi-notebook-edit-outline',
+        permission: 'mdi-calendar-check-outline', punition: 'mdi-alert-octagon-outline', bulletin: 'mdi-file-certificate-outline', programme: 'mdi-calendar-clock',
+      }[type] || 'mdi-bell-outline';
     },
-
-    closeMotifDialog() {
-      if (this.motifSubmitting) return;
-      this.motifDialog = false;
-      this.selectedNotif = null;
-      this.motifForm = { motif: "" };
+    libelleLien(type) {
+      return { note: 'Voir la note', devoir: 'Voir les devoirs', permission: 'Voir mes demandes', punition: 'Voir la conduite', bulletin: 'Ouvrir le bulletin', programme: 'Voir le détail' }[type] || 'Ouvrir';
     },
-
-    async submitMotif() {
-      const token = localStorage.getItem("token");
-      const motif = String(this.motifForm.motif || "").trim();
-
-      if (!this.selectedNotif?.presence_id) {
-        this.snackbar = { show: true, text: "Présence introuvable pour cette notification." };
-        return;
-      }
-      if (!motif) {
-        this.snackbar = { show: true, text: "Veuillez saisir le motif." };
-        return;
-      }
-
-      const presenceId = this.selectedNotif.presence_id;
-
-      this.motifSubmitting = true;
+    jour(date) {
+      const d = new Date(date);
+      const cle = (x) => x.toDateString();
+      const hier = new Date(); hier.setDate(hier.getDate() - 1);
+      if (cle(d) === cle(new Date())) return "Aujourd'hui";
+      if (cle(d) === cle(hier)) return 'Hier';
+      return `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : ''}`;
+    },
+    heure(date) {
+      const d = new Date(date);
+      return `${d.getHours()}h${String(d.getMinutes()).padStart(2, '0')}`;
+    },
+    ouvrir(n) {
+      if (n.lien) this.$router.push(n.lien);
+    },
+    ouvrirMotif(n) {
+      this.motif = { ouvert: true, notif: n, texte: '', envoi: false, erreur: '' };
+    },
+    async envoyerMotif() {
+      this.motif.envoi = true;
+      this.motif.erreur = '';
       try {
-        await axios.post(
-          `/api/presence/${encodeURIComponent(presenceId)}/motif`,
-          { motif },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        this.snackbar = { show: true, text: "Motif mis à jour avec succès." };
-
-        this.notifications = this.notifications.map((n) =>
-          n.presence_id === presenceId ? { ...n, motif } : n
-        );
-
-        this.closeMotifDialog();
-      } catch (error) {
-        console.error("❌ Erreur envoi motif :", error?.response?.data || error);
-        const msg =
-          typeof error?.response?.data === "string"
-            ? error.response.data
-            : "Erreur lors de l’envoi du motif.";
-        this.snackbar = { show: true, text: msg };
+        const n = this.motif.notif;
+        const { data } = await axios.post('/api/parent/absences/motif', { eleveId: n.eleveId, date: n.details?.date, motif: this.motif.texte.trim() });
+        n.motif = this.motif.texte.trim();
+        this.motif.ouvert = false;
+        this.notifier(data.message || 'Motif envoyé.');
+      } catch (e) {
+        this.motif.erreur = e?.response?.data?.message || "Le motif n'a pas pu être envoyé.";
       } finally {
-        this.motifSubmitting = false;
+        this.motif.envoi = false;
       }
     },
-
-    fakeTime(index) {
-      const now = new Date();
-      const past = new Date(now.getTime() - index * 15 * 60000);
-      return past.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    },
-
-    formatDate(d) {
+    async activerPush() {
+      this.pushEnCours = true;
       try {
-        const dt = new Date(d);
-        if (Number.isNaN(dt.getTime())) return String(d);
-        return dt.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "numeric" });
-      } catch {
-        return String(d);
+        this.push = await this.telephone.activer();
+        if (this.push === 'actif') {
+          await this.telephone.essai().catch(() => {});
+          this.notifier('Notifications activées : une notification d’essai vient d’être envoyée.');
+        }
+      } catch (e) {
+        this.push = await this.telephone.etat().catch(() => 'non-supporte');
+        this.notifier(e?.message === 'lent'
+          ? 'Le service de notifications du téléphone répond lentement. Vérifiez la connexion internet et réessayez.'
+          : "Les notifications n'ont pas pu être activées sur ce téléphone.", 'error');
+      } finally {
+        this.pushEnCours = false;
       }
     },
-
-    relativeDateLabel(d) {
+    async desactiverPush() {
+      this.push = await this.telephone.desactiver();
+      this.notifier('Notifications désactivées sur ce téléphone.');
+    },
+    async essaiPush() {
+      this.pushEnCours = true;
       try {
-        const dt = new Date(d);
-        if (Number.isNaN(dt.getTime())) return "est absent.";
-
-        const today = new Date();
-        const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-        const d0 = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
-        const diffDays = Math.round((t0 - d0) / (24 * 60 * 60 * 1000));
-
-        if (diffDays === 0) return "est absent aujourd'hui";
-        if (diffDays === 1) return "était absent hier";
-        if (diffDays === 2) return "était absent avant-hier";
-        return `était absent le ${this.formatDate(dt)}`;
-      } catch {
-        return "est absent.";
+        const r = await this.telephone.essai();
+        this.notifier(r.envoyes ? 'Notification d’essai envoyée.' : "Aucun téléphone abonné : réactivez les notifications.", r.envoyes ? 'success' : 'warning');
+      } finally {
+        this.pushEnCours = false;
       }
     },
-  },
-  mounted() {
-    this.fetchNotifications(false);
+    async changerSms(v) {
+      try {
+        await axios.put('/api/parent/alertes/preferences', { sms: v });
+        this.notifier(v ? 'Vous recevrez les SMS de l’école.' : 'Vous ne recevrez plus de SMS de l’école.');
+      } catch (e) {
+        this.prefs.sms = !v;
+        this.notifier("Le réglage n'a pas pu être enregistré.", 'error');
+      }
+    },
+    notifier(texte, couleur = 'success') {
+      this.snack = { ouvert: true, texte, couleur };
+    },
   },
 };
 </script>
 
 <style scoped>
-/* Palette */
-.notifications-page {
-  --primary: #2563eb;
-  --primary-600: #1d4ed8;
-  --primary-50: #eff6ff;
-  --text: #0f172a;
-  --muted: #64748b;
-  --border: rgba(15, 23, 42, 0.10);
-  --card: #ffffff;
-  --bg: #f6f8fc;
-
-  min-height: 100vh;
-  background: radial-gradient(1200px 500px at 50% -20%, var(--primary-50), transparent 60%),
-    linear-gradient(to bottom, var(--bg), #ffffff 55%);
-  padding-bottom: 18px;
-}
-
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  backdrop-filter: blur(10px);
-  background: rgba(246, 248, 252, 0.75);
-  border-bottom: 1px solid var(--border);
-
-  display: grid;
-  grid-template-columns: 44px 1fr 44px;
-  gap: 10px;
-  align-items: center;
-
-  padding: 12px 14px;
-}
-
-.back-btn,
-.refresh-btn {
-  border-radius: 12px;
-}
-
-.topbar :deep(.v-btn) {
-  color: var(--primary-600);
-}
-
-.topbar-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.title {
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: var(--text);
-  letter-spacing: -0.2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.subtitle {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.chip-unread {
-  background: var(--primary-50);
-  color: var(--primary-600);
-  border: 1px solid rgba(37, 99, 235, 0.25);
-  font-weight: 700;
-}
-
-.content {
-  padding: 14px 10px 0;
-}
-
-.skeleton-wrap {
-  padding: 6px 6px 0;
-}
-
-.list-wrap {
-  max-width: 760px;
-  margin: 0 auto;
-}
-
-.list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 10px 6px 12px;
-}
-
-.list-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.82rem;
-  flex-wrap: wrap;
-}
-
-.dot {
-  opacity: 0.6;
-}
-
-.btn-soft {
-  border-radius: 12px;
-  border: 1px solid rgba(37, 99, 235, 0.18);
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--primary-600);
-  font-weight: 700;
-  text-transform: none;
-}
-
-.btn-primary {
-  border-radius: 14px;
-  background: var(--primary);
-  color: #fff;
-  font-weight: 800;
-  text-transform: none;
-}
-
-.btn-primary:hover {
-  background: var(--primary-600);
-}
-
-.notif-card {
-  border-radius: 16px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.notif-card.is-new {
-  background: linear-gradient(0deg, rgba(37, 99, 235, 0.05), rgba(37, 99, 235, 0.05)),
-    var(--card);
-  border: 1px solid rgba(37, 99, 235, 0.22);
-}
-
-.notif-inner {
-  display: grid;
-  grid-template-columns: 44px 1fr;
-  gap: 12px;
-  padding: 14px 14px;
-  align-items: start;
-}
-
-.notif-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  background: #f1f5f9;
-  color: #64748b;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.notif-icon.icon-new {
-  background: rgba(37, 99, 235, 0.10);
-  color: var(--primary-600);
-  border: 1px solid rgba(37, 99, 235, 0.22);
-}
-
-.notif-body {
-  min-width: 0;
-}
-
-.notif-title {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.notif-text {
-  font-size: 0.98rem;
-  font-weight: 750;
-  color: var(--text);
-  line-height: 1.25rem;
-
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.pill-new {
-  flex: 0 0 auto;
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  color: var(--primary-600);
-  background: rgba(37, 99, 235, 0.10);
-  border: 1px solid rgba(37, 99, 235, 0.22);
-  padding: 4px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.notif-sub {
-  margin-top: 8px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  color: var(--muted);
-  flex-wrap: wrap;
-}
-
-.time {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.82rem;
-}
-
-.motif-chip {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #0f766e;
-  background: rgba(15, 118, 110, 0.10);
-  border: 1px solid rgba(15, 118, 110, 0.18);
-  padding: 3px 10px;
-  border-radius: 999px;
-}
-
-.notif-actions {
-  margin-top: 10px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn-link {
-  text-transform: none;
-  font-weight: 800;
-  color: var(--primary-600);
-  border-radius: 12px;
-}
-
-.btn-link:hover {
-  background: rgba(37, 99, 235, 0.08);
-}
-
-/* ✅ Dialog motif */
-.motif-card {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  overflow: hidden;
-}
-
-.motif-header {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #fff;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  padding: 14px 16px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.motif-title {
-  font-weight: 900;
-  font-size: 1.05rem;
-  color: var(--text);
-}
-
-.motif-subtitle {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.close-x {
-  margin-top: -4px;
-}
-
-.motif-body {
-  max-height: min(55vh, 420px);
-  overflow: auto;
-  padding: 16px;
-}
-
-.motif-footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  background: #fff;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-/* ✅ assure une bonne largeur et un texte visible (même si thème modifié) */
-.btn-submit {
-  min-width: 140px;
-  border-radius: 14px;
-  font-weight: 900;
-}
-
-@media (max-width: 600px) {
-  .content {
-    padding: 12px 8px 0;
-  }
-  .notif-inner {
-    padding: 12px 12px;
-    gap: 10px;
-    grid-template-columns: 42px 1fr;
-  }
-  .notif-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
-  }
-  .notif-text {
-    font-size: 0.95rem;
-    -webkit-line-clamp: 4;
-  }
-  .list-head {
-    margin: 10px 2px 12px;
-  }
-  .btn-soft {
-    padding: 0 10px;
-  }
-  .notif-actions {
-    justify-content: flex-start;
-  }
-  .motif-body {
-    max-height: 55vh;
-  }
-}
+.notifs-page { max-width: 760px; margin: 0 auto; padding: 4px 4px 24px; }
+.notifs-tete { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.notifs-titre { font-size: 1.2rem; font-weight: 800; color: #1c2a3a; margin: 0; }
+.notifs-sous { font-size: 0.85rem; color: #5f6b7a; }
+.alertes-carte { background: #fff; border: 1px solid #cfe0f5; border-radius: 14px; padding: 4px 12px; margin-bottom: 12px; }
+.alertes-ligne { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.alertes-ligne + .alertes-ligne { border-top: 1px solid #eef2f6; }
+.alertes-texte { flex: 1; display: flex; flex-direction: column; font-size: 0.82rem; color: #546e7a; min-width: 0; }
+.alertes-texte strong { color: #1c2a3a; font-size: 0.9rem; }
+.notifs-filtres { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.notifs-etat { text-align: center; padding: 34px 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.notifs-aide { font-size: 0.85rem; color: #5f6b7a; max-width: 420px; }
+.notifs-jour { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #5f6b7a; margin: 14px 2px 6px; }
+.notif { display: flex; gap: 10px; background: #fff; border: 1px solid #e3e9f1; border-radius: 12px; padding: 10px 12px; margin-bottom: 6px; }
+.notif.is-nouveau { border-left: 4px solid #1976d2; background: #f7faff; }
+.notif-icone { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #e3f2fd; color: #1565c0; }
+.t-absence .notif-icone { background: #fdecea; color: #c62828; }
+.t-punition .notif-icone { background: #fff3e0; color: #e65100; }
+.t-bulletin .notif-icone { background: #e8f5e9; color: #2e7d32; }
+.t-note .notif-icone { background: #ede7f6; color: #5e35b1; }
+.t-permission .notif-icone { background: #e0f7fa; color: #00838f; }
+.notif-corps { flex: 1; min-width: 0; }
+.notif-titre { font-weight: 800; font-size: 0.92rem; color: #1c2a3a; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.notif-nouveau { font-size: 0.66rem; font-weight: 800; color: #fff; background: #1976d2; border-radius: 6px; padding: 0 6px; text-transform: uppercase; }
+.notif-texte { font-size: 0.86rem; color: #37474f; margin-top: 2px; }
+.notif-pied { font-size: 0.74rem; color: #8a96a3; margin-top: 3px; }
+.notif-actions { margin-top: 6px; }
+.notif-motif { font-size: 0.8rem; color: #2e7d32; }
 </style>

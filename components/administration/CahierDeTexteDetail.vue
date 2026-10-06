@@ -1,9 +1,6 @@
 <template>
   <div class="container">
     <div class="detail-topbar">
-      <v-btn icon class="detail-back-btn" @click="$emit('back')" aria-label="Retour">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
       <div class="detail-topbar-title">Cahier de texte</div>
     </div>
 
@@ -199,12 +196,12 @@ export default {
   border: 1px solid #e0e0e0;
   margin-bottom: 18px;
   border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   transition: box-shadow 0.3s ease;
 }
 
 .matiere-card:hover {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .matiere-header {

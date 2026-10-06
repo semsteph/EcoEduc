@@ -1,19 +1,10 @@
 <template>
   <v-container fluid class="pa-0">
-    <v-row align="center" class="mb-6 px-4 pt-2">
+    <v-row align="center" class="mb-3 px-3 pt-2">
       <v-col cols="auto">
-        <v-btn
-          icon
-          variant="tonal"
-          color="error"
-          @click="selectedStudentId ? clearSelection() : $emit('back')"
-          elevation="0"
-        >
-          <v-icon>mdi-arrow-left</v-icon>
-        </v-btn>
       </v-col>
       <v-col>
-        <h2 class="text-h5 font-weight-bold text-error d-flex align-center">
+        <h2 class="text-h6 font-weight-bold text-error d-flex align-center">
           <v-icon start size="32" color="error">mdi-book-alert</v-icon>
           {{ selectedStudentId ? 'Historique disciplinaire' : 'Répertoire des élèves' }}
         </h2>
@@ -25,9 +16,9 @@
 
     <v-window v-model="activeView" disabled>
       <v-window-item value="list">
-        <v-card border flat class="rounded-xl overflow-hidden elevation-1 mx-4">
-          <v-toolbar color="error-lighten-5" flat class="px-4">
-            <v-toolbar-title class="text-subtitle-1 font-weight-bold text-error">
+        <v-card border flat class="rounded-lg overflow-hidden elevation-1 mx-4">
+          <v-toolbar height="40" color="error-lighten-5" flat class="px-3">
+            <v-toolbar-title class="text-subtitle-1 font-weight-bold text-error text-subtitle-1">
               Liste des élèves inscrits
             </v-toolbar-title>
             <v-spacer></v-spacer>
@@ -36,7 +27,7 @@
             </v-chip>
           </v-toolbar>
 
-          <v-card-text class="pa-4 pa-md-6 bg-grey-lighten-5">
+          <v-card-text class="pa-3 pa-md-3 bg-grey-lighten-5">
             <v-row v-if="eleves.length > 0">
               <v-col
                 v-for="eleve in eleves"
@@ -52,8 +43,8 @@
                   @click="selectStudent(eleve)"
                   ripple
                 >
-                  <v-card-text class="d-flex align-center pa-4">
-                    <v-avatar color="error-lighten-4" size="48" class="me-4 font-weight-bold text-error">
+                  <v-card-text class="d-flex align-center pa-3">
+                    <v-avatar color="error-lighten-4" size="32" class="me-2 font-weight-bold text-error">
                       {{ eleve.nom.charAt(0) }}{{ eleve.prenom.charAt(0) }}
                     </v-avatar>
                     
@@ -84,9 +75,9 @@
       </v-window-item>
 
       <v-window-item value="detail">
-        <div class="w-100 px-4">
+        <div class="w-100 px-3">
           <cahier-punition
-            v-if="selectedStudentId"
+            v-if="selectedStudent"
             :student-id="selectedStudentId"
             :student-nom="selectedStudentNom"
             :student-prenom="selectedStudentPrenom"
@@ -113,15 +104,39 @@ export default {
     etablissementId: { type: Number, required: true },
     etablissementNom: { type: String, required: true },
     anneeScolaire: { type: String, required: true },
-    anneeScolaireId: { type: Number, required: true }
+    anneeScolaireId: { type: Number, required: true },
+    eleveId: { type: Number, default: null }
   },
+  emits: ['back', 'ouvrir-eleve'],
   data() {
     return {
       eleves: [],
-      selectedStudentId: null,
-      selectedStudentNom: '',
-      selectedStudentPrenom: '',
       activeView: 'list'
+    }
+  },
+  computed: {
+    // Élève ouvert : donné par la route (…/<classeId>/<eleveId>). Le changer
+    // émet « ouvrir-eleve » et la page va vers la nouvelle adresse.
+    selectedStudentId: {
+      get() { return this.eleveId },
+      set(id) { this.$emit('ouvrir-eleve', id) }
+    },
+    selectedStudent() {
+      return this.eleves.find((e) => Number(e.id) === this.eleveId) || null
+    },
+    selectedStudentNom() {
+      return this.selectedStudent ? this.selectedStudent.nom : ''
+    },
+    selectedStudentPrenom() {
+      return this.selectedStudent ? this.selectedStudent.prenom : ''
+    }
+  },
+  watch: {
+    eleveId: {
+      handler(id) {
+        this.activeView = id ? 'detail' : 'list'
+      },
+      immediate: true
     }
   },
   methods: {
@@ -130,6 +145,8 @@ export default {
         .get(`/api/eleves/${this.classId}/${this.anneeScolaireId}`)
         .then((response) => {
           this.eleves = response.data
+          // Élève inconnu dans cette classe : retour à la liste de la classe.
+          if (this.eleveId && !this.selectedStudent) this.selectedStudentId = null
         })
         .catch((error) => {
           console.error('Erreur lors de la récupération des élèves:', error)
@@ -138,15 +155,9 @@ export default {
     // Modification pour accepter l'objet eleve
     selectStudent(eleve) {
       this.selectedStudentId = eleve.id
-      this.selectedStudentNom = eleve.nom
-      this.selectedStudentPrenom = eleve.prenom
-      this.activeView = 'detail'
     },
     clearSelection() {
       this.selectedStudentId = null
-      this.selectedStudentNom = ''
-      this.selectedStudentPrenom = ''
-      this.activeView = 'list'
     }
   },
   created() {

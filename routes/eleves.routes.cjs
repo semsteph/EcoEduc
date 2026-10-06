@@ -5,7 +5,8 @@
 const express = require('express');
 const router = express.Router();
 
-const { authenticateJWT } = require('../server-lib/auth.cjs');
+const { authenticateJWT, requireAdminStaff } = require('../server-lib/auth.cjs');
+const { savePhoto, deletePhoto, photoUpload } = require('../server-lib/photo.cjs');
 const { upload } = require('../server-lib/upload.cjs');
 const db = require('../server-lib/db.cjs');
 const XLSX = require('xlsx');
@@ -76,11 +77,14 @@ router.post('/eleves', authenticateJWT, async (req, res) => {
   try {
     const [rows] = await db.execute(
       `SELECT
-         e.id, e.nom, e.prenom, e.date_naissance, e.sexe, e.classe_id, c.nom AS classe_nom, e.Parents_id AS parent_id
+         e.id, e.nom, e.prenom, e.date_naissance, e.sexe, e.classe_id, c.nom AS classe_nom, e.Parents_id AS parent_id,
+         p.nom AS parent_nom, p.prenom AS parent_prenom, p.contact AS parent_contact, p.email AS parent_email
        FROM
          eleve e
        JOIN
          classes c ON e.classe_id = c.id
+       LEFT JOIN
+         parents p ON p.id = e.Parents_id AND p.etablissement_id = e.etablissement_id
        WHERE
          e.etablissement_id = ? AND e.Annee_scolaire_id = ? AND e.statut = 'actif'`,
       [etablissement_id, annee_scolaire_id]
@@ -246,11 +250,18 @@ router.post('/eleves/annuler-depart', authenticateJWT, async (req, res) => {
   }
 });
 
-router.post('/import-eleves', authenticateJWT, upload.single('file'), async (req, res) => {
+router.post('/import-eleves', authenticateJWT, requireAdminStaff, upload.single('file'), async (req, res) => {
   const file = req.file;
-  const { classeId, etablissementId, anneeScolaireId } = req.body;
+  const { classeId, anneeScolaireId } = req.body;
+  // École lue dans le jeton (corps multipart : le garde central ne le lit pas).
+  const etablissementId = Number(req.user.etablissementId);
 
   if (!file) return res.status(400).json({ message: 'Aucun fichier reçu.' });
+  const [[classeOk]] = await db.query('SELECT id FROM classes WHERE id = ? AND etablissement_id = ?', [classeId, etablissementId]);
+  if (!classeOk) {
+    fs.unlink(file.path, () => {});
+    return res.status(403).json({ message: "Cette classe n'appartient pas à votre établissement." });
+  }
 
   try {
     const workbook = XLSX.readFile(file.path);
@@ -260,8 +271,9 @@ router.post('/import-eleves', authenticateJWT, upload.single('file'), async (req
     // On commence à lire les données après l'entête
     let data = XLSX.utils.sheet_to_json(worksheet, { range: 1 });
 
-    // ON IGNORE L'EXEMPLE (La première ligne de données)
-    if (data.length > 0) data.shift();
+    // Ligne d'exemple du canevas ignorée seulement si elle est restée telle
+    // quelle (avant : la 1re ligne était toujours supprimée, même un vrai élève).
+    if (data.length > 0 && String(data[0]['Nom Élève'] || '').trim().toUpperCase() === 'KOUADIO' && String(data[0]['Prénom Élève'] || '').trim() === 'Jean') data.shift();
 
     if (data.length === 0) {
       return res.status(400).json({ message: "Le fichier est vide ou ne contient que l'exemple." });
@@ -329,7 +341,7 @@ router.post('/import-eleves', authenticateJWT, upload.single('file'), async (req
         }
 
         // INSCRIPTION ELEVE
-        const matricule = `E-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const matricule = `${new Date().getFullYear()}-T${Date.now().toString().slice(-7)}${Math.floor(Math.random() * 100)}`;
         await connection.query(
           `INSERT INTO eleve 
             (matricule, nom, prenom, date_naissance, classe_id, Parents_id, sexe, etablissement_id, Annee_scolaire_id) 
@@ -428,7 +440,7 @@ router.get('/students/:eleveId', authenticateJWT, async (req, res) => {
 });
 
 //pour presence,punition dans gestion eleve page administration
-router.get('/eleves/:classId/:anneeScolaireId', async (req, res) => {
+router.get('/eleves/:classId/:anneeScolaireId', authenticateJWT, async (req, res) => {
   const { classId, anneeScolaireId } = req.params;
 
   // Log des paramètres reçus
@@ -748,6 +760,226 @@ router.get('/eleve/:studentId', authenticateJWT, async (req, res) => {
   } catch (err) {
     console.error('Erreur lors de la récupération des informations de l\'élève:', err);
     res.status(500).send('Erreur interne du serveur');
+  }
+});
+
+// Inscription en masse d'une classe à partir d'une liste déjà lue et
+// vérifiée par l'écran (copier-coller depuis Excel/Word ou fichier).
+// Corps : { classeId, anneeScolaireId, eleves: [{ nom, prenom, dateNaissance
+//   (AAAA-MM-JJ), sexe (M/F), parentNom, parentPrenom, telephone, email }] }
+// - le parent peut n'avoir qu'un téléphone ; un parent déjà connu (même
+//   téléphone ou même e-mail) est réutilisé : les frères et sœurs sont
+//   rattachés au même compte ;
+// - un élève déjà inscrit (même nom, prénom, date de naissance) est ignoré ;
+// - réponse ligne par ligne (les lignes valides sont inscrites).
+router.post('/eleves/import-liste', authenticateJWT, requireAdminStaff, async (req, res) => {
+  const { classeId, anneeScolaireId, eleves } = req.body || {};
+  const etablissementId = Number(req.user.etablissementId);
+  if (!classeId || !anneeScolaireId || !Array.isArray(eleves) || eleves.length === 0) {
+    return res.status(400).json({ message: 'Choisissez la classe et ajoutez au moins un élève.' });
+  }
+  if (eleves.length > 300) return res.status(400).json({ message: 'Au plus 300 élèves par envoi.' });
+
+  const conn = await db.getConnection();
+  try {
+    const [[classe]] = await conn.query('SELECT id, nom FROM classes WHERE id = ? AND etablissement_id = ?', [classeId, etablissementId]);
+    const [[annee]] = await conn.query("SELECT id, nom_annee FROM annee_scolaire WHERE id = ? AND etablissement_id = ? AND statut = 'ouverte'", [anneeScolaireId, etablissementId]);
+    if (!classe || !annee) return res.status(403).json({ message: 'Classe ou année invalide.' });
+
+    const params = await fetchClotureParams(conn, etablissementId);
+    const [[{ total }]] = await conn.query("SELECT COUNT(*) AS total FROM eleve WHERE classe_id = ? AND statut = 'actif'", [classeId]);
+    let effectif = Number(total);
+    const debut = String(annee.nom_annee).slice(0, 4);
+    const chiffres = (t) => String(t || '').replace(/\D/g, '');
+
+    const inscrits = [];
+    const erreurs = [];
+    const ignores = [];
+    for (const [index, row] of eleves.entries()) {
+      const ligne = index + 1;
+      const nom = String(row.nom || '').trim().replace(/\s+/g, ' ').toUpperCase();
+      const prenom = String(row.prenom || '').trim().replace(/\s+/g, ' ');
+      const date = String(row.dateNaissance || '').trim();
+      const sexe = String(row.sexe || '').trim().toUpperCase();
+      const telephone = chiffres(row.telephone);
+      const email = String(row.email || '').trim().toLowerCase();
+      try {
+        if (!nom || !prenom) throw new Error('nom ou prénom manquant');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T12:00:00`).getTime())) throw new Error('date de naissance invalide');
+        if (!['M', 'F'].includes(sexe)) throw new Error('sexe à préciser (M ou F)');
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('e-mail du parent invalide');
+        if (effectif >= params.effectifMaxParClasse) throw new Error(`effectif maximum atteint (${params.effectifMaxParClasse})`);
+
+        const [doublon] = await conn.query(
+          "SELECT id FROM eleve WHERE etablissement_id = ? AND nom = ? AND prenom = ? AND date_naissance = ? AND statut = 'actif'",
+          [etablissementId, nom, prenom, date]
+        );
+        if (doublon.length) { ignores.push({ ligne, nom, prenom, raison: 'déjà inscrit(e)' }); continue; }
+
+        let parentId = null;
+        if (telephone || email) {
+          const [parents] = await conn.query(
+            `SELECT id FROM parents WHERE etablissement_id = ?
+               AND ((? <> '' AND REPLACE(REPLACE(REPLACE(contact, ' ', ''), '-', ''), '.', '') = ?) OR (? <> '' AND LOWER(email) = ?))
+             LIMIT 1`,
+            [etablissementId, telephone, telephone, email, email]
+          );
+          if (parents.length) {
+            parentId = parents[0].id;
+          } else {
+            const [ins] = await conn.query(
+              `INSERT INTO parents (nom, prenom, contact, email, mot_de_passe, nom_utilisateur, etablissement_id, Annee_scolaire_id)
+               VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)`,
+              [String(row.parentNom || nom).trim().toUpperCase(), String(row.parentPrenom || '').trim(), telephone || null, email, etablissementId, anneeScolaireId]
+            );
+            parentId = ins.insertId;
+          }
+        }
+
+        const [ins] = await conn.query(
+          `INSERT INTO eleve (nom, prenom, date_naissance, sexe, classe_id, Parents_id, etablissement_id, Annee_scolaire_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [nom, prenom, date, sexe, classeId, parentId, etablissementId, anneeScolaireId]
+        );
+        const matricule = `${debut}-${String(ins.insertId).padStart(5, '0')}`;
+        await conn.query('UPDATE eleve SET matricule = ? WHERE id = ?', [matricule, ins.insertId]);
+        effectif += 1;
+        inscrits.push({ ligne, id: ins.insertId, nom, prenom, matricule, sansParent: !parentId });
+      } catch (error) {
+        erreurs.push({ ligne, nom, prenom, message: error.message });
+      }
+    }
+    res.json({ classe: classe.nom, inscrits, ignores, erreurs, effectif, effectifMax: params.effectifMaxParClasse });
+  } catch (error) {
+    console.error('Erreur inscription en masse :', error);
+    res.status(500).json({ message: "Erreur lors de l'inscription." });
+  } finally {
+    conn.release();
+  }
+});
+
+// Photo d'identité d'un élève (facultative) : ajout / remplacement /
+// suppression, par l'administration de son établissement.
+async function eleveDeLEcole(req, res) {
+  const [[eleve]] = await db.query('SELECT id, etablissement_id FROM eleve WHERE id = ?', [req.params.id]);
+  if (!eleve) { res.status(404).json({ message: 'Élève introuvable.' }); return null; }
+  if (Number(eleve.etablissement_id) !== Number(req.user.etablissementId)) {
+    res.status(403).json({ message: "Cet élève n'appartient pas à votre établissement." });
+    return null;
+  }
+  return eleve;
+}
+
+// Rattacher un parent plus tard (élèves inscrits sans parent, ou erreur à
+// corriger) : un parent existant, ou un nouveau parent créé à la volée —
+// retrouvé s'il existe déjà avec le même téléphone ou e-mail. Plusieurs
+// élèves d'un coup pour les frères et sœurs.
+router.post('/eleves/parent', authenticateJWT, requireAdminStaff, async (req, res) => {
+  const etablissementId = Number(req.user.etablissementId);
+  const { eleveIds, parentId, parent, anneeScolaireId } = req.body || {};
+  const ids = [...new Set((Array.isArray(eleveIds) ? eleveIds : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length || ids.length > 20) return res.status(400).json({ message: 'Choisissez entre 1 et 20 élèves.' });
+
+  const conn = await db.getConnection();
+  try {
+    const [eleves] = await conn.query('SELECT id FROM eleve WHERE id IN (?) AND etablissement_id = ?', [ids, etablissementId]);
+    if (eleves.length !== ids.length) return res.status(403).json({ message: "Un des élèves n'appartient pas à votre établissement." });
+
+    let idParent = Number(parentId) || null;
+    let cree = false;
+    if (idParent) {
+      const [[p]] = await conn.query('SELECT id FROM parents WHERE id = ? AND etablissement_id = ?', [idParent, etablissementId]);
+      if (!p) return res.status(404).json({ message: 'Parent introuvable dans votre établissement.' });
+    } else {
+      const nom = String(parent?.nom || '').trim().replace(/\s+/g, ' ').toUpperCase();
+      const prenom = String(parent?.prenom || '').trim().replace(/\s+/g, ' ');
+      const telephone = String(parent?.telephone || '').replace(/\D/g, '');
+      const email = String(parent?.email || '').trim().toLowerCase();
+      if (!nom) return res.status(400).json({ message: 'Indiquez au moins le nom du parent.' });
+      if (!telephone && !email) return res.status(400).json({ message: 'Indiquez le téléphone ou l\'e-mail du parent.' });
+      if (telephone && (telephone.length < 8 || telephone.length > 15)) return res.status(400).json({ message: 'Numéro de téléphone invalide.' });
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ message: 'E-mail invalide.' });
+
+      const [existant] = await conn.query(
+        `SELECT id FROM parents WHERE etablissement_id = ?
+           AND ((? <> '' AND REPLACE(REPLACE(REPLACE(contact, ' ', ''), '-', ''), '.', '') = ?) OR (? <> '' AND LOWER(email) = ?))
+         LIMIT 1`,
+        [etablissementId, telephone, telephone, email, email]
+      );
+      if (existant.length) {
+        idParent = existant[0].id;
+      } else {
+        let annee = Number(anneeScolaireId) || null;
+        if (!annee) {
+          const [[a]] = await conn.query("SELECT id FROM annee_scolaire WHERE etablissement_id = ? AND statut = 'ouverte' ORDER BY id DESC LIMIT 1", [etablissementId]);
+          annee = a?.id || null;
+        }
+        const [ins] = await conn.query(
+          `INSERT INTO parents (nom, prenom, contact, email, mot_de_passe, nom_utilisateur, etablissement_id, Annee_scolaire_id)
+           VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)`,
+          [nom, prenom, telephone || null, email, etablissementId, annee]
+        );
+        idParent = ins.insertId;
+        cree = true;
+      }
+    }
+
+    await conn.query('UPDATE eleve SET Parents_id = ? WHERE id IN (?) AND etablissement_id = ?', [idParent, ids, etablissementId]);
+    const [[p]] = await conn.query(
+      'SELECT id, nom, prenom, contact, email, nom_utilisateur, (mot_de_passe IS NOT NULL) AS actif FROM parents WHERE id = ?',
+      [idParent]
+    );
+    res.json({
+      message: ids.length > 1 ? `Parent rattaché à ${ids.length} élèves.` : 'Parent rattaché.',
+      cree,
+      parent: { id: p.id, nom: p.nom, prenom: p.prenom, contact: p.contact, email: p.email, identifiant: p.nom_utilisateur, actif: Boolean(p.actif) },
+    });
+  } catch (error) {
+    console.error('Erreur rattachement parent :', error);
+    res.status(500).json({ message: 'Erreur lors du rattachement du parent.' });
+  } finally {
+    conn.release();
+  }
+});
+
+// Détacher le parent d'un élève (mauvais parent rattaché).
+router.delete('/eleves/:id/parent', authenticateJWT, requireAdminStaff, async (req, res) => {
+  try {
+    if (!(await eleveDeLEcole(req, res))) return;
+    await db.query('UPDATE eleve SET Parents_id = NULL WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Parent détaché.' });
+  } catch (error) {
+    console.error('Erreur détachement parent :', error);
+    res.status(500).json({ message: 'Erreur lors du détachement du parent.' });
+  }
+});
+
+router.post('/eleves/:id/photo', authenticateJWT, requireAdminStaff, (req, res, next) => {
+  photoUpload.single('photo')(req, res, (err) => {
+    if (err) return res.status(400).json({ message: err.code === 'LIMIT_FILE_SIZE' ? 'Photo trop lourde (5 Mo au plus).' : 'Envoi de la photo impossible.' });
+    next();
+  });
+}, async (req, res) => {
+  try {
+    if (!(await eleveDeLEcole(req, res))) return;
+    if (!req.file) return res.status(400).json({ message: 'Aucune photo reçue.' });
+    const photoUrl = await savePhoto(db, req.params.id, req.file.buffer);
+    res.json({ message: 'Photo enregistrée.', photo_url: photoUrl });
+  } catch (error) {
+    if (error.code === 'IMAGE') return res.status(400).json({ message: error.message });
+    console.error('Erreur photo élève :', error);
+    res.status(500).json({ message: 'Erreur lors de l\'enregistrement de la photo.' });
+  }
+});
+
+router.delete('/eleves/:id/photo', authenticateJWT, requireAdminStaff, async (req, res) => {
+  try {
+    if (!(await eleveDeLEcole(req, res))) return;
+    await deletePhoto(db, req.params.id);
+    res.json({ message: 'Photo retirée.' });
+  } catch (error) {
+    console.error('Erreur suppression photo :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
 

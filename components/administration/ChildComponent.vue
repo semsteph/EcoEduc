@@ -1,10 +1,7 @@
 <template>
-  <v-card class="rounded-xl elevation-2 border-light mt-4" min-height="500">
-    <v-toolbar flat color="white" class="border-b">
-      <v-btn icon variant="tonal" color="primary" @click="$emit('back')" class="me-2">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
-      <v-toolbar-title class="font-weight-bold text-primary">
+  <v-card class="rounded-lg elevation-2 border-light mt-4" min-height="500">
+    <v-toolbar height="40" flat color="white" class="border-b">
+      <v-toolbar-title class="font-weight-bold text-primary text-subtitle-1">
         Registre des Présences
       </v-toolbar-title>
       <v-spacer></v-spacer>
@@ -43,7 +40,7 @@
             v-else
             :headers="headers"
             :items="s.data"
-            density="comfortable"
+            density="compact"
             hover
             class="attendance-table"
           >
@@ -86,9 +83,13 @@ export default {
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true }
   },
+  setup() {
+    // Période (onglet) affichée, conservée dans l'URL.
+    const tabIndex = useUrlState('periode', null);
+    return { tabIndex };
+  },
   data() {
     return {
-      tabIndex: null,
       loading: false,
       headers: [
         { title: 'Date', key: 'date', align: 'start' },
@@ -110,7 +111,9 @@ export default {
         }));
 
         if (this.semestre.length > 0) {
-          this.tabIndex = this.semestre[0].nom;
+          if (!this.semestre.some(s => s.nom === this.tabIndex)) {
+            this.tabIndex = this.semestre[0].nom;
+          }
           this.fetchSemestreData(this.tabIndex);
         }
       } catch (error) {

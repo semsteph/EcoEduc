@@ -1,16 +1,6 @@
 <template>
   <v-container fluid class="eleve-container">
     <!-- Bouton retour -->
-    <v-btn
-      icon
-      color="primary"
-      variant="text"
-      class="mb-3"
-      @click="$emit('back')"
-      :size="$vuetify.display.smAndDown ? 'x-small' : 'default'"
-    >
-      <v-icon :size="$vuetify.display.smAndDown ? 16 : 24">mdi-arrow-left</v-icon>
-    </v-btn>
 
     <!-- Titre -->
     <h2 class="title">Liste des Élèves</h2>
@@ -20,9 +10,27 @@
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="🔍 Rechercher par nom ou prénom..."
+        placeholder="🔍 Rechercher par nom, prénom ou classe..."
         class="search-input"
       />
+    </div>
+
+    <AideEssentiel cle="nos-eleves-parent" titre="À savoir : le parent de l'élève">
+      <ul class="aide-liste">
+        <li>Un élève inscrit sans parent est marqué <strong>« Sans parent »</strong>. Le filtre ci-dessous les regroupe.</li>
+        <li>Cliquez sur l'icône <v-icon size="16" color="warning">mdi-account-supervisor</v-icon> de l'élève : choisissez un parent déjà inscrit ou créez-le (téléphone ou e-mail suffit).</li>
+        <li>Les frères et sœurs sans parent (même nom) sont proposés pour être rattachés en même temps.</li>
+        <li>Parent sans e-mail : « Créer son accès » lui donne un identifiant et un mot de passe à lui remettre.</li>
+      </ul>
+    </AideEssentiel>
+
+    <div class="filtres">
+      <v-chip :color="filtre === 'tous' ? 'primary' : undefined" :variant="filtre === 'tous' ? 'flat' : 'outlined'" size="small" @click="filtre = 'tous'">
+        Tous ({{ eleves.length }})
+      </v-chip>
+      <v-chip :color="filtre === 'sansParent' ? 'warning' : undefined" :variant="filtre === 'sansParent' ? 'flat' : 'outlined'" size="small" prepend-icon="mdi-account-question" @click="filtre = 'sansParent'">
+        Sans parent ({{ nbSansParent }})
+      </v-chip>
     </div>
 
     <!-- Liste des élèves -->
@@ -36,8 +44,17 @@
         <div class="eleve-info">
           <p class="eleve-nom">{{ eleve.nom }}</p>
           <p class="eleve-prenom">{{ eleve.prenom }}</p>
+          <span v-if="!eleve.parent_id" class="sans-parent">Sans parent</span>
         </div>
         <div class="d-flex">
+          <v-icon
+            :color="eleve.parent_id ? 'teal' : 'warning'"
+            class="info-btn mr-2"
+            :title="eleve.parent_id ? 'Parent : ' + (eleve.parent_prenom || '') + ' ' + (eleve.parent_nom || '') : 'Rattacher un parent'"
+            @click="ouvrirParent(eleve)"
+          >
+            mdi-account-supervisor
+          </v-icon>
           <v-icon
             color="primary"
             class="info-btn mr-2"
@@ -74,6 +91,17 @@
           <p><strong>Nom :</strong> {{ selectedEleve.nom }}</p>
           <p><strong>Prénom :</strong> {{ selectedEleve.prenom }}</p>
           <p><strong>Classe :</strong> {{ selectedEleve.classe_nom }}</p>
+          <p>
+            <strong>Parent :</strong>
+            <template v-if="selectedEleve.parent_id">
+              {{ selectedEleve.parent_prenom }} {{ selectedEleve.parent_nom }}
+              <span v-if="selectedEleve.parent_contact"> · {{ selectedEleve.parent_contact }}</span>
+            </template>
+            <span v-else class="text-warning">aucun</span>
+            <v-btn size="x-small" variant="text" color="primary" @click="dialog = false; ouvrirParent(selectedEleve)">
+              {{ selectedEleve.parent_id ? 'Changer' : 'Rattacher' }}
+            </v-btn>
+          </p>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -89,6 +117,20 @@
       </v-card>
     </v-dialog>
 
+    <!-- DIALOGUE PARENT -->
+    <v-dialog v-model="parentDialog" max-width="560px" scrollable :fullscreen="$vuetify.display.xs">
+      <AssocierParent
+        v-if="parentDialog && eleveParent"
+        :key="eleveParent.id"
+        :eleve="eleveParent"
+        :eleves="eleves"
+        :etablissement-id="etablissementId"
+        :annee-scolaire-id="anneeScolaireId"
+        @modifie="fetchEleves"
+        @fermer="parentDialog = false"
+      />
+    </v-dialog>
+
     <!-- DIALOGUE D'ÉDITION -->
     <v-dialog v-model="editDialog" max-width="500px">
       <v-card v-if="editForm">
@@ -100,10 +142,10 @@
           <v-alert v-if="editError" type="error" density="compact" class="mb-4" closable @click:close="editError = ''">
             {{ editError }}
           </v-alert>
-          <v-text-field v-model="editForm.nom" label="Nom" variant="outlined" density="comfortable" class="mb-2" />
-          <v-text-field v-model="editForm.prenom" label="Prénom" variant="outlined" density="comfortable" class="mb-2" />
-          <v-text-field v-model="editForm.dateNaissance" type="date" label="Date de naissance" variant="outlined" density="comfortable" class="mb-2" />
-          <v-select v-model="editForm.sexe" :items="['M', 'F']" label="Sexe" variant="outlined" density="comfortable" class="mb-2" />
+          <v-text-field v-model="editForm.nom" label="Nom" variant="outlined" density="compact" class="mb-2" />
+          <v-text-field v-model="editForm.prenom" label="Prénom" variant="outlined" density="compact" class="mb-2" />
+          <v-text-field v-model="editForm.dateNaissance" type="date" label="Date de naissance" variant="outlined" density="compact" class="mb-2" />
+          <v-select v-model="editForm.sexe" :items="['M', 'F']" label="Sexe" variant="outlined" density="compact" class="mb-2" />
           <v-select
             v-model="editForm.classeId"
             :items="classes"
@@ -111,7 +153,7 @@
             item-value="id"
             label="Classe"
             variant="outlined"
-            density="comfortable"
+            density="compact"
           />
         </v-card-text>
         <v-card-actions>
@@ -150,8 +192,12 @@
 </template>
 
 <script>
+import AideEssentiel from "@/components/AideEssentiel.vue";
+import AssocierParent from "@/components/administration/AssocierParent.vue";
+
 export default {
   name: "ListeEleves",
+  components: { AideEssentiel, AssocierParent },
   props: {
     etablissementId: { type: Number, required: true },
     anneeScolaireId: { type: Number, required: true }
@@ -161,6 +207,9 @@ export default {
       eleves: [],
       classes: [],
       searchQuery: "",
+      filtre: "tous",
+      parentDialog: false,
+      eleveParent: null,
       selectedEleve: null,
       dialog: false,
 
@@ -179,8 +228,12 @@ export default {
     filteredEleves() {
       const query = this.searchQuery.toLowerCase();
       return this.eleves.filter(e =>
-        (e.nom + " " + e.prenom).toLowerCase().includes(query)
+        (this.filtre !== "sansParent" || !e.parent_id) &&
+        (e.nom + " " + e.prenom + " " + (e.classe_nom || "")).toLowerCase().includes(query)
       );
+    },
+    nbSansParent() {
+      return this.eleves.filter(e => !e.parent_id).length;
     }
   },
   mounted() {
@@ -206,9 +259,13 @@ export default {
             annee_scolaire_id: this.anneeScolaireId
           })
         });
-        this.eleves = await response.json();
+        const data = await response.json();
+        // Réponse d'erreur du serveur (objet au lieu d'une liste) : liste vide
+        // plutôt qu'un écran cassé.
+        this.eleves = response.ok && Array.isArray(data) ? data : [];
       } catch (error) {
         console.error("Erreur lors du chargement des élèves :", error);
+        this.eleves = [];
       }
     },
     async fetchClasses() {
@@ -233,6 +290,10 @@ export default {
       alert(`Afficher le bulletin de ${eleve.nom} ${eleve.prenom}`);
     },
 
+    ouvrirParent(eleve) {
+      this.eleveParent = eleve;
+      this.parentDialog = true;
+    },
     ouvrirEdition(eleve) {
       this.editError = "";
       this.editForm = {
@@ -344,12 +405,12 @@ export default {
   background: white;
   padding: 10px;
   border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   transition: 0.2s;
 }
 
 .eleve-card:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .avatar {
@@ -380,6 +441,31 @@ export default {
   margin: 0;
   font-size: 13px;
   color: #7f8c8d;
+}
+
+.filtres {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.aide-liste {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.84rem;
+}
+
+.sans-parent {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a5300;
+  background: #fff3cd;
+  border-radius: 6px;
+  padding: 0 6px;
 }
 
 .info-btn {

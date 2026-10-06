@@ -2,9 +2,6 @@
   <div class="scolarite-page">
     <!-- Topbar -->
     <div class="topbar">
-      <v-btn icon class="back-btn" @click="$emit('back')" aria-label="Retour">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
 
       <div class="topbar-title">
         <div class="title">Scolarité</div>
@@ -45,7 +42,7 @@
         <v-card v-if="!summary.defini" class="empty-card" variant="outlined">
           <v-card-text class="empty-content">
             <div class="empty-icon">
-              <v-icon size="42">mdi-cash-remove</v-icon>
+              <v-icon size="24">mdi-cash-remove</v-icon>
             </div>
             <div class="empty-title">Scolarité non encore définie</div>
             <div class="empty-subtitle">
@@ -430,7 +427,7 @@ export default {
   background: rgba(246, 248, 252, 0.82);
   border-bottom: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: minmax(0, 1fr) 44px; /* la flèche retour est dans le cadre (PageNav) */
   gap: 10px;
   align-items: center;
   padding: 12px 14px;
@@ -479,18 +476,18 @@ export default {
 .empty-card {
   max-width: 640px;
   margin: 18px auto 0;
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
 }
 .empty-content {
-  padding: 22px 18px;
+  padding: 14px 12px;
   text-align: center;
 }
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
@@ -499,13 +496,13 @@ export default {
   border: 1px solid rgba(37, 99, 235, 0.22);
 }
 .empty-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 900;
   color: var(--text);
 }
 .empty-subtitle {
   margin-top: 4px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: var(--muted);
 }
 
@@ -519,7 +516,7 @@ export default {
 .summary-card {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 14px 12px;
   text-align: center;
 }
@@ -549,7 +546,7 @@ export default {
   margin-bottom: 22px;
 }
 .btn-primary {
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--primary);
   color: #fff;
   font-weight: 950;
@@ -591,7 +588,7 @@ export default {
   align-items: center;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 12px 14px;
 }
 .echeance-libelle {
@@ -627,7 +624,7 @@ export default {
   align-items: flex-start;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 12px 14px;
   gap: 10px;
 }
@@ -690,9 +687,9 @@ export default {
   max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 24px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   font-family: "Roboto", system-ui, sans-serif;
 }
 .modal__head {

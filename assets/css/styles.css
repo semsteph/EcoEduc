@@ -22,10 +22,11 @@
   --ee-muted: #64748b;
   --ee-border: rgba(25, 118, 210, 0.12);
 
-  --ee-radius-lg: 20px;
-  --ee-radius-md: 14px;
-  --ee-shadow-soft: 0 4px 16px rgba(15, 23, 42, 0.06);
-  --ee-shadow-hover: 0 10px 28px rgba(15, 23, 42, 0.1);
+  /* Interface fine : coins discrets, ombres à peine visibles. */
+  --ee-radius-lg: 10px;
+  --ee-radius-md: 8px;
+  --ee-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --ee-shadow-hover: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
 body,

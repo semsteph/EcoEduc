@@ -2,9 +2,6 @@
   <div class="notes-page">
     <!-- Top bar -->
     <div class="topbar">
-      <v-btn icon class="back-btn" @click="$emit('back')" aria-label="Retour">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
 
       <div class="topbar-title">
         <div class="title">Notes</div>
@@ -41,7 +38,7 @@
       <v-card v-else-if="!semestres.length" class="empty-card" variant="outlined">
         <v-card-text class="empty-content">
           <div class="empty-icon">
-            <v-icon size="42">mdi-calendar-remove-outline</v-icon>
+            <v-icon size="24">mdi-calendar-remove-outline</v-icon>
           </div>
           <div class="empty-title">Aucun semestre disponible</div>
           <div class="empty-subtitle">Vérifiez l’année scolaire ou réessayez.</div>
@@ -177,11 +174,15 @@ export default {
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true },
   },
+  setup() {
+    // Semestre déplié, conservé dans l'URL (?semestre=...).
+    const selectedSemestre = useUrlState("semestre", null);
+    return { selectedSemestre };
+  },
   data() {
     return {
       notesBySemestre: {},
       semestres: [],
-      selectedSemestre: null,
       loading: true,
       error: null,
     };
@@ -303,7 +304,7 @@ export default {
   border-bottom: 1px solid var(--border);
 
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: minmax(0, 1fr) 44px; /* la flèche retour est dans le cadre (PageNav) */
   gap: 10px;
   align-items: center;
 
@@ -355,20 +356,20 @@ export default {
 .empty-card {
   max-width: 640px;
   margin: 18px auto 0;
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
 }
 
 .empty-content {
-  padding: 22px 18px;
+  padding: 14px 12px;
   text-align: center;
 }
 
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
@@ -378,19 +379,19 @@ export default {
 }
 
 .empty-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 900;
   color: var(--text);
 }
 
 .empty-subtitle {
   margin-top: 4px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: var(--muted);
 }
 
 .btn-primary {
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--primary);
   color: #fff;
   font-weight: 900;
@@ -435,8 +436,8 @@ export default {
 .semestre-card {
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 18px;
-  box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   overflow: hidden;
   margin: 10px 0;
 }
@@ -464,7 +465,7 @@ export default {
 .semestre-icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: rgba(37, 99, 235, 0.10);
@@ -545,7 +546,7 @@ export default {
   border-spacing: 0;
   background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -629,7 +630,7 @@ export default {
   .semestre-icon {
     width: 40px;
     height: 40px;
-    border-radius: 14px;
+    border-radius: 10px;
   }
 
   .semestre-name {

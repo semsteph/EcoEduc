@@ -5,8 +5,10 @@
 const express = require('express');
 const router = express.Router();
 
+const { authenticateJWT } = require('../server-lib/auth.cjs');
 const { upload } = require('../server-lib/upload.cjs');
 const db = require('../server-lib/db.cjs');
+const notesService = require('../server-lib/notes-service.cjs');
 const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
@@ -28,14 +30,14 @@ function mapTypeNoteToField(typeNote) {
 }
 
 // Endpoint pour générer le fichier Excel
-router.post('/export/excel/:classeId', async (req, res) => {
+router.post('/export/excel/:classeId', authenticateJWT, async (req, res) => {
   const classeId = req.params.classeId;
 
   try {
     // Récupération des données des élèves et tri par ordre alphabétique
     const [students] = await req.db.query(
-      'SELECT nom, prenom FROM eleve WHERE classe_id = ? ORDER BY nom ASC, prenom ASC',
-      [classeId]
+      "SELECT e.nom, e.prenom FROM eleve e JOIN classes c ON c.id = e.classe_id WHERE e.classe_id = ? AND c.etablissement_id = ? AND e.statut = 'actif' ORDER BY e.nom ASC, e.prenom ASC",
+      [classeId, req.user.etablissementId]
     );
 
     // Création d'un nouveau workbook
@@ -56,7 +58,7 @@ router.post('/export/excel/:classeId', async (req, res) => {
     XLSX.utils.book_append_sheet(workbook, worksheet, `Classe_${classeId}`);
 
     // Définir le chemin du fichier temporaire
-    const filePath = path.join(__dirname, `Classe_${classeId}.xlsx`);
+    const filePath = path.join(require('os').tmpdir(), `Classe_${classeId}_${Date.now()}_${Math.random().toString(36).slice(2)}.xlsx`);
 
     // Écrire le fichier Excel dans le système de fichiers
     XLSX.writeFile(workbook, filePath);
@@ -84,22 +86,45 @@ router.post('/export/excel/:classeId', async (req, res) => {
   }
 });
 
-router.post('/upload/excel', upload.single('file'), async (req, res) => {
+router.post('/upload/excel', authenticateJWT, upload.single('file'), async (req, res) => {
+  const file = req.file;
+  const cleanup = () => { if (file) fs.unlink(file.path, () => {}); };
   try {
-    const file = req.file;
     if (!file) {
       return res.status(400).send({ message: 'Aucun fichier uploadé.' });
     }
 
-    const { typeNote, semestreId, matiereId, classeId, etablissementId, anneeScolaireId } = req.body;
-    const updateField = mapTypeNoteToField(typeNote);
-    if (!updateField) {
+    const { typeNote, semestreId, matiereId, classeId, anneeScolaireId } = req.body;
+    // L'école vient du jeton, jamais du formulaire (multipart : le garde
+    // central ne lit pas ce corps).
+    const etablissementId = Number(req.user.etablissementId);
+    const field = notesService.noteField(mapTypeNoteToField(typeNote) || typeNote);
+    if (!field) {
+      cleanup();
       return res.status(400).send({ message: 'Type de note non valide.' });
+    }
+
+    const k = { classeId, matiereId, semestreId, anneeScolaireId, etablissementId };
+    const [owned] = await db.query(
+      `SELECT (SELECT COUNT(*) FROM classes WHERE id = ? AND etablissement_id = ?)
+            + (SELECT COUNT(*) FROM matieres WHERE id = ? AND etablissement_id = ?)
+            + (SELECT COUNT(*) FROM semestre WHERE id = ? AND etablissement_id = ?)
+            + (SELECT COUNT(*) FROM annee_scolaire WHERE id = ? AND etablissement_id = ? AND statut = 'ouverte') AS n`,
+      [classeId, etablissementId, matiereId, etablissementId, semestreId, etablissementId, anneeScolaireId, etablissementId]
+    );
+    if (Number(owned[0].n) !== 4) {
+      cleanup();
+      return res.status(403).send({ message: 'Classe, matière, période ou année invalide (ou année clôturée).' });
+    }
+    if (!(await notesService.canWriteNotes(db, req.user, k))) {
+      cleanup();
+      return res.status(403).send({ message: "Vous n'enseignez pas cette matière dans cette classe." });
     }
 
     const workbook = XLSX.readFile(file.path);
     const sheetNameList = workbook.SheetNames;
     if (sheetNameList.length === 0) {
+      cleanup();
       return res.status(400).send({ message: 'Le fichier Excel ne contient aucune feuille.' });
     }
 
@@ -107,80 +132,71 @@ router.post('/upload/excel', upload.single('file'), async (req, res) => {
     const elevesNonTrouves = [];
     const elevesDejaNote = [];
     const elevesAjoutes = [];
+    const notesInvalides = [];
 
     for (const row of data) {
-      const Nom = row.Nom?.trim();
-      const Prenom = row['Prénom']?.trim();
-      const Note = row.Note !== undefined ? row.Note : null;
+      const Nom = String(row.Nom ?? '').trim();
+      const Prenom = String(row['Prénom'] ?? row.Prenom ?? '').trim();
+      if (!Nom || !Prenom) continue;
+      if (row.Note === undefined || row.Note === null || String(row.Note).trim() === '') continue;
 
-      if (!Nom || !Prenom) {
-        console.warn(`⚠️ Élève ignoré (Nom ou Prénom manquant):`, row);
+      const parsed = notesService.parseNoteValue(row.Note);
+      if (!parsed.ok) {
+        notesInvalides.push(`${Nom} ${Prenom} (${row.Note})`);
         continue;
       }
 
       const [eleves] = await db.query(
-        'SELECT id FROM eleve WHERE nom = ? AND prenom = ? AND classe_id = ? AND etablissement_id = ?',
+        "SELECT id FROM eleve WHERE nom = ? AND prenom = ? AND classe_id = ? AND etablissement_id = ? AND statut = 'actif'",
         [Nom, Prenom, classeId, etablissementId]
       );
-
-      if (eleves.length === 0) {
-        elevesNonTrouves.push(`${Nom} ${Prenom}`);
+      // Homonymes dans la classe : impossible de savoir à qui est la note.
+      if (eleves.length !== 1) {
+        elevesNonTrouves.push(`${Nom} ${Prenom}${eleves.length > 1 ? ' (homonymes : saisir à l\'écran)' : ''}`);
         continue;
       }
 
-      const eleveId = eleves[0].id;
-
-      // Vérifie si l'élève a déjà une note pour ce typeNote
-      const [notesExistantes] = await db.query(
-        `SELECT id FROM note 
-         WHERE Eleves_id = ? AND ${updateField} IS NOT NULL
-         AND Semestre_id = ? AND matieres_id = ? 
-         AND classe_id = ? AND etablissement_id = ? 
-         AND Annee_scolaire_id = ?`,
-        [eleveId, semestreId, matiereId, classeId, etablissementId, anneeScolaireId]
-      );
-
-      if (notesExistantes.length > 0) {
+      const ek = { ...k, eleveId: eleves[0].id };
+      const existing = await notesService.noteRow(db, ek);
+      if (existing && existing[field] !== null) {
         elevesDejaNote.push(`${Nom} ${Prenom}`);
         continue;
       }
-
-      const noteValue = isNaN(Note) || Note === "" ? null : parseFloat(Note);
-
-      await db.query(
-        `INSERT INTO note (${updateField}, Eleves_id, Semestre_id, matieres_id, classe_id, etablissement_id, Annee_scolaire_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE ${updateField} = VALUES(${updateField})`,
-        [noteValue, eleveId, semestreId, matiereId, classeId, etablissementId, anneeScolaireId]
-      );
-
+      // Case vide seulement (une note existante n'est jamais écrasée) ; après
+      // validation, la moyenne attend la prochaine validation.
+      await notesService.setNote(db, ek, field, parsed.value, { recompute: false });
       elevesAjoutes.push(`${Nom} ${Prenom}`);
     }
 
-    fs.unlinkSync(file.path);
+    cleanup();
+
+    // Élèves de la classe toujours sans cette note après l'import (absents
+    // du fichier ou case vide) : à compléter avant de valider.
+    const [sansNoteRows] = await db.query(
+      `SELECT e.nom, e.prenom FROM eleve e
+       LEFT JOIN note n ON n.Eleves_id = e.id AND n.classe_id = ? AND n.matieres_id = ? AND n.Semestre_id = ? AND n.Annee_scolaire_id = ?
+       WHERE e.classe_id = ? AND e.statut = 'actif'
+       GROUP BY e.id, e.nom, e.prenom
+       HAVING MAX(n.${field}) IS NULL
+       ORDER BY e.nom, e.prenom`,
+      [classeId, matiereId, semestreId, anneeScolaireId, classeId]
+    );
+    const sansNote = sansNoteRows.map((e) => `${e.nom} ${e.prenom}`);
 
     const messageParts = [`✅ Import terminé.`];
-
-    if (elevesAjoutes.length > 0) {
-      messageParts.push(`Notes ajoutées pour : ${elevesAjoutes.join(', ')}.`);
-    }
-    if (elevesDejaNote.length > 0) {
-      messageParts.push(`Ignorés (déjà notés) : ${elevesDejaNote.join(', ')}.`);
-    }
-    if (elevesNonTrouves.length > 0) {
-      messageParts.push(`Non trouvés : ${elevesNonTrouves.join(', ')}.`);
-    }
+    if (elevesAjoutes.length > 0) messageParts.push(`${elevesAjoutes.length} note(s) ajoutée(s).`);
+    if (elevesDejaNote.length > 0) messageParts.push(`Ignorés (déjà notés) : ${elevesDejaNote.join(', ')}.`);
+    if (elevesNonTrouves.length > 0) messageParts.push(`Non trouvés : ${elevesNonTrouves.join(', ')}.`);
+    if (notesInvalides.length > 0) messageParts.push(`Notes invalides (0 à 20) : ${notesInvalides.join(', ')}.`);
+    if (sansNote.length > 0) messageParts.push(`${sansNote.length} élève(s) toujours sans note : donnez-leur une note ou 00 avant de valider.`);
 
     return res.send({
       message: messageParts.join(' '),
-      details: {
-        ajoutes: elevesAjoutes,
-        dejaNote: elevesDejaNote,
-        nonTrouves: elevesNonTrouves
-      }
+      details: { ajoutes: elevesAjoutes, dejaNote: elevesDejaNote, nonTrouves: elevesNonTrouves, invalides: notesInvalides, sansNote },
     });
-
   } catch (error) {
+    cleanup();
+    if (error.code === 'ANNEE_CLOTUREE') return res.status(409).json({ message: error.message });
     console.error('❌ Erreur lors de l\'importation des données Excel', error);
     res.status(500).send({ message: 'Erreur lors de l\'importation' });
   }

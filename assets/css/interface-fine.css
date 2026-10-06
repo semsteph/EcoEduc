@@ -1,0 +1,298 @@
+/* =====================================================================
+   INTERFACE FINE — règles globales, appliquées à TOUTES les pages.
+
+   Demande : champs, étiquettes, boutons et conteneurs beaucoup plus fins ;
+   sur téléphone, champs deux par ligne et plus de grands conteneurs.
+
+   Ces règles visent les classes Vuetify elles-mêmes (.v-btn, .v-field,
+   .v-card...) avec !important : elles l'emportent sur les styles propres
+   à chaque composant (tailles, ombres et marges « épaisses »), sans avoir à
+   modifier les 100+ composants un par un.
+   ===================================================================== */
+
+:root {
+  --fine-radius: 8px;
+  --fine-border: rgba(15, 23, 42, 0.12);
+  --fine-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --fine-control: 36px;
+}
+
+/* ---------------------------------------------------------------------
+   Boutons
+   --------------------------------------------------------------------- */
+/* Classes doublées (.v-btn.v-btn) : l'emportent aussi sur les classes
+   utilitaires Vuetify (rounded-xl, elevation-8...), chargées après ce
+   fichier et elles aussi en !important. */
+.v-btn.v-btn:not(.v-btn--icon) {
+  height: 34px !important;
+  min-height: 0 !important;
+  padding: 0 12px !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  border-radius: var(--fine-radius) !important;
+  box-shadow: none !important;
+}
+
+.v-btn.v-btn--size-small:not(.v-btn--icon),
+.v-btn.v-btn--size-x-small:not(.v-btn--icon) {
+  height: 28px !important;
+  padding: 0 10px !important;
+  font-size: 12.5px !important;
+}
+
+.v-btn.v-btn--icon {
+  box-shadow: none !important;
+}
+
+.v-btn--icon.v-btn--density-default,
+.v-btn--icon.v-btn--density-comfortable {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.v-btn .v-icon {
+  font-size: 18px;
+}
+
+/* ---------------------------------------------------------------------
+   Champs de saisie (texte, liste, zone de texte, fichier...)
+   --------------------------------------------------------------------- */
+.v-input {
+  --v-input-control-height: var(--fine-control) !important;
+  --v-input-padding-top: 6px !important;
+  font-size: 14px !important;
+}
+
+.v-field {
+  --v-field-input-padding-top: 6px !important;
+  --v-field-input-padding-bottom: 6px !important;
+  --v-field-padding-start: 10px !important;
+  --v-field-padding-end: 10px !important;
+  --v-field-border-width: 1px !important;
+  --v-field-border-opacity: 0.22 !important;
+  border-radius: var(--fine-radius) !important;
+  font-size: 14px !important;
+}
+
+.v-field--focused {
+  --v-field-border-opacity: 0.9 !important;
+}
+
+.v-field__outline {
+  --v-field-border-width: 1px !important;
+}
+
+.v-field__input {
+  min-height: var(--fine-control) !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+.v-textarea .v-field__input {
+  min-height: calc(var(--fine-control) * 2) !important;
+}
+
+.v-field-label {
+  font-size: 13.5px !important;
+}
+
+.v-field-label--floating {
+  font-size: 11.5px !important;
+}
+
+.v-field__prepend-inner > .v-icon,
+.v-field__append-inner > .v-icon,
+.v-field__clearable > .v-icon {
+  font-size: 18px !important;
+}
+
+.v-input__details {
+  min-height: 0 !important;
+  padding-top: 2px !important;
+  font-size: 11.5px !important;
+}
+
+.v-selection-control {
+  --v-selection-control-size: 30px !important;
+  min-height: 30px !important;
+}
+
+/* ---------------------------------------------------------------------
+   Conteneurs : cartes, feuilles, alertes, listes, tableaux, onglets
+   --------------------------------------------------------------------- */
+.v-card.v-card,
+.v-sheet.v-sheet[class*="rounded"],
+.v-sheet.v-sheet[class*="elevation-"],
+.v-expansion-panel.v-expansion-panel {
+  border-radius: var(--fine-radius) !important;
+  box-shadow: var(--fine-shadow) !important;
+}
+
+.v-card.v-card {
+  border: 1px solid var(--fine-border);
+}
+
+/* Grandes marges intérieures des conteneurs (pa-4 à pa-8) réduites. */
+.v-card.v-card:is(.pa-4, .pa-5, .pa-6, .pa-7, .pa-8),
+.v-sheet.v-sheet:is(.pa-4, .pa-5, .pa-6, .pa-7, .pa-8) {
+  padding: 12px !important;
+}
+
+/* Les pastilles et avatars restent ronds. */
+.v-avatar.v-avatar {
+  border-radius: 50% !important;
+}
+
+.v-card-title {
+  padding: 10px 12px 4px !important;
+  font-size: 15px !important;
+  line-height: 1.35 !important;
+}
+
+.v-card-subtitle {
+  padding: 0 12px !important;
+  font-size: 13px !important;
+}
+
+.v-card-text {
+  padding: 10px 12px !important;
+  font-size: 14px !important;
+}
+
+.v-card-actions {
+  min-height: 0 !important;
+  padding: 6px 10px 10px !important;
+  gap: 6px;
+}
+
+.v-alert.v-alert {
+  padding: 8px 12px !important;
+  font-size: 13.5px !important;
+  border-radius: var(--fine-radius) !important;
+}
+
+.v-alert__prepend > .v-icon {
+  font-size: 20px !important;
+}
+
+.v-list-item {
+  min-height: 36px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+.v-list-item-title {
+  font-size: 14px !important;
+}
+
+.v-table {
+  --v-table-header-height: 36px !important;
+  --v-table-row-height: 36px !important;
+  font-size: 13.5px !important;
+}
+
+.v-table > .v-table__wrapper > table > tbody > tr > td,
+.v-table > .v-table__wrapper > table > thead > tr > th {
+  padding: 0 10px !important;
+}
+
+.v-tab.v-btn {
+  height: 36px !important;
+}
+
+.v-chip {
+  --v-chip-height: 24px !important;
+  font-size: 12.5px !important;
+}
+
+.v-expansion-panel-title {
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+}
+
+.v-expansion-panel-text__wrapper {
+  padding: 8px 12px !important;
+}
+
+/* ---------------------------------------------------------------------
+   Téléphone
+   --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  .v-container {
+    padding: 8px !important;
+  }
+
+  .v-card.v-card:is(.pa-3, .pa-4, .pa-5, .pa-6, .pa-7, .pa-8),
+  .v-sheet.v-sheet:is(.pa-3, .pa-4, .pa-5, .pa-6, .pa-7, .pa-8) {
+    padding: 10px !important;
+  }
+
+  /* Plus de grands conteneurs : une carte qui en contient d'autres, un
+     formulaire ou un tableau devient transparente (sans fond, bordure,
+     ombre ni marge). Les fenêtres de dialogue gardent leur cadre. */
+  .v-card.v-card:is(:has(.v-card), :has(form), :has(.v-table)):not(.v-overlay .v-card),
+  .v-sheet.v-sheet:has(.v-card):not(.v-overlay .v-sheet) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .v-card:is(:has(.v-card), :has(form), :has(.v-table)):not(.v-overlay .v-card) > :is(.v-card-text, .v-card-title, .v-card-subtitle, .v-card-actions) {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Champs deux par ligne : tout groupe d'au moins deux champs voisins
+     passe sur deux colonnes (un champ seul en fin de groupe prend la
+     largeur restante). Les zones de texte, cases à cocher et
+     interrupteurs restent sur toute la largeur. */
+  :is(form, div, section, fieldset):has(> .v-input:not(.v-textarea, .v-selection-control-group, .v-checkbox, .v-switch, .v-radio-group) ~ .v-input:not(.v-textarea, .v-selection-control-group, .v-checkbox, .v-switch, .v-radio-group)) {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    column-gap: 8px !important;
+    align-items: flex-start;
+  }
+
+  :is(form, div, section, fieldset):has(> .v-input:not(.v-textarea, .v-selection-control-group, .v-checkbox, .v-switch, .v-radio-group) ~ .v-input:not(.v-textarea, .v-selection-control-group, .v-checkbox, .v-switch, .v-radio-group)) > * {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  :is(form, div, section, fieldset):has(> .v-input:not(.v-textarea, .v-selection-control-group, .v-checkbox, .v-switch, .v-radio-group) ~ .v-input:not(.v-textarea, .v-selection-control-group, .v-checkbox, .v-switch, .v-radio-group)) > .v-input:not(.v-textarea, .v-selection-control-group, .v-checkbox, .v-switch, .v-radio-group) {
+    flex: 1 1 calc(50% - 4px) !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* Même règle pour les formulaires en grille (v-row / v-col) : une colonne
+     qui ne contient qu'un champ occupe une demi-ligne. */
+  .v-row > [class*="v-col"]:has(> .v-input:only-child:not(.v-textarea, .v-selection-control-group, .v-checkbox, .v-switch, .v-radio-group)) {
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+  }
+
+  .v-row:has(> [class*="v-col"] > .v-input:only-child) {
+    --v-gutter-x: 8px;
+    margin-left: -4px !important;
+    margin-right: -4px !important;
+  }
+
+  .v-row:has(> [class*="v-col"] > .v-input:only-child) > [class*="v-col"] {
+    padding: 4px !important;
+  }
+
+  .v-card-title {
+    font-size: 14.5px !important;
+  }
+
+  /* Conteneurs faits maison (classes « card », « shell », « wrapper »,
+     « panel »...) qui en contiennent d'autres : même traitement que les
+     cartes, pas de grand cadre sur téléphone. */
+  main :is([class*="card"], [class*="shell"], [class*="wrapper"], [class*="panel"], [class*="container"]):is(:has([class*="card"]), :has(form), :has(table)):not(.v-overlay *, .v-field *, .v-input *, .v-btn, .v-table__wrapper, .v-expansion-panel, .v-expansion-panels) {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+}

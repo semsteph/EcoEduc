@@ -10,6 +10,8 @@ const { upload } = require('../server-lib/upload.cjs');
 const fs = require('fs');
 const path = require('path');
 const admZip = require('adm-zip');
+const db = require('../server-lib/db.cjs');
+const { savePhoto, imageType } = require('../server-lib/photo.cjs');
 
 router.post("/upload-photos-zip", authenticateJWT, upload.single("zipFile"), async (req, res) => {
   const { classeId, etablissementId } = req.body;
@@ -52,8 +54,8 @@ router.post("/upload-photos-zip", authenticateJWT, upload.single("zipFile"), asy
 
     // Récupération des élèves
     const [eleves] = await req.db.query(
-      "SELECT id, nom, prenom FROM eleve WHERE classe_id = ? AND etablissement_id = ?",
-      [classeId, etablissementId]
+      "SELECT id, nom, prenom FROM eleve WHERE classe_id = ? AND etablissement_id = ? AND statut = 'actif'",
+      [classeId, req.user.etablissementId]
     );
 
     if (!eleves || eleves.length === 0) {
@@ -79,8 +81,6 @@ router.post("/upload-photos-zip", authenticateJWT, upload.single("zipFile"), asy
       patternToEleveId.set(p2.replace(/_/g, ""), e.id);
     }
 
-    const targetDir = path.join(__dirname, "uploads", "photos", String(classeId));
-    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
 
     let matchCount = 0;
     let ignored = 0;
@@ -130,17 +130,12 @@ router.post("/upload-photos-zip", authenticateJWT, upload.single("zipFile"), asy
         continue;
       }
 
-      // Nom final standardisé
-      const newFileName = `eleve_${foundId}${ext}`;
-      const fullPath = path.join(targetDir, newFileName);
-
-      // Écriture fichier
-      fs.writeFileSync(fullPath, entry.getData());
-
-      // URL publique (selon ton static)
-      const publicUrl = `/uploads/photos/${classeId}/${newFileName}`;
-
-      await req.db.query("UPDATE eleve SET photo_url = ? WHERE id = ?", [publicUrl, foundId]);
+      // Même enregistrement que la photo prise à l'inscription : vrai
+      // fichier image, nom aléatoire, dans le dossier servi par le serveur
+      // (avant : écrit dans routes/uploads, donc jamais affiché).
+      const data = entry.getData();
+      if (!imageType(data)) { ignored++; continue; }
+      await savePhoto(db, foundId, data);
 
       matchCount++;
       updatedIds.add(foundId);
@@ -170,21 +165,22 @@ router.get('/cartes-scolaires/verification/:classeId/:etablissementId', authenti
   const { classeId, etablissementId } = req.params;
 
   try {
-    // 1. Récupérer les infos de l'établissement et de l'année scolaire active
-    const [infosGenerales] = await req.db.query(`
-      SELECT e.nom as etablissementNom, a.nom_annee as anneeNom
-      FROM etablissement e
-      LEFT JOIN annee_scolaire a ON e.id = a.etablissement_id
-      WHERE e.id = ? AND a.statut = 'active' LIMIT 1
-    `, [etablissementId]);
+    // 1. Établissement et année ouverte (avant : statut « active », qui
+    //    n'existe pas, et un tableau lu comme un objet → nom et année vides).
+    const [[infos]] = await req.db.query(`
+      SELECT e.nom AS etablissementNom,
+             (SELECT a.nom_annee FROM annee_scolaire a WHERE a.etablissement_id = e.id AND a.statut = 'ouverte' ORDER BY a.id DESC LIMIT 1) AS anneeNom
+      FROM etablissement e WHERE e.id = ?
+    `, [req.user.etablissementId]);
+    const [[classe]] = await req.db.query('SELECT nom FROM classes WHERE id = ? AND etablissement_id = ?', [classeId, req.user.etablissementId]);
 
-    // 2. Récupérer les élèves de la classe
+    // 2. Élèves présents de la classe
     const [eleves] = await req.db.query(`
-      SELECT id, nom,date_naissance, prenom, photo_url 
-      FROM eleve 
-      WHERE classe_id = ? AND etablissement_id = ?
+      SELECT id, matricule, nom, prenom, sexe, date_naissance, photo_url
+      FROM eleve
+      WHERE classe_id = ? AND etablissement_id = ? AND statut = 'actif'
       ORDER BY nom ASC, prenom ASC
-    `, [classeId, etablissementId]);
+    `, [classeId, req.user.etablissementId]);
 
     // 3. Logique de vérification : est-ce que TOUT LE MONDE a une photo ?
     // On considère que si au moins un élève n'a pas de photo, on doit proposer l'import.
@@ -192,14 +188,33 @@ router.get('/cartes-scolaires/verification/:classeId/:etablissementId', authenti
 
     res.json({
       tousOntUnePhoto,
-      etablissement: infosGenerales ? infosGenerales.etablissementNom : "Établissement",
-      anneeScolaire: infosGenerales ? infosGenerales.anneeNom : "N/A",
+      etablissement: infos ? infos.etablissementNom : "Établissement",
+      anneeScolaire: infos && infos.anneeNom ? infos.anneeNom : "",
+      classe: classe ? classe.nom : "",
       eleves: eleves
     });
 
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Erreur lors de la vérification des données" });
+  }
+});
+
+// État des photos de chaque classe (tableau de suivi des cartes scolaires).
+router.get('/cartes-scolaires/etat', authenticateJWT, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT c.id AS classeId, COUNT(e.id) AS effectif, SUM(e.photo_url IS NOT NULL AND e.photo_url <> '') AS avecPhoto
+       FROM classes c
+       LEFT JOIN eleve e ON e.classe_id = c.id AND e.statut = 'actif'
+       WHERE c.etablissement_id = ?
+       GROUP BY c.id`,
+      [req.user.etablissementId]
+    );
+    res.json(rows.map((r) => ({ classeId: r.classeId, effectif: Number(r.effectif), avecPhoto: Number(r.avecPhoto || 0) })));
+  } catch (error) {
+    console.error('Erreur état des cartes :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
 

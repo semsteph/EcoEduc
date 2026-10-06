@@ -1,169 +1,61 @@
 <template>
   <v-container class="cm-wrap">
-    <!-- Vue details (InfoClasse) -->
-    <template v-if="selectedClass && currentView === 'details'">
-      <InfoClasse
-        :classe="selectedClass"
-        :etablissement-id="etablissementId"
-        :annee-scolaire="anneeScolaire"
-        :annee-scolaire-id="anneeScolaireId"
-        :subject-id="subjectId"
-        @back="goBack"
-        @navigate="navigateTo"
-      />
-    </template>
-
-    <!-- Vue NoteManager -->
-    <template v-else-if="currentView === 'NoteManager'">
-      <NoteManager
-        :classe="selectedClass"
-        :classe-id="selectedClassId || selectedClass?.classe_id"
-        :subject-id="subjectId"
-        :etablissement-id="etablissementId"
-        :annee-scolaire="anneeScolaire"
-        :annee-scolaire-id="anneeScolaireId"
-        @back="goBack"
-      />
-    </template>
-
-    <!-- Vue PresenceManager -->
-    <template v-else-if="currentView === 'PresenceManager'">
-      <PresenceManager
-        :classe="selectedClass"
-        :classe-id="selectedClassId || selectedClass?.classe_id"
-        :subject-id="subjectId"
-        :etablissement-id="etablissementId"
-        :annee-scolaire="anneeScolaire"
-        :annee-scolaire-id="anneeScolaireId"
-        @back="goBack"
-      />
-    </template>
-
-    <!-- Vue PresencesPrecedantes -->
-    <template v-else-if="currentView === 'PresencesPrecedantes'">
-      <PresencesPrecedantes
-        :classe="selectedClass"
-        :classe-id="selectedClassId || selectedClass?.classe_id"
-        :subject-id="subjectId"
-        :etablissement-id="etablissementId"
-        :annee-scolaire="anneeScolaire"
-        :annee-scolaire-id="anneeScolaireId"
-        @back="goBack"
-      />
-    </template>
-
-    <!-- Vue ConductManager -->
-    <template v-else-if="currentView === 'ConductManager'">
-      <ConductManager
-        :classe="selectedClass"
-        :classe-id="selectedClassId || selectedClass?.classe_id"
-        :subject-id="subjectId"
-        :etablissement-id="etablissementId"
-        :annee-scolaire="anneeScolaire"
-        :annee-scolaire-id="anneeScolaireId"
-        @back="goBack"
-      />
-    </template>
-
-    <!-- Vue CahierDeTexteManager -->
-    <template v-else-if="currentView === 'CahierDeTexteManager'">
-      <CahierDeTexteManager
-        :classe="selectedClass"
-        :classe-id="selectedClassId || selectedClass?.classe_id"
-        :subject-id="subjectId"
-        :etablissement-id="etablissementId"
-        :annee-scolaire="anneeScolaire"
-        :annee-scolaire-id="anneeScolaireId"
-        @back="goBack"
-      />
-    </template>
-
-    <!-- Vue DevoirsManager -->
-    <template v-else-if="currentView === 'DevoirsManager'">
-      <DevoirsManager
-        :classe-id="selectedClassId || selectedClass?.classe_id"
-        :subject-id="subjectId"
-        :etablissement-id="etablissementId"
-        :annee-scolaire="anneeScolaire"
-        :annee-scolaire-id="anneeScolaireId"
-        @back="goBack"
-      />
-    </template>
-
-    <!-- Liste des classes -->
-    <template v-else>
-      <div class="cm-header">
-        <div class="cm-title">
-          <v-icon class="mr-2" color="primary">mdi-google-classroom</v-icon>
-          Choisir une classe
-        </div>
-        <div class="cm-subtitle">
-          Sélectionnez une classe pour accéder aux outils (notes, présence, conduite…)
-        </div>
+    <!-- Liste des classes (les outils de la classe ont leurs propres routes :
+         pages/professeurs/dashbord/matieres/[matiereId]/classes/...) -->
+    <div class="cm-header">
+      <div class="cm-title">
+        <v-icon class="mr-2" color="primary">mdi-google-classroom</v-icon>
+        Choisir une classe
       </div>
+      <div class="cm-subtitle">
+        Sélectionnez une classe pour accéder aux outils (notes, présence, conduite…)
+      </div>
+    </div>
 
-      <v-row>
-        <v-col
-          v-for="classe in filteredClasses"
-          :key="classe.classe_id"
-          cols="12"
-          sm="6"
-          md="4"
-          lg="3"
-        >
-          <v-card class="class-card" @click="selectClass(classe)" elevation="6">
-            <div class="class-card-top">
-              <v-icon size="22" color="white">mdi-school</v-icon>
-            </div>
-
-            <v-card-text class="class-card-body">
-              <div class="class-name">{{ classe.classe }}</div>
-
-              <div class="class-meta">
-                <v-icon size="16" class="mr-1" color="primary">mdi-information-outline</v-icon>
-                Cliquez pour voir les détails
-              </div>
-            </v-card-text>
-
-            <div class="class-card-arrow">
-              <v-icon color="primary">mdi-chevron-right</v-icon>
-            </div>
-          </v-card>
-        </v-col>
-      </v-row>
-
-      <v-alert
-        v-if="filteredClasses.length === 0"
-        type="info"
-        variant="tonal"
-        class="mt-4"
+    <v-row dense>
+      <v-col
+        v-for="classe in filteredClasses"
+        :key="classe.classe_id"
+        cols="12"
+        sm="6"
+        md="4"
+        lg="3"
       >
-        Aucune classe trouvée pour cette matière.
-      </v-alert>
-    </template>
+        <v-card class="class-card" @click="selectClass(classe)" elevation="0">
+          <div class="class-card-top">
+            <v-icon size="22" color="white">mdi-school</v-icon>
+          </div>
+
+          <v-card-text class="class-card-body">
+            <div class="class-name">{{ classe.classe }}</div>
+
+            <div class="class-meta">
+              <v-icon size="16" class="mr-1" color="primary">mdi-information-outline</v-icon>
+              Cliquez pour voir les détails
+            </div>
+          </v-card-text>
+
+          <div class="class-card-arrow">
+            <v-icon color="primary">mdi-chevron-right</v-icon>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-alert
+      v-if="filteredClasses.length === 0"
+      type="info"
+      variant="tonal"
+      class="mt-4"
+    >
+      Aucune classe trouvée pour cette matière.
+    </v-alert>
   </v-container>
 </template>
 
 <script>
-import InfoClasse from "~/components/professeurs/InfoClasse.vue";
-import NoteManager from "~/components/professeurs/NoteManager.vue";
-import PresenceManager from "~/components/professeurs/PresenceManager.vue";
-import ConductManager from "~/components/professeurs/ConductManager.vue";
-import CahierDeTexteManager from "~/components/professeurs/CahierDeTexteManager.vue";
-import DevoirsManager from "~/components/professeurs/DevoirsManager.vue";
-import PresencesPrecedantes from "~/components/professeurs/PresencesPrecedantes.vue";
-
 export default {
   name: "ClassManager",
-  components: {
-    InfoClasse,
-    NoteManager,
-    PresenceManager,
-    PresencesPrecedantes,
-    ConductManager,
-    CahierDeTexteManager,
-    DevoirsManager,
-  },
   props: {
     subjectId: { type: Number, required: true },
     classes: { type: Array, required: true },
@@ -172,12 +64,7 @@ export default {
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true },
   },
-  data() {
-    return {
-      selectedClass: null,
-      currentView: null,
-    };
-  },
+  emits: ["class-selected"],
   computed: {
     filteredClasses() {
       return this.classes;
@@ -185,20 +72,7 @@ export default {
   },
   methods: {
     selectClass(classe) {
-      this.selectedClass = classe;
-      this.currentView = "details";
       this.$emit("class-selected", classe.classe_id);
-    },
-    goBack() {
-      if (this.currentView === "details") {
-        this.selectedClass = null;
-        this.currentView = null;
-      } else {
-        this.currentView = "details";
-      }
-    },
-    navigateTo(view) {
-      this.currentView = view;
     },
   },
   mounted() {
@@ -208,67 +82,89 @@ export default {
 </script>
 
 <style scoped>
+/* Interface fine : pas de marge de conteneur en plus de la section. */
 .cm-wrap {
-  padding-top: 12px;
-  padding-bottom: 18px;
+  padding: 0 !important;
 }
 
 .cm-header {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(25, 118, 210, 0.12);
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .cm-title {
   display: flex;
   align-items: center;
-  font-weight: 950;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-weight: 800;
   color: #0b2e4a;
-  font-size: 1.05rem;
+  font-size: 15px;
 }
 
 .cm-subtitle {
-  margin-top: 6px;
+  margin-top: 2px;
   color: #546e7a;
-  font-size: 0.92rem;
-  line-height: 1.2rem;
+  font-size: 13px;
+  line-height: 1.3;
 }
 
+/* Carte d'outil fine : une ligne (pastille dégradée 32 px, texte, flèche)
+   au lieu d'un grand bandeau dégradé de 44 px au-dessus du texte. */
 .class-card {
-  border-radius: 18px !important;
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
   overflow: hidden;
   position: relative;
-  border: 1px solid rgba(25, 118, 210, 0.12);
-  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(25, 118, 210, 0.14);
+  background: rgba(255, 255, 255, 0.96);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.class-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 60px rgba(11, 46, 74, 0.12);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .class-card-top {
-  height: 44px;
-  background: linear-gradient(90deg, #1976d2, #0b2e4a);
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
+  background: linear-gradient(135deg, #1976d2, #0b2e4a);
+}
+
+.class-card:hover {
+  border-color: rgba(25, 118, 210, 0.4);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.class-card-top {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.class-card-top :deep(.v-icon) {
+  font-size: 18px !important;
 }
 
 .class-card-body {
-  padding: 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 !important;
 }
 
 .class-name {
-  font-weight: 950;
+  font-weight: 800;
   color: #0b2e4a;
-  font-size: 1.08rem;
-  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.3;
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -278,30 +174,30 @@ export default {
   display: flex;
   align-items: center;
   color: #607d8b;
-  font-weight: 700;
-  font-size: 0.85rem;
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.3;
 }
 
 .class-card-arrow {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
-  background: rgba(25, 118, 210, 0.10);
+  background: rgba(25, 118, 210, 0.08);
   border: 1px solid rgba(25, 118, 210, 0.14);
 }
 
 @media (max-width: 600px) {
+  /* Téléphone : l'en-tête n'est plus un cadre, juste un titre. */
   .cm-header {
-    padding: 12px;
-    border-radius: 14px;
-  }
-  .class-card {
-    border-radius: 16px !important;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 8px;
   }
 }
 </style>

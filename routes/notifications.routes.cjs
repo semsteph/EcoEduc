@@ -10,7 +10,7 @@ const db = require('../server-lib/db.cjs');
 const moment = require('moment');
 
 ///////////////////////////////////////////////////////notification vrai
-router.get('/notifications/unread/:etablissementId/:anneeScolaireId', async (req, res) => {
+router.get('/notifications/unread/:etablissementId/:anneeScolaireId', authenticateJWT, async (req, res) => {
   const { etablissementId, anneeScolaireId } = req.params;
   try {
     const [rows] = await db.query(
@@ -25,7 +25,7 @@ router.get('/notifications/unread/:etablissementId/:anneeScolaireId', async (req
   }
 });
 
-router.put('/notifications/mark-read/:etabId/:anneeId', async (req, res) => {
+router.put('/notifications/mark-read/:etabId/:anneeId', authenticateJWT, async (req, res) => {
   const { etabId, anneeId } = req.params;
 
   try {
@@ -42,7 +42,7 @@ router.put('/notifications/mark-read/:etabId/:anneeId', async (req, res) => {
 });
 
 // Vérifie si une notification existe déjà pour une période donnée
-router.get('/notifications/check/:eleveId/:startDate/:endDate/:etabId/:anneeId', async (req, res) => {
+router.get('/notifications/check/:eleveId/:startDate/:endDate/:etabId/:anneeId', authenticateJWT, async (req, res) => {
   const { eleveId, startDate, endDate, etabId, anneeId } = req.params;
 
   try {
@@ -63,7 +63,7 @@ router.get('/notifications/check/:eleveId/:startDate/:endDate/:etabId/:anneeId',
   }
 });
 
-router.post('/notifications/generate', async (req, res) => {
+router.post('/notifications/generate', authenticateJWT, async (req, res) => {
   const { etablissement_id, annee_scolaire_id } = req.body;
 
   if (!etablissement_id || !annee_scolaire_id) {
@@ -165,7 +165,7 @@ router.post('/notifications/generate', async (req, res) => {
   }
 });
 
-router.get('/notifications/:etabId/:anneeId', async (req, res) => {
+router.get('/notifications/:etabId/:anneeId', authenticateJWT, async (req, res) => {
   const { etabId, anneeId } = req.params;
 
   try {
@@ -347,6 +347,249 @@ router.put('/notificationprof/mark-read-bulk', authenticateJWT, async (req, res)
   }
 });
 
+// =====================================================================
+//  Espace enseignant : une seule liste de notifications (identité lue dans
+//  le jeton, jamais dans l'URL).
+//  - permissions d'absence accordées (ou sous réserve de justification) aux
+//    élèves de ses classes, récentes ou à venir ;
+//  - réponses de l'administration à ses demandes de modification de notes.
+// =====================================================================
+const STATUTS_ABSENCE = ['autoriser', 'sous reserve de justification'];
+
+// Nombre de jours couverts par une permission (« 2 jours », « 1 semaine »,
+// « 8h-10h » → 1).
+function joursDePermission(duree) {
+  const t = String(duree || '').toLowerCase();
+  const n = Number((t.match(/(\d+)/) || [])[1]) || 1;
+  if (/semaine/.test(t)) return Math.min(n * 7, 60);
+  if (/jour|journ|\bj\b/.test(t) && !/\d+\s*h/.test(t)) return Math.min(n, 60);
+  return 1;
+}
+const isoJour = (d) => {
+  if (typeof d === 'string') return d.slice(0, 10);
+  const x = new Date(d);
+  return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+const ajouterJours = (iso, n) => {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return isoJour(d);
+};
+
+const JOURS_SEMAINE = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const minutesDe = (t) => { const m = String(t || '').trim().match(/^(\d{1,2})\s*(?:h|:)\s*(\d{0,2})/i); return m ? Number(m[1]) * 60 + Number(m[2] || 0) : null; };
+const plageDe = (h) => { const [a, b] = String(h || '').split(/\s*[-–à]\s*/); const d = minutesDe(a); const f = minutesDe(b); return { d, f: f ?? (d === null ? null : d + 60) }; };
+
+// Période couverte par une permission : jours (début → fin) et, pour une
+// absence de quelques heures, la plage horaire. Anciennes demandes : durée
+// lue dans le texte.
+function etendue(p) {
+  const debut = isoJour(p.Date);
+  const fin = p.date_fin ? isoJour(p.date_fin) : ajouterJours(debut, joursDePermission(p.Duree) - 1);
+  let heures = null;
+  if (p.heure_debut && p.heure_fin) heures = { d: minutesDe(p.heure_debut), f: minutesDe(p.heure_fin) };
+  else if (!p.date_fin && joursDePermission(p.Duree) === 1) {
+    const h = plageDe(p.Duree);
+    if (h.d !== null && /\d\s*h/i.test(String(p.Duree))) heures = h;
+  }
+  return { debut, fin, heures };
+}
+
+// Jours de la semaine (« Lundi »...) couverts, au plus deux semaines.
+function joursCouverts(debut, fin) {
+  const jours = new Set();
+  for (let d = debut, i = 0; d <= fin && i < 14; d = ajouterJours(d, 1), i += 1) jours.add(JOURS_SEMAINE[new Date(`${d}T12:00:00`).getDay()]);
+  return jours;
+}
+
+// L'enseignant a-t-il cours avec la classe pendant l'absence ? Si la classe
+// n'a pas encore d'emploi du temps, on prévient tous ses enseignants.
+function aCoursPendant(etendueP, creneauxClasse, creneauxProf) {
+  if (!creneauxClasse.length) return true;
+  const jours = joursCouverts(etendueP.debut, etendueP.fin);
+  return creneauxProf.some((c) => {
+    if (!jours.has(c.jour)) return false;
+    if (!etendueP.heures) return true;
+    const q = plageDe(c.horaire);
+    return q.d === null || (etendueP.heures.d < q.f && q.d < etendueP.heures.f);
+  });
+}
+
+async function creneaux(conn, { enseignantId, annee, classeIds }) {
+  if (!classeIds.length) return { classe: {}, prof: {} };
+  const [tous] = await conn.query('SELECT classe_id, `matière_id` AS matiereId, jour, horaire FROM programmes WHERE classe_id IN (?) AND Annee_scolaire_id = ?', [classeIds, annee]);
+  const [mesMatieres] = await conn.query('SELECT Classes_id, matiere_id FROM enseigner WHERE Enseignants_id = ? AND Annee_scolaire_id = ?', [enseignantId, annee]);
+  const miennes = new Set(mesMatieres.map((m) => `${m.Classes_id}:${m.matiere_id}`));
+  const classe = {}; const prof = {};
+  for (const c of tous) {
+    (classe[c.classe_id] = classe[c.classe_id] || []).push(c);
+    if (miennes.has(`${c.classe_id}:${c.matiereId}`)) (prof[c.classe_id] = prof[c.classe_id] || []).push(c);
+  }
+  return { classe, prof };
+}
+
+function enseignantDuJeton(req, res) {
+  const u = req.user || {};
+  if (u.type !== undefined || u.role === 'parent' || !u.id || !u.etablissementId) {
+    res.status(403).json({ message: 'Réservé aux enseignants.' });
+    return null;
+  }
+  return { id: Number(u.id), etab: Number(u.etablissementId) };
+}
+
+async function anneeOuverte(etab) {
+  const [[a]] = await db.query("SELECT id FROM annee_scolaire WHERE etablissement_id = ? AND statut = 'ouverte' ORDER BY id DESC LIMIT 1", [etab]);
+  return a ? a.id : null;
+}
+
+router.get('/enseignant/notifications', authenticateJWT, async (req, res) => {
+  const ens = enseignantDuJeton(req, res);
+  if (!ens) return;
+  try {
+    const annee = await anneeOuverte(ens.etab);
+    const items = [];
+    if (annee) {
+      // Permissions récentes ou à venir des élèves de ses classes, retenues
+      // seulement s'il a cours avec la classe pendant l'absence (jour et
+      // heures, d'après l'emploi du temps).
+      const [candidates] = await db.query(
+        `SELECT DISTINCT p.id, p.Date, p.date_fin, p.heure_debut, p.heure_fin, p.Duree, e.classe_id
+         FROM permission p
+         JOIN eleve e ON e.id = p.eleve_id
+         JOIN enseigner g ON g.Classes_id = e.classe_id AND g.Enseignants_id = ? AND g.Annee_scolaire_id = ?
+         WHERE p.etablissement_id = ? AND p.Annee_scolaire_id = ? AND p.Statut IN (?)
+           AND COALESCE(p.date_fin, p.Date) >= CURDATE() - INTERVAL 30 DAY`,
+        [ens.id, annee, ens.etab, annee, STATUTS_ABSENCE]
+      );
+      const cr = await creneaux(db, { enseignantId: ens.id, annee, classeIds: [...new Set(candidates.map((c) => c.classe_id))] });
+      const concernees = candidates
+        .filter((p) => aCoursPendant(etendue(p), cr.classe[p.classe_id] || [], cr.prof[p.classe_id] || []))
+        .map((p) => p.id);
+      if (concernees.length) {
+        await db.query(
+          'INSERT IGNORE INTO notificationProf (enseignant_id, permission_id, etablissement_id) VALUES ?',
+          [concernees.map((id) => [ens.id, id, ens.etab])]
+        );
+      }
+      const [perms] = await db.query(
+        `SELECT np.id, np.is_read, np.created_at, p.id AS permissionId, p.Date, p.date_fin, p.heure_debut, p.heure_fin, p.Duree, p.Statut,
+                e.nom, e.prenom, c.id AS classeId, c.nom AS classe,
+                (SELECT MIN(g2.matiere_id) FROM enseigner g2 WHERE g2.Classes_id = c.id AND g2.Enseignants_id = ? AND g2.Annee_scolaire_id = ?) AS matiereId
+         FROM notificationProf np
+         JOIN permission p ON p.id = np.permission_id
+         JOIN eleve e ON e.id = p.eleve_id
+         JOIN classes c ON c.id = e.classe_id
+         WHERE np.enseignant_id = ? AND np.etablissement_id = ? AND p.Annee_scolaire_id = ?
+           AND p.Statut IN (?) AND p.id IN (?)
+         ORDER BY p.Date DESC LIMIT 200`,
+        [ens.id, annee, ens.id, ens.etab, annee, STATUTS_ABSENCE, concernees.length ? concernees : [0]]
+      );
+      const auj = isoJour(new Date());
+      for (const p of perms) {
+        const { debut, fin } = etendue(p);
+        const quand = fin < auj ? 'passee' : debut > auj ? 'a-venir' : 'aujourdhui';
+        items.push({
+          cle: `perm:${p.permissionId}`,
+          type: 'permission',
+          lu: Boolean(p.is_read),
+          date: p.created_at,
+          eleve: `${p.nom} ${p.prenom}`,
+          classe: p.classe,
+          classeId: p.classeId,
+          matiereId: p.matiereId,
+          debut, fin, duree: p.Duree,
+          sousReserve: p.Statut !== 'autoriser',
+          quand,
+        });
+      }
+    }
+    // Réponses de l'administration aux demandes de modification de notes.
+    const [demandes] = await db.query(
+      `SELECT r.id, r.statut, r.note_type, r.type_demande, r.ancienne_valeur, r.nouvelle_valeur,
+              r.commentaire_admin, r.vu_par_enseignant, r.date_traitement, r.date_demande,
+              r.matieres_id AS matiereId, r.classe_id AS classeId, e.nom, e.prenom, m.nom AS matiere
+       FROM note_modification_requests r
+       JOIN eleve e ON e.id = r.eleve_id
+       JOIN matieres m ON m.id = r.matieres_id
+       WHERE r.enseignant_id = ? AND r.statut <> 'en_attente'
+       ORDER BY COALESCE(r.date_traitement, r.date_demande) DESC LIMIT 50`,
+      [ens.id]
+    );
+    for (const d of demandes) {
+      items.push({
+        cle: `dem:${d.id}`,
+        type: 'demande',
+        lu: Boolean(d.vu_par_enseignant),
+        date: d.date_traitement || d.date_demande,
+        eleve: `${d.nom} ${d.prenom}`,
+        matiere: d.matiere,
+        matiereId: d.matiereId,
+        classeId: d.classeId,
+        champ: d.note_type,
+        acceptee: d.statut === 'approuvee',
+        statut: d.statut,
+        suppression: d.type_demande !== 'modification',
+        ancienne: d.ancienne_valeur,
+        nouvelle: d.nouvelle_valeur,
+        commentaire: d.commentaire_admin,
+      });
+    }
+    items.sort((a, b) => (a.lu - b.lu) || (new Date(b.date) - new Date(a.date)));
+    res.json({ items, nonLues: items.filter((i) => !i.lu).length });
+  } catch (error) {
+    console.error('Erreur notifications enseignant :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+router.put('/enseignant/notifications/lues', authenticateJWT, async (req, res) => {
+  const ens = enseignantDuJeton(req, res);
+  if (!ens) return;
+  try {
+    await db.query('UPDATE notificationProf SET is_read = 1, read_at = NOW() WHERE enseignant_id = ? AND etablissement_id = ? AND is_read = 0', [ens.id, ens.etab]);
+    await db.query("UPDATE note_modification_requests SET vu_par_enseignant = 1 WHERE enseignant_id = ? AND statut <> 'en_attente' AND vu_par_enseignant = 0", [ens.id]);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Erreur marquage notifications enseignant :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+// Élèves d'une classe ayant une permission accordée couvrant une date :
+// l'appel les marque d'office « Permissionnaire ».
+router.get('/enseignant/permissions', authenticateJWT, async (req, res) => {
+  const ens = enseignantDuJeton(req, res);
+  if (!ens) return;
+  const classeId = Number(req.query.classeId);
+  const matiereId = Number(req.query.matiereId) || null;
+  const date = String(req.query.date || '');
+  if (!classeId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ message: 'Classe et date requises.' });
+  try {
+    const annee = await anneeOuverte(ens.etab);
+    const [[ok]] = await db.query('SELECT 1 AS ok FROM enseigner WHERE Enseignants_id = ? AND Classes_id = ? AND Annee_scolaire_id = ? LIMIT 1', [ens.id, classeId, annee]);
+    if (!ok) return res.status(403).json({ message: "Vous n'enseignez pas dans cette classe." });
+    const [perms] = await db.query(
+      `SELECT p.eleve_id, p.Date, p.date_fin, p.heure_debut, p.heure_fin, p.Duree, p.Statut FROM permission p JOIN eleve e ON e.id = p.eleve_id
+       WHERE e.classe_id = ? AND p.Annee_scolaire_id = ? AND p.Statut IN (?) AND p.Date BETWEEN ? - INTERVAL 60 DAY AND ?`,
+      [classeId, annee, STATUTS_ABSENCE, date, date]
+    );
+    // Absence de quelques heures : seulement si elle touche le cours de cette
+    // matière ce jour-là (ou si l'horaire du cours n'est pas connu).
+    const [cours] = matiereId
+      ? await db.query('SELECT horaire FROM programmes WHERE classe_id = ? AND `matière_id` = ? AND jour = ? AND Annee_scolaire_id = ?', [classeId, matiereId, JOURS_SEMAINE[new Date(`${date}T12:00:00`).getDay()], annee])
+      : [[]];
+    const eleves = perms
+      .map((p) => ({ p, e: etendue(p) }))
+      .filter(({ e }) => e.debut <= date && e.fin >= date)
+      .filter(({ e }) => !e.heures || !cours.length || cours.some((c) => { const q = plageDe(c.horaire); return q.d === null || (e.heures.d < q.f && q.d < e.heures.f); }))
+      .map(({ p }) => ({ eleveId: p.eleve_id, duree: p.Duree, sousReserve: p.Statut !== 'autoriser' }));
+    res.json(eleves);
+  } catch (error) {
+    console.error('Erreur permissions du jour :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
 // Route pour récupérer les notifications d'un établissement et d'un parent spécifiques
 router.get("/notificationed/:parentId/:etablissementId/:anneeScolaireId", authenticateJWT, async (req, res) => {
   const { parentId, etablissementId, anneeScolaireId } = req.params;
@@ -405,17 +648,9 @@ router.get("/notificationed/:parentId/:etablissementId/:anneeScolaireId", authen
       [parentId, parentId, etablissementId, anneeScolaireId, startMonth, endMonth]
     );
 
-    // ✅ Enregistrer automatiquement comme "vu" les absences non lues
-    const toInsert = rows
-      .filter((n) => Number(n.is_read) === 0)
-      .map((n) => [parentId, n.presence_id]);
-
-    if (toInsert.length > 0) {
-      await req.db.query(
-        `INSERT IGNORE INTO absenceVueParents (parent_id, presence_id) VALUES ?`,
-        [toInsert]
-      );
-    }
+    // Ancienne route (remplacée par GET /parent/notifications) : elle ne
+    // marque plus rien comme « vu » — le simple calcul d'un badge faisait
+    // disparaître les nouvelles absences avant que le parent les lise.
 
     // ✅ Générer les messages
     const today = moment().format("YYYY-MM-DD");
@@ -480,16 +715,6 @@ router.get("/notificationed/:parentId/:etablissementId/:anneeScolaireId", authen
       [parentId, parentId, etablissementId, anneeScolaireId]
     );
 
-    const devoirToInsert = devoirRows
-      .filter((n) => Number(n.is_read) === 0)
-      .map((n) => [parentId, n.devoir_id]);
-
-    if (devoirToInsert.length > 0) {
-      await req.db.query(
-        `INSERT IGNORE INTO devoir_vue_parent (parent_id, devoir_id) VALUES ?`,
-        [devoirToInsert]
-      );
-    }
 
     const devoirNotifications = devoirRows.map((d) => ({
       type: 'devoir',

@@ -1,20 +1,11 @@
 <template>
-  <v-container fluid class="pa-4 bg-grey-lighten-4">
+  <v-container fluid class="pa-3 bg-grey-lighten-4">
     
-    <v-row align="center" class="mb-6">
+    <v-row align="center" class="mb-3">
       <v-col cols="auto">
-        <v-btn
-          icon
-          variant="elevated"
-          color="white"
-          @click="selectedClassId ? clearSelection() : $emit('back')"
-          elevation="2"
-        >
-          <v-icon color="primary">mdi-arrow-left</v-icon>
-        </v-btn>
       </v-col>
       <v-col>
-        <h1 class="text-h5 font-weight-bold text-primary d-flex align-center">
+        <h1 class="text-h6 font-weight-bold text-primary d-flex align-center">
           <v-icon start size="32">mdi-calendar-check</v-icon>
           {{ selectedClassId ? 'Détails : ' + selectedClassName : 'Gestion des Présences' }}
         </h1>
@@ -29,8 +20,8 @@
         <v-window v-model="viewTransition" disabled>
           
           <v-window-item value="list">
-            <v-card border flat class="rounded-xl pa-2 pa-md-6 w-100">
-              <v-card-title class="px-4 pt-4">
+            <v-card border flat class="rounded-lg pa-2 pa-md-3 w-100">
+              <v-card-title class="px-3 pt-4">
                 <span class="text-subtitle-1 font-weight-medium text-grey-darken-2">
                   Sélectionnez une classe pour faire l'appel
                 </span>
@@ -54,12 +45,12 @@
                       <v-card
                         variant="tonal"
                         color="primary"
-                        class="class-card rounded-lg py-4 text-center border"
-                        @click="goToClass(classe.id, classe.nom)"
+                        class="class-card rounded-lg py-3 text-center border"
+                        @click="goToClass(classe.id)"
                         ripple
                       >
-                        <v-avatar color="primary" size="56" class="mb-3">
-                          <v-icon color="white" size="32">mdi-account-group</v-icon>
+                        <v-avatar color="primary" size="32" class="mb-3">
+                          <v-icon size="18" color="white">mdi-account-group</v-icon>
                         </v-avatar>
                         
                         <v-card-title class="justify-center font-weight-bold py-0">
@@ -70,7 +61,7 @@
                           {{ anneeScolaire }}
                         </v-card-subtitle>
 
-                        <v-divider class="mx-10 my-3" opacity="0.1"></v-divider>
+                        <v-divider class="mx-4 my-3" opacity="0.1"></v-divider>
                         
                         <v-btn
                           variant="text"
@@ -108,6 +99,8 @@
                 v-if="selectedClassId"
                 :class-id="selectedClassId"
                 :class-name="selectedClassName"
+                :eleve-id="eleveId"
+                @ouvrir-eleve="$emit('ouvrir-eleve', $event)"
                 :annee-scolaire="anneeScolaire"
                 :annee-scolaire-id="anneeScolaireId"
                 :etablissement-id="etablissementId"
@@ -134,14 +127,35 @@ export default {
     etablissementNom: { type: String, required: true },
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true },
+    classeId: { type: Number, default: null },
+    eleveId: { type: Number, default: null },
   },
+  emits: ['back', 'ouvrir-classe', 'ouvrir-eleve'],
   data() {
     return {
       classes: [],
-      selectedClassId: null,
-      selectedClassName: '',
       loading: false,
       viewTransition: 'list'
+    }
+  },
+  computed: {
+    // Classe ouverte : donnée par la route (…/<classeId>). La changer émet
+    // « ouvrir-classe » et la page va vers la nouvelle adresse.
+    selectedClassId: {
+      get() { return this.classeId },
+      set(id) { this.$emit('ouvrir-classe', id) }
+    },
+    selectedClassName() {
+      const classe = this.classes.find((c) => Number(c.id) === Number(this.classeId))
+      return classe ? classe.nom : ''
+    },
+  },
+  watch: {
+    classeId: {
+      handler(id) {
+        this.viewTransition = id ? 'detail' : 'list'
+      },
+      immediate: true
     }
   },
   methods: {
@@ -153,21 +167,19 @@ export default {
           headers: { Authorization: `Bearer ${token}` },
         })
         this.classes = response.data
+        // Classe inconnue dans l'adresse : retour à la liste des classes.
+        if (this.classeId && !this.selectedClassName) this.selectedClassId = null
       } catch (error) {
         console.error('Erreur lors de la récupération des classes:', error)
       } finally {
         this.loading = false
       }
     },
-    goToClass(classId, className) {
+    goToClass(classId) {
       this.selectedClassId = classId
-      this.selectedClassName = className
-      this.viewTransition = 'detail'
     },
     clearSelection() {
       this.selectedClassId = null
-      this.selectedClassName = ''
-      this.viewTransition = 'list'
     }
   },
   created() {
@@ -189,7 +201,7 @@ export default {
 
 .class-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08)!important;
   background-color: white !important;
   border-color: rgb(var(--v-theme-primary)) !important;
 }

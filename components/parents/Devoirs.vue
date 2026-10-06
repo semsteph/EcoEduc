@@ -2,9 +2,6 @@
   <div class="devoirs-page">
     <!-- Topbar -->
     <div class="topbar">
-      <v-btn icon class="back-btn" @click="$emit('back')" aria-label="Retour">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
 
       <div class="topbar-title">
         <div class="title">Devoirs</div>
@@ -33,7 +30,7 @@
       <v-card v-else-if="!error && devoirs.length === 0" class="empty-card" variant="outlined">
         <v-card-text class="empty-content">
           <div class="empty-icon">
-            <v-icon size="42">mdi-notebook-outline</v-icon>
+            <v-icon size="24">mdi-notebook-outline</v-icon>
           </div>
           <div class="empty-title">Aucun devoir pour le moment</div>
           <div class="empty-subtitle">
@@ -169,7 +166,7 @@ export default {
   background: rgba(246, 248, 252, 0.82);
   border-bottom: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: minmax(0, 1fr) 44px; /* la flèche retour est dans le cadre (PageNav) */
   gap: 10px;
   align-items: center;
   padding: 12px 14px;
@@ -217,18 +214,18 @@ export default {
 .empty-card {
   max-width: 640px;
   margin: 18px auto 0;
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
 }
 .empty-content {
-  padding: 22px 18px;
+  padding: 14px 12px;
   text-align: center;
 }
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
@@ -237,17 +234,17 @@ export default {
   border: 1px solid rgba(37, 99, 235, 0.22);
 }
 .empty-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 900;
   color: var(--text);
 }
 .empty-subtitle {
   margin-top: 4px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: var(--muted);
 }
 .btn-primary {
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--primary);
   color: #fff;
   font-weight: 900;
@@ -271,8 +268,8 @@ export default {
   gap: 14px;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 18px;
-  box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   padding: 14px 14px;
 }
 .devoir-card--warn {
@@ -282,7 +279,7 @@ export default {
 .devoir-icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: rgba(37, 99, 235, 0.1);

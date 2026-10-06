@@ -41,6 +41,10 @@
       <!-- ✅ HERO (bannière moderne, pas de texte qui défile en continu) -->
       <section class="hero">
         <v-container class="py-10 py-md-14">
+          <div class="landing-nav">
+            <PageNav :crumbs="crumbs" position="top" />
+          </div>
+
           <v-row align="center" class="gy-8">
             <v-col cols="12" md="7">
               <div class="hero-badge">
@@ -76,7 +80,7 @@
             </v-col>
 
             <v-col cols="12" md="5">
-              <v-card class="hero-card" rounded="xl" elevation="10">
+              <v-card class="hero-card" rounded="xl" elevation="0">
                 <v-card-title class="hero-card-title">
                   <v-icon color="primary" class="mr-2">mdi-view-dashboard</v-icon>
                   Avantages clés
@@ -135,7 +139,7 @@
               v-for="advantage in advantages"
               :key="advantage.title"
             >
-              <v-card class="info-card" rounded="xl" elevation="6">
+              <v-card class="info-card" rounded="xl" elevation="0">
                 <div class="info-icon">
                   <v-icon size="26" color="primary">{{ advantage.icon }}</v-icon>
                 </div>
@@ -163,6 +167,12 @@
         </v-container>
       </section>
 
+      <v-container class="py-2">
+        <div class="landing-nav">
+          <PageNav :crumbs="crumbs" position="bottom" />
+        </div>
+      </v-container>
+
       <!-- ✅ Footer -->
       <footer class="footer">
         <v-container class="py-6">
@@ -184,6 +194,11 @@
 </template>
 
 <script setup>
+// Fil d'Ariane : Accueil › Espace parents.
+const crumbs = [
+  { label: "Accueil", to: "/Accueil/Accueil" },
+  { label: "Espace parents", to: "/parents/Acceuil" },
+];
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -355,7 +370,7 @@ const goHome = () => {
 
 .hero-btn,
 .hero-btn-outline {
-  border-radius: 14px;
+  border-radius: 10px;
   font-weight: 900;
 }
 
@@ -459,7 +474,7 @@ const goHome = () => {
 .info-icon {
   width: 46px;
   height: 46px;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: rgba(var(--v-theme-primary), 0.10);
@@ -505,7 +520,7 @@ const goHome = () => {
 }
 
 .bottom-cta-btn {
-  border-radius: 14px;
+  border-radius: 10px;
   font-weight: 950;
 }
 
@@ -569,5 +584,20 @@ const goHome = () => {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Fil d'Ariane et flèches retour, posés sur une bande claire (fond sombre). */
+.landing-nav {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 8px 0;
+  padding: 2px 8px 2px 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.landing-nav :deep(.page-nav) {
+  margin: 0;
+  min-width: 0;
 }
 </style>

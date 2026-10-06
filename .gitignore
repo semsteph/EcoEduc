@@ -26,3 +26,7 @@ logs
 # Skill Python cache
 __pycache__/
 *.pyc
+
+# Sauvegardes locales et fichiers envoyés par les utilisateurs (photos d élèves)
+*.backup*
+uploads/photos/

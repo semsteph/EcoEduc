@@ -7,6 +7,7 @@ const router = express.Router();
 
 const { authenticateJWT } = require('../server-lib/auth.cjs');
 const db = require('../server-lib/db.cjs');
+const { creerClasses, normaliserGroupe, nomDeBase } = require('../server-lib/nomsClasses.cjs');
 
 router.post('/Classes/multiple', authenticateJWT, async (req, res) => {
   const { promotion_id, etablissement_id, cycle, nombre } = req.body;
@@ -18,56 +19,27 @@ router.post('/Classes/multiple', authenticateJWT, async (req, res) => {
     return res.status(403).json({ error: "Vous n'avez pas accès à cet établissement." });
   }
 
-  const connection = req.db;
-
   try {
-    // 1. Récupère le nom EXACT de la promotion (ex: "6ème")
-    const [promoRows] = await connection.query(
-      'SELECT nom FROM promotion WHERE id = ?',
-      [promotion_id]
-    );
-
+    const [promoRows] = await db.query('SELECT nom FROM promotion WHERE id = ?', [promotion_id]);
     if (promoRows.length === 0) {
       return res.status(404).json({ error: 'Promotion non trouvée.' });
     }
-
-    const nomPromotion = promoRows[0].nom;
-    const createdClasses = [];
-    
-    // 2. Initialisation des compteurs
-    let nombreCrees = 0;
-    let tentativeIndex = 1;
-
-    // 3. Boucle intelligente : on cherche les numéros libres
-    while (nombreCrees < nombre) {
-      // On génère le nom cible (ex: "6ème 1", "6ème 2"...)
-      const nomClasse = `${nomPromotion} ${tentativeIndex}`;
-      
-      // On vérifie si ce nom existe déjà pour cet établissement
-      const [existing] = await connection.query(
-        'SELECT id FROM classes WHERE nom = ? AND etablissement_id = ?',
-        [nomClasse, etablissement_id]
-      );
-
-      // Si la "place" est libre (pas de classe avec ce nom)
-      if (existing.length === 0) {
-        const [result] = await connection.query(
-          'INSERT INTO classes (nom, Promotion_id, etablissement_id, cycle) VALUES (?, ?, ?, ?)',
-          [nomClasse, promotion_id, etablissement_id, cycle]
-        );
-        createdClasses.push({ id: result.insertId, nom: nomClasse });
-        nombreCrees++; // Une classe de faite !
-      }
-
-      // On passe au numéro suivant pour le prochain test
-      tentativeIndex++;
-
-      // Sécurité anti-boucle infinie
-      if (tentativeIndex > 500) break; 
-    }
-
-    if (createdClasses.length === 0) {
-      return res.status(200).json({ message: 'Toutes les classes demandées existent déjà.' });
+    const n = Math.min(30, Math.max(1, Number(nombre)));
+    // Une seule classe : « 2nd D » ; plusieurs : « 2nd D 1 », « 2nd D 2 »…
+    // (une classe « 2nd D » déjà là devient « 2nd D 1 »).
+    const conn = await db.getConnection();
+    let createdClasses;
+    try {
+      await conn.beginTransaction();
+      createdClasses = await creerClasses(conn, {
+        etablissementId: etablissement_id, base: promoRows[0].nom.trim(), promotionId: promotion_id, cycle, nombre: n,
+      });
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
     }
 
     res.status(201).json({
@@ -81,7 +53,7 @@ router.post('/Classes/multiple', authenticateJWT, async (req, res) => {
   }
 });
 
-router.get('/Promotions', async (req, res) => {
+router.get('/Promotions', authenticateJWT, async (req, res) => {
   try {
     const [promotions] = await req.db.query('SELECT id, nom FROM promotion');
     res.status(200).json(promotions);
@@ -123,13 +95,13 @@ router.get('/classetablissement/:etablissementId', authenticateJWT, async (req, 
       SELECT 
         c.id, 
         c.nom AS class_name, 
-        p.nom AS promotion_name, 
+        COALESCE(p.nom, 'Autres classes') AS promotion_name, 
         c.Promotion_id as promotion_id,
-        (SELECT COUNT(*) FROM eleve e WHERE e.classe_id = c.id) AS studentCount
+        (SELECT COUNT(*) FROM eleve e WHERE e.classe_id = c.id AND e.statut = 'actif') AS studentCount
       FROM classes c
-      JOIN promotion p ON c.Promotion_id = p.id
+      LEFT JOIN promotion p ON c.Promotion_id = p.id
       WHERE c.etablissement_id = ?
-      ORDER BY p.nom ASC, c.nom ASC
+      ORDER BY c.Promotion_id IS NULL, c.Promotion_id, LENGTH(c.nom), c.nom
     `, [etablissementId]);
 
     // Regrouper les résultats par nom de promotion
@@ -190,7 +162,7 @@ router.delete('/Classes/:id', authenticateJWT, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [classRows] = await req.db.query('SELECT etablissement_id FROM classes WHERE id = ?', [id]);
+    const [classRows] = await req.db.query('SELECT etablissement_id, nom FROM classes WHERE id = ?', [id]);
     if (classRows.length === 0) {
       return res.status(404).json({ error: 'Classe non trouvée.' });
     }
@@ -210,12 +182,21 @@ router.delete('/Classes/:id', authenticateJWT, async (req, res) => {
       return res.status(400).json({ error: 'Impossible de supprimer cette classe car elle contient des élèves.' });
     }
 
+    // Une classe qui a déjà des notes garde son historique (bulletins des
+    // années passées) : elle ne peut pas être supprimée.
+    const [[historique]] = await req.db.query('SELECT COUNT(*) AS n FROM note WHERE classe_id = ?', [id]);
+    if (Number(historique.n) > 0) {
+      return res.status(409).json({ error: "Impossible de supprimer cette classe : elle a des notes enregistrées (historique des bulletins)." });
+    }
+
     // Supprimer la classe si elle est vide
     const [result] = await req.db.query('DELETE FROM classes WHERE id = ?', [id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Classe non trouvée.' });
     }
+    // S'il ne reste qu'une classe dans la promotion, elle reprend le nom sans numéro.
+    await normaliserGroupe(db, classRows[0].etablissement_id, nomDeBase(classRows[0].nom));
 
     res.status(200).json({ message: 'Classe supprimée avec succès.' });
   } catch (error) {
@@ -272,7 +253,7 @@ router.get('/classes/:classId', authenticateJWT, async (req, res) => {
 router.get('/classe/:etablissementId', authenticateJWT, async (req, res) => {
   const etablissementId = req.params.etablissementId; // Récupérer l'ID de l'établissement depuis l'URL
   try {
-    const [rows] = await db.query('SELECT id, nom FROM classes WHERE etablissement_id = ?', [etablissementId]);
+    const [rows] = await db.query('SELECT id, nom FROM classes WHERE etablissement_id = ? ORDER BY Promotion_id IS NULL, Promotion_id, LENGTH(nom), nom', [etablissementId]);
     if (rows.length === 0) {
       return res.status(404).json({ message: 'Aucune classe trouvée pour cet établissement.' });
     }
@@ -321,8 +302,8 @@ router.get('/classes/:classId/:anneeScolaireId/details', authenticateJWT, async 
 
     // Vérifiez si aucun résultat n'est trouvé
     if (!results || results.length === 0) {
-      console.warn('Aucun détail trouvé pour cette classe et cette année scolaire.');
-      return res.status(404).json({ message: 'Aucun détail trouvé pour cette classe.' });
+      // Pas encore de cahier de texte : liste vide (ce n'est pas une erreur).
+      return res.json({ matieres: [] });
     }
 
     const matieresData = {};

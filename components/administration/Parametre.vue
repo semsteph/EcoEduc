@@ -1,19 +1,19 @@
 <template>
-  <v-container class="pa-2 pa-sm-4 pa-md-8 page-bg" fluid>
+  <v-container class="pa-2 pa-sm-3 pa-md-3 page-bg" fluid>
     <v-row justify="center">
       <v-col cols="12" xl="11">
-        <v-card class="mx-auto rounded-xl elevation-4 overflow-hidden main-card">
-          <v-toolbar flat color="primary" dark class="toolbar-custom px-2 px-sm-4">
+        <v-card class="mx-auto rounded-lg elevation-4 overflow-hidden main-card">
+          <v-toolbar height="52" flat color="primary" dark class="toolbar-custom px-2 px-sm-3">
             <div class="d-flex align-center min-w-0">
               <div class="toolbar-icon-box mr-3">
                 <v-icon dark>mdi-cog-outline</v-icon>
               </div>
 
               <div class="min-w-0">
-                <v-toolbar-title class="font-weight-bold text-h6 text-sm-h5 text-truncate">
+                <v-toolbar-title class="font-weight-bold text-truncate text-subtitle-1">
                   Paramètres de l'établissement
                 </v-toolbar-title>
-                <div class="toolbar-subtitle text-caption text-sm-body-2">
+                <div class="toolbar-subtitle text-caption d-none d-sm-block">
                   Année scolaire, clôture, frais de scolarité et collaborateurs
                 </div>
               </div>
@@ -75,8 +75,8 @@
                   </div>
                 </div>
 
-                <v-card flat class="year-card rounded-xl mb-5">
-                  <v-card-text class="pa-4 pa-sm-5">
+                <v-card flat class="year-card rounded-lg mb-5">
+                  <v-card-text class="pa-3 pa-sm-3">
                     <div class="d-flex flex-column flex-sm-row align-sm-center justify-space-between">
                       <div>
                         <div class="year-label mb-1">Année scolaire en cours</div>
@@ -100,9 +100,8 @@
 
                 <v-btn
                   color="primary"
-                  large
-                  elevation="2"
-                  class="rounded-xl text-none font-weight-bold btn-main"
+                  elevation="0"
+                  class="rounded-lg text-none font-weight-bold btn-main"
                   :disabled="isSubmitting"
                   @click="showAddForm = !showAddForm"
                 >
@@ -112,7 +111,7 @@
 
                 <v-expand-transition>
                   <div v-if="showAddForm">
-                    <v-sheet class="pa-4 pa-sm-5 rounded-xl add-form-box mt-4">
+                    <v-sheet class="pa-3 pa-sm-3 rounded-lg add-form-box mt-4">
                       <v-row dense align="center">
                         <v-col cols="12" md="8">
                           <v-text-field
@@ -173,7 +172,7 @@
                   </div>
                 </div>
 
-                <v-sheet class="pa-4 pa-sm-5 rounded-xl settings-box">
+                <v-sheet class="pa-3 pa-sm-3 rounded-lg settings-box">
                   <v-row dense>
                     <v-col cols="12" lg="7">
                       <v-row dense>
@@ -217,18 +216,6 @@
                           />
                         </v-col>
 
-                        <v-col cols="12" sm="6">
-                          <v-switch
-                            v-model="settings.activerRepartitionIntelligente"
-                            inset
-                            color="primary"
-                            class="mt-0 settings-switch"
-                            :disabled="isSavingSettings"
-                            label="Activer la répartition intelligente"
-                            @change="handleAutoSaveSwitch"
-                          />
-                        </v-col>
-
                         <v-col cols="12">
                           <v-textarea
                             v-model.trim="settings.noteInterne"
@@ -246,8 +233,8 @@
                     </v-col>
 
                     <v-col cols="12" lg="5">
-                      <v-card flat class="settings-summary-card rounded-xl">
-                        <v-card-text class="pa-4">
+                      <v-card flat class="settings-summary-card rounded-lg">
+                        <v-card-text class="pa-3">
                           <div class="summary-title mb-3">Résumé métier appliqué</div>
 
                           <div class="summary-item">
@@ -265,16 +252,13 @@
                             <strong>{{ settings.activerCreationAutoClasse ? "Oui" : "Non" }}</strong>
                           </div>
 
-                          <div class="summary-item">
-                            <span class="summary-key">Répartition intelligente :</span>
-                            <strong>{{ settings.activerRepartitionIntelligente ? "Oui" : "Non" }}</strong>
-                          </div>
 
                           <v-divider class="my-3"></v-divider>
 
                           <div class="summary-text">
-                            Les classes de <strong>3eme</strong> et <strong>Tle</strong>
-                            restent des <strong>fins de cycle</strong> et ne migrent pas.
+                            Les admis sont répartis équitablement dans les classes du niveau supérieur, sans dépasser le maximum.
+                            Les admis de <strong>3ème</strong> passent en <strong>2nde</strong> dans la série proposée ;
+                            ceux de <strong>Terminale</strong> quittent l'établissement.
                           </div>
                         </v-card-text>
                       </v-card>
@@ -303,8 +287,8 @@
                   </div>
                 </v-sheet>
 
-                <v-card flat class="rounded-xl cloture-cta mt-5">
-                  <v-card-text class="pa-4 pa-sm-5 d-flex flex-column flex-sm-row align-sm-center justify-space-between gap-3">
+                <v-card flat class="rounded-lg cloture-cta mt-5">
+                  <v-card-text class="pa-3 pa-sm-3 d-flex flex-column flex-sm-row align-sm-center justify-space-between gap-3">
                     <div class="mb-3 mb-sm-0">
                       <div class="section-title-text mb-1">Clôturer l’année</div>
                       <div class="section-subtitle-text">
@@ -314,8 +298,8 @@
 
                     <v-btn
                       color="error"
-                      elevation="2"
-                      class="rounded-xl text-none font-weight-bold btn-main flex-shrink-0"
+                      elevation="0"
+                      class="rounded-lg text-none font-weight-bold btn-main flex-shrink-0"
                       :loading="isPreparingReport || isClosing"
                       :disabled="isSubmitting || !currentAnneeScolaireId"
                       @click="ouvrirRapportCloture"
@@ -325,11 +309,44 @@
                     </v-btn>
                   </v-card-text>
                 </v-card>
+
+                <!-- Dernière clôture : annulable tant que la nouvelle année n'a pas commencé -->
+                <v-card v-if="derniereCloture" flat class="rounded-lg mt-3 annulation-card">
+                  <v-card-text class="pa-3">
+                    <div class="d-flex align-center flex-wrap ga-2">
+                      <v-icon color="primary">mdi-history</v-icon>
+                      <div class="flex-grow-1">
+                        <div class="font-weight-bold">Dernière clôture : {{ derniereCloture.annee }} → {{ derniereCloture.nouvelleAnnee }}</div>
+                        <div class="text-caption">Le {{ formatDateCloture(derniereCloture.date) }} · {{ derniereCloture.eleves }} élève(s)</div>
+                      </div>
+                      <v-btn
+                        v-if="derniereCloture.annulable"
+                        variant="outlined"
+                        color="primary"
+                        class="text-none"
+                        prepend-icon="mdi-undo"
+                        @click="annulationDialog = true"
+                      >Annuler cette clôture</v-btn>
+                    </div>
+                    <div v-if="!derniereCloture.annulable" class="text-caption mt-2">
+                      Elle ne peut plus être annulée : {{ derniereCloture.raisons.join(', ') }}.
+                    </div>
+                    <div v-else class="text-caption mt-2">
+                      Possible tant que rien n'est fait dans la nouvelle année (notes, présences, inscriptions, paiements).
+                    </div>
+                  </v-card-text>
+                </v-card>
               </div>
 
               <!-- ================================================================= -->
               <!-- PANNEAU : FRAIS DE SCOLARITÉ PAR CLASSE                            -->
               <!-- ================================================================= -->
+              <div v-else-if="activeSection === 'alertes'" class="settings-panel">
+                <div class="section-title-text mb-1">Alertes des parents</div>
+                <div class="section-subtitle-text mb-3">Notifications sur le téléphone et SMS : absences, permissions, bulletins.</div>
+                <AlertesSms />
+              </div>
+
               <div v-else-if="activeSection === 'frais'" class="settings-panel">
                 <div class="section-head mb-4">
                   <div class="section-icon success-soft">
@@ -344,20 +361,20 @@
                   </div>
                 </div>
 
-                <v-sheet class="pa-4 pa-sm-5 rounded-xl frais-box">
+                <v-sheet class="pa-3 pa-sm-3 rounded-lg frais-box">
                   <!-- Pas d'année active -->
                   <v-alert
                     v-if="!currentAnneeScolaireId"
                     type="warning"
                     outlined
-                    class="rounded-xl mb-0"
+                    class="rounded-lg mb-0"
                   >
                     Veuillez d’abord définir une année scolaire active avant de paramétrer les frais.
                   </v-alert>
 
                   <template v-else>
                     <!-- Chargement des promotions -->
-                    <div v-if="isLoadingPromotions" class="d-flex justify-center py-6">
+                    <div v-if="isLoadingPromotions" class="d-flex justify-center py-3">
                       <v-progress-circular indeterminate color="success" />
                     </div>
 
@@ -366,7 +383,7 @@
                         v-if="promotionsFrais.length === 0"
                         type="info"
                         outlined
-                        class="rounded-xl mb-0"
+                        class="rounded-lg mb-0"
                       >
                         Aucune classe trouvée pour cet établissement.
                       </v-alert>
@@ -445,7 +462,7 @@
                   <v-btn
                     color="deep-purple"
                     dark
-                    class="rounded-xl text-none font-weight-bold"
+                    class="rounded-lg text-none font-weight-bold"
                     @click="openCollaborateurDialog()"
                   >
                     <v-icon left>mdi-plus</v-icon>
@@ -457,7 +474,7 @@
                   :headers="collaborateurHeaders"
                   :items="collaborateurs"
                   :loading="isLoadingCollaborateurs"
-                  class="elevation-0 rounded-xl custom-table"
+                  class="elevation-0 rounded-lg custom-table"
                   no-data-text="Aucun collaborateur pour le moment"
                   mobile-breakpoint="768"
                 >
@@ -496,8 +513,8 @@
             </div>
           </div>
 
-          <v-card-text class="pa-4 pa-sm-6 pt-0">
-            <v-card flat class="rounded-xl info-box pa-3 pa-sm-4">
+          <v-card-text class="pa-3 pa-sm-3 pt-0">
+            <v-card flat class="rounded-lg info-box pa-3 pa-sm-3">
               <div class="d-flex align-start">
                 <v-icon color="primary" class="mr-3 mt-1">mdi-information-outline</v-icon>
                 <div>
@@ -518,18 +535,18 @@
     </v-row>
 
     <v-dialog v-model="reportDialog" max-width="1250" scrollable persistent>
-      <v-card class="rounded-xl report-dialog-card">
-        <v-toolbar
+      <v-card class="rounded-lg report-dialog-card">
+        <v-toolbar height="40"
           flat
           :color="reportMeta.isError ? 'warning darken-1' : 'primary'"
           dark
-          class="px-2 px-sm-4"
+          class="px-2 px-sm-3"
         >
           <v-icon left>
             {{ reportMeta.isError ? "mdi-file-alert-outline" : "mdi-file-chart-outline" }}
           </v-icon>
 
-          <v-toolbar-title class="text-subtitle-1 text-sm-h6 font-weight-bold">
+          <v-toolbar-title class="text-subtitle-1 text-sm-h6 font-weight-bold text-subtitle-1">
             {{ reportMeta.title }}
           </v-toolbar-title>
 
@@ -540,13 +557,13 @@
           </v-btn>
         </v-toolbar>
 
-        <v-card-text class="pa-3 pa-sm-5 report-content-wrap">
+        <v-card-text class="pa-3 pa-sm-3 report-content-wrap">
           <v-alert
             border="left"
             colored-border
             :color="reportMeta.isError ? 'warning' : 'success'"
             elevation="1"
-            class="rounded-xl mb-5"
+            class="rounded-lg mb-5"
             :icon="reportMeta.isError ? 'mdi-alert-circle-outline' : 'mdi-check-circle-outline'"
           >
             {{ reportMessage }}
@@ -554,8 +571,8 @@
 
           <v-row dense class="mb-4">
             <v-col cols="12" sm="6" lg="3">
-              <v-card flat class="stat-card stat-card-blue rounded-xl">
-                <v-card-text class="pa-4">
+              <v-card flat class="stat-card stat-card-blue rounded-lg">
+                <v-card-text class="pa-3">
                   <div class="stat-label">Classes analysées</div>
                   <div class="stat-value">{{ reportStats.totalClasses }}</div>
                 </v-card-text>
@@ -563,8 +580,8 @@
             </v-col>
 
             <v-col cols="12" sm="6" lg="3">
-              <v-card flat class="stat-card stat-card-green rounded-xl">
-                <v-card-text class="pa-4">
+              <v-card flat class="stat-card stat-card-green rounded-lg">
+                <v-card-text class="pa-3">
                   <div class="stat-label">Élèves qui passent</div>
                   <div class="stat-value">{{ reportStats.totalPassent }}</div>
                 </v-card-text>
@@ -572,17 +589,17 @@
             </v-col>
 
             <v-col cols="12" sm="6" lg="3">
-              <v-card flat class="stat-card stat-card-red rounded-xl">
-                <v-card-text class="pa-4">
-                  <div class="stat-label">Élèves qui échouent</div>
+              <v-card flat class="stat-card stat-card-red rounded-lg">
+                <v-card-text class="pa-3">
+                  <div class="stat-label">Élèves qui redoublent</div>
                   <div class="stat-value">{{ reportStats.totalEchouent }}</div>
                 </v-card-text>
               </v-card>
             </v-col>
 
             <v-col cols="12" sm="6" lg="3">
-              <v-card flat class="stat-card stat-card-orange rounded-xl">
-                <v-card-text class="pa-4">
+              <v-card flat class="stat-card stat-card-orange rounded-lg">
+                <v-card-text class="pa-3">
                   <div class="stat-label">Anomalies détectées</div>
                   <div class="stat-value">{{ reportStats.totalAnomalies }}</div>
                 </v-card-text>
@@ -618,6 +635,67 @@
             </v-col>
           </v-row>
 
+          <!-- Ce qui bloque la clôture : expliqué, avec le responsable et un lien direct -->
+          <div v-if="(reportData.blocages || []).length" class="section-block">
+            <div class="section-title">
+              <v-icon color="error" class="mr-2">mdi-lock-alert-outline</v-icon>
+              Pourquoi la clôture est bloquée ({{ reportData.blocages.length }})
+            </div>
+            <v-card v-for="(b, i) in reportData.blocages" :key="`bloc-${i}`" flat class="rounded-lg blocage-card mb-2">
+              <v-card-text class="pa-3">
+                <div class="d-flex align-start flex-wrap ga-2">
+                  <div class="flex-grow-1">
+                    <div class="blocage-titre">{{ i + 1 }}. {{ b.titre }}</div>
+                    <v-chip size="x-small" :color="b.responsable === 'Administration' ? 'primary' : 'deep-purple'" variant="flat" class="my-1">
+                      {{ b.responsable === 'Administration' ? 'À faire par vous' : b.responsable }}
+                    </v-chip>
+                    <div class="blocage-explication">{{ b.explication }}</div>
+                  </div>
+                  <v-btn v-if="b.lien" color="primary" variant="flat" size="small" class="text-none" append-icon="mdi-arrow-right" @click="allerVers(b.lien.chemin)">
+                    {{ b.lien.libelle }}
+                  </v-btn>
+                </div>
+                <ul v-if="b.lignes && b.lignes.length" class="liste-compacte mt-2">
+                  <li v-for="(l, j) in (blocagesOuverts[i] ? b.lignes : b.lignes.slice(0, 6))" :key="j">{{ l }}</li>
+                </ul>
+                <button v-if="b.lignes && b.lignes.length > 6" type="button" class="voir-tout" @click="basculer(blocagesOuverts, i)">
+                  {{ blocagesOuverts[i] ? 'Réduire' : `Voir tout (${b.lignes.length})` }}
+                </button>
+              </v-card-text>
+            </v-card>
+          </div>
+
+          <div v-if="(reportData.avertissements || []).length" class="section-block">
+            <div class="section-title">
+              <v-icon color="warning" class="mr-2">mdi-alert-outline</v-icon>
+              À savoir avant de valider
+            </div>
+            <v-alert v-for="(a, i) in reportData.avertissements" :key="`avert-${i}`" type="warning" variant="tonal" density="compact" class="mb-2">
+              <div class="font-weight-bold">{{ a.titre }}</div>
+              <ul v-if="a.details && a.details.length" class="liste-compacte">
+                <li v-for="(d, j) in a.details.slice(0, 15)" :key="j">{{ d }}</li>
+                <li v-if="a.details.length > 15">… et {{ a.details.length - 15 }} autre(s)</li>
+              </ul>
+            </v-alert>
+          </div>
+
+          <div v-if="aFaire.length" class="section-block">
+            <div class="section-title">
+              <v-icon color="primary" class="mr-2">mdi-clipboard-check-outline</v-icon>
+              À faire maintenant dans la nouvelle année
+            </div>
+            <v-alert v-for="(a, i) in aFaire" :key="`afaire-${i}`" type="info" variant="tonal" density="compact" class="mb-2">
+              <div class="d-flex align-center flex-wrap ga-2">
+                <div class="font-weight-bold flex-grow-1">{{ a.titre }}</div>
+                <v-btn v-if="a.lien" size="small" color="primary" variant="flat" class="text-none" append-icon="mdi-arrow-right" @click="allerVers(a.lien.chemin)">{{ a.lien.libelle }}</v-btn>
+              </div>
+              <ul v-if="a.details && a.details.length" class="liste-compacte">
+                <li v-for="(d, j) in a.details.slice(0, 20)" :key="j">{{ d }}</li>
+                <li v-if="a.details.length > 20">… et {{ a.details.length - 20 }} autre(s)</li>
+              </ul>
+            </v-alert>
+          </div>
+
           <div class="section-block">
             <div class="section-title">
               <v-icon color="primary" class="mr-2">mdi-google-classroom</v-icon>
@@ -632,8 +710,8 @@
                 md="6"
                 xl="4"
               >
-                <v-card flat class="rounded-xl class-report-card">
-                  <v-card-text class="pa-4">
+                <v-card flat class="rounded-lg class-report-card">
+                  <v-card-text class="pa-3">
                     <div class="d-flex align-center justify-space-between mb-3 flex-wrap gap-2">
                       <div class="font-weight-bold text-subtitle-1 class-name">
                         {{ item.classeNom }}
@@ -667,16 +745,28 @@
                       <v-col cols="4">
                         <div class="mini-stat-box mini-stat-fail">
                           <div class="mini-stat-number">{{ item.nombreQuiEchouent || 0 }}</div>
-                          <div class="mini-stat-label">Échouent</div>
+                          <div class="mini-stat-label">Redoublent</div>
                         </div>
                       </v-col>
                     </v-row>
+                    <template v-if="(item.eleves || []).length">
+                      <button type="button" class="voir-tout mt-2" @click="basculer(classesOuvertes, item.classeId)">
+                        {{ classesOuvertes[item.classeId] ? 'Masquer les élèves' : `Voir les ${item.eleves.length} élèves et leur moyenne annuelle` }}
+                      </button>
+                      <div v-if="classesOuvertes[item.classeId]" class="liste-eleves-classe">
+                        <div v-for="e in filterEleves(item.eleves)" :key="e.eleveId" class="eleve-moyenne" :class="e.admis ? 'is-admis' : 'is-redouble'">
+                          <span class="eleve-name">{{ e.nom }} {{ e.prenom }}</span>
+                          <span class="eleve-moy">{{ formatMoy(e.moyenneAnnuelle) }}</span>
+                          <span class="eleve-decision">{{ e.admis ? 'Admis' : 'Redouble' }}</span>
+                        </div>
+                      </div>
+                    </template>
                   </v-card-text>
                 </v-card>
               </v-col>
 
               <v-col cols="12" v-if="filteredRapportParClasse.length === 0">
-                <v-alert type="info" outlined class="rounded-xl mb-0">
+                <v-alert type="info" outlined class="rounded-lg mb-0">
                   Aucune classe ne correspond à votre recherche.
                 </v-alert>
               </v-col>
@@ -697,8 +787,8 @@
                 md="6"
                 xl="4"
               >
-                <v-card flat class="rounded-xl affectation-card">
-                  <v-card-text class="pa-4">
+                <v-card flat class="rounded-lg affectation-card">
+                  <v-card-text class="pa-3">
                     <div class="d-flex justify-space-between align-start mb-3 flex-wrap gap-2">
                       <div>
                         <div class="font-weight-bold text-subtitle-1">
@@ -717,21 +807,24 @@
 
                     <div class="eleves-preview">
                       <div
-                        v-for="(eleve, idx) in filterEleves(groupe.eleves).slice(0, 6)"
+                        v-for="(eleve, idx) in (groupesOuverts[index] ? filterEleves(groupe.eleves) : filterEleves(groupe.eleves).slice(0, 6))"
                         :key="`eleve-prev-${index}-${idx}-${eleve.eleveId}`"
                         class="eleve-line"
                       >
                         <v-icon small color="primary" class="mr-2">mdi-account</v-icon>
                         <span class="eleve-name">{{ eleve.nom }} {{ eleve.prenom }}</span>
                         <span class="eleve-class ml-2">({{ eleve.classeActuelle }})</span>
+                        <span v-if="eleve.moyenneAnnuelle != null" class="eleve-moy ml-auto">{{ formatMoy(eleve.moyenneAnnuelle) }}</span>
                       </div>
 
-                      <div
+                      <button
                         v-if="filterEleves(groupe.eleves).length > 6"
-                        class="text-caption grey--text mt-2"
+                        type="button"
+                        class="voir-tout mt-2"
+                        @click="basculer(groupesOuverts, index)"
                       >
-                        + {{ filterEleves(groupe.eleves).length - 6 }} autre(s) élève(s)
-                      </div>
+                        {{ groupesOuverts[index] ? 'Réduire' : `Voir les ${filterEleves(groupe.eleves).length - 6} autre(s) élève(s)` }}
+                      </button>
 
                       <div
                         v-if="filterEleves(groupe.eleves).length === 0"
@@ -746,17 +839,74 @@
             </v-row>
           </div>
 
+          <!-- Fins de cycle : repliées par défaut, une ligne par classe -->
+          <div class="section-block" v-if="reportAOrienter.length > 0 || reportSortants.length > 0">
+            <div class="section-title">
+              <v-icon color="primary" class="mr-2">mdi-school-outline</v-icon>
+              Fins de cycle
+            </div>
+            <v-expansion-panels multiple variant="accordion" class="fin-cycle">
+              <v-expansion-panel v-if="reportAOrienter.length > 0" elevation="0">
+                <v-expansion-panel-title>
+                  <div class="fin-cycle-titre">
+                    <strong>Admis de 3ème → 2nde, série à choisir</strong>
+                    <v-chip size="small" color="deep-orange" variant="flat" class="ml-2">{{ reportAOrienter.length }}</v-chip>
+                  </div>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <p class="text-caption mb-2">
+                    Ils passent en 2nde sans série : après la clôture, choisissez la série de chacun selon son vœu (Élèves → Orientation en 2nde).
+                  </p>
+                  <v-expansion-panels multiple variant="accordion">
+                    <v-expansion-panel v-for="g in parClasse(reportAOrienter)" :key="`or-${g.classe}`" elevation="0">
+                      <v-expansion-panel-title class="fin-cycle-classe">{{ g.classe }} <span class="fin-cycle-nb">{{ g.eleves.length }} élève(s)</span></v-expansion-panel-title>
+                      <v-expansion-panel-text>
+                        <div v-for="o in g.eleves" :key="o.eleveId" class="eleve-moyenne is-admis">
+                          <span class="eleve-name">{{ o.nom }} {{ o.prenom }}</span>
+                          <span class="eleve-moy">{{ formatMoy(o.moyenneAnnuelle) }}</span>
+                        </div>
+                      </v-expansion-panel-text>
+                    </v-expansion-panel>
+                  </v-expansion-panels>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+
+              <v-expansion-panel v-if="reportSortants.length > 0" elevation="0">
+                <v-expansion-panel-title>
+                  <div class="fin-cycle-titre">
+                    <strong>Sortants : ils quittent l'établissement</strong>
+                    <v-chip size="small" color="blue-grey" variant="flat" class="ml-2">{{ reportSortants.length }}</v-chip>
+                  </div>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <p class="text-caption mb-2">Leur dossier et leurs bulletins restent consultables.</p>
+                  <v-expansion-panels multiple variant="accordion">
+                    <v-expansion-panel v-for="g in parClasse(reportSortants)" :key="`so-${g.classe}`" elevation="0">
+                      <v-expansion-panel-title class="fin-cycle-classe">{{ g.classe }} <span class="fin-cycle-nb">{{ g.eleves.length }} élève(s) · {{ g.eleves[0].motif }}</span></v-expansion-panel-title>
+                      <v-expansion-panel-text>
+                        <div v-for="o in g.eleves" :key="o.eleveId" class="eleve-moyenne is-admis">
+                          <span class="eleve-name">{{ o.nom }} {{ o.prenom }}</span>
+                          <span class="eleve-moy">{{ formatMoy(o.moyenneAnnuelle) }}</span>
+                        </div>
+                      </v-expansion-panel-text>
+                    </v-expansion-panel>
+                  </v-expansion-panels>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </div>
+
           <div class="section-block" v-if="reportMoyennesManquantes.length > 0">
             <div class="section-title">
               <v-icon color="warning darken-2" class="mr-2">mdi-alert-outline</v-icon>
-              Élèves avec moyennes manquantes
+              Détail élève par élève : moyennes manquantes
             </div>
 
             <v-data-table
               :headers="reportHeadersMoyennes"
               :items="filteredRapportMoyennesManquantes"
               :items-per-page="8"
-              class="elevation-0 rounded-xl custom-table"
+              class="elevation-0 rounded-lg custom-table"
               no-data-text="Aucune anomalie de moyenne à afficher"
               mobile-breakpoint="768"
             >
@@ -774,7 +924,7 @@
             </v-data-table>
           </div>
 
-          <div class="section-block" v-if="reportAnomaliesPromotion.length > 0">
+          <div class="section-block" v-if="reportAnomaliesPromotion.length > 0 && !(reportData.blocages || []).length">
             <div class="section-title">
               <v-icon color="error" class="mr-2">mdi-alert-decagram-outline</v-icon>
               Anomalies de promotion
@@ -787,8 +937,8 @@
                 cols="12"
                 md="6"
               >
-                <v-card flat class="rounded-xl anomaly-card">
-                  <v-card-text class="pa-4">
+                <v-card flat class="rounded-lg anomaly-card">
+                  <v-card-text class="pa-3">
                     <div class="d-flex justify-space-between align-start flex-wrap gap-2 mb-2">
                       <div class="font-weight-bold text-subtitle-2">
                         {{
@@ -848,8 +998,8 @@
                 cols="12"
                 md="6"
               >
-                <v-card flat class="rounded-xl anomaly-card">
-                  <v-card-text class="pa-4">
+                <v-card flat class="rounded-lg anomaly-card">
+                  <v-card-text class="pa-3">
                     <div class="d-flex justify-space-between align-start flex-wrap gap-2 mb-2">
                       <div class="font-weight-bold text-subtitle-2">
                         {{ alerte.classeNom }}
@@ -876,7 +1026,7 @@
 
         <v-divider></v-divider>
 
-        <v-card-actions class="pa-3 pa-sm-4 flex-wrap action-bar">
+        <v-card-actions class="pa-3 pa-sm-3 flex-wrap action-bar">
           <v-btn text class="text-none" @click="closeReportDialog">
             Fermer
           </v-btn>
@@ -889,7 +1039,7 @@
             depressed
             class="text-none font-weight-bold rounded-lg"
             :loading="isClosing"
-            @click="confirmDialog = true"
+            @click="confirmationSaisie = ''; confirmDialog = true"
           >
             <v-icon left>mdi-check-bold</v-icon>
             Valider définitivement
@@ -899,7 +1049,7 @@
     </v-dialog>
 
     <v-dialog v-model="confirmDialog" max-width="520" persistent>
-      <v-card class="rounded-xl">
+      <v-card class="rounded-lg">
         <v-card-title class="headline error--text d-flex align-center">
           <v-icon color="error" left>mdi-alert-circle-outline</v-icon>
           Validation finale
@@ -911,15 +1061,23 @@
             <strong>{{ currentAnneeScolaire }}</strong>.
           </p>
           <p class="mb-2">
-            Les changements seront appliqués selon les paramètres enregistrés, puis
-            l’année sera marquée <strong>Clôturée</strong>.
+            Les élèves passeront dans les classes du rapport, l’année sera marquée <strong>Clôturée</strong>
+            (notes figées) et l’année suivante sera ouverte.
           </p>
-          <p class="mb-0 font-weight-medium">
-            Confirmez-vous cette opération ?
+          <p class="mb-2 text-caption">
+            Une erreur ? La clôture peut être annulée tant que rien n’a été fait dans la nouvelle année.
           </p>
+          <v-text-field
+            v-model="confirmationSaisie"
+            :label="`Tapez ${nomAnneeACloturer} pour confirmer`"
+            variant="outlined"
+            density="compact"
+            autocomplete="off"
+            hide-details
+          />
         </v-card-text>
 
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
           <v-btn text :disabled="isClosing" @click="confirmDialog = false">
             Annuler
@@ -929,16 +1087,39 @@
             depressed
             class="rounded-lg text-none font-weight-bold"
             :loading="isClosing"
+            :disabled="confirmationSaisie.trim() !== nomAnneeACloturer"
             @click="executerClotureConfirmee"
           >
-            Oui, valider
+            Clôturer définitivement
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="annulationDialog" max-width="500" persistent>
+      <v-card v-if="derniereCloture" class="rounded-lg">
+        <v-card-title class="d-flex align-center text-wrap">
+          <v-icon color="primary" class="mr-2">mdi-undo</v-icon>
+          Annuler la clôture de {{ derniereCloture.annee }} ?
+        </v-card-title>
+        <v-card-text>
+          <p class="mb-2">Tout revient comme avant la clôture :</p>
+          <ul class="liste-compacte mb-2">
+            <li>chaque élève retrouve sa classe de {{ derniereCloture.annee }} (y compris les sortants) ;</li>
+            <li>l’année {{ derniereCloture.annee }} est de nouveau ouverte (notes modifiables) ;</li>
+            <li>l’année {{ derniereCloture.nouvelleAnnee }} et les classes créées par la clôture sont retirées, ainsi que la répartition et l’emploi du temps reportés.</li>
+          </ul>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" :disabled="annulationEnCours" @click="annulationDialog = false">Retour</v-btn>
+          <v-btn color="primary" variant="flat" :loading="annulationEnCours" @click="annulerCloture">Annuler la clôture</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="collaborateurDialog" max-width="700" persistent>
-      <v-card class="rounded-xl">
+      <v-card class="rounded-lg">
         <v-card-title class="headline d-flex align-center">
           <v-icon color="deep-purple" left>mdi-account-cog-outline</v-icon>
           {{ collaborateurForm.id ? "Modifier le collaborateur" : "Ajouter un collaborateur" }}
@@ -1000,7 +1181,7 @@
               @update:model-value="toggleSimpleModule(mod.key)"
             ></v-checkbox>
 
-            <div v-if="mod.children.length" class="pl-8">
+            <div v-if="mod.children.length" class="pl-3">
               <v-checkbox
                 v-for="child in mod.children"
                 :key="child.key"
@@ -1014,7 +1195,7 @@
           </div>
         </v-card-text>
 
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
           <v-btn text :disabled="isSavingCollaborateur" @click="collaborateurDialog = false">Annuler</v-btn>
           <v-btn
@@ -1031,19 +1212,19 @@
     </v-dialog>
 
     <v-dialog v-model="generatedPasswordDialog" max-width="480" persistent>
-      <v-card class="rounded-xl">
+      <v-card class="rounded-lg">
         <v-card-title class="headline d-flex align-center">
           <v-icon color="success" left>mdi-check-circle-outline</v-icon>
           Mot de passe généré
         </v-card-title>
         <v-card-text>
           <p>Communiquez ces identifiants au collaborateur. Ce mot de passe ne sera plus affiché ensuite.</p>
-          <v-sheet color="#f8f9fa" class="pa-4 rounded-lg text-left border">
+          <v-sheet color="#f8f9fa" class="pa-3 rounded-lg text-left border">
             <div class="mb-2"><strong>Email :</strong> {{ generatedCredentials.email }}</div>
             <div><strong>Mot de passe :</strong> <span class="font-weight-bold">{{ generatedCredentials.password }}</span></div>
           </v-sheet>
         </v-card-text>
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
           <v-btn color="primary" dark class="rounded-lg text-none font-weight-bold" @click="generatedPasswordDialog = false">
             C'est noté
@@ -1053,7 +1234,7 @@
     </v-dialog>
 
     <v-dialog v-model="deleteCollaborateurDialog" max-width="480" persistent>
-      <v-card class="rounded-xl">
+      <v-card class="rounded-lg">
         <v-card-title class="headline error--text d-flex align-center">
           <v-icon color="error" left>mdi-alert-circle-outline</v-icon>
           Supprimer ce collaborateur ?
@@ -1063,7 +1244,7 @@
           <strong>{{ collaborateurToDelete?.prenom }} {{ collaborateurToDelete?.nom }}</strong>
           perdra immédiatement l'accès à l'espace administration.
         </v-card-text>
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
           <v-btn text :disabled="isSavingCollaborateur" @click="deleteCollaborateurDialog = false">Annuler</v-btn>
           <v-btn
@@ -1099,6 +1280,7 @@
 
 <script>
 import axios from "axios";
+import AlertesSms from "@/components/administration/AlertesSms.vue";
 
 const API_BASE = "/api";
 
@@ -1120,6 +1302,7 @@ function parseBoolean(value, defaultValue = false) {
 
 export default {
   name: "GestionAnneeScolaire",
+  components: { AlertesSms },
 
   props: {
     etablissementId: { type: Number, required: true },
@@ -1127,13 +1310,21 @@ export default {
     anneeScolaireId: { type: Number, required: false, default: null },
   },
 
+  setup() {
+    // Section des paramètres affichée, gardée dans l'adresse (?onglet=...).
+    const activeSection = useUrlState("onglet", "annee", {
+      allowed: ["annee", "cloture", "frais", "alertes", "collaborateurs"],
+    });
+    return { activeSection };
+  },
+
   data() {
     return {
-      activeSection: "annee",
       sections: [
         { key: "annee", label: "Année scolaire", icon: "mdi-calendar-range" },
         { key: "cloture", label: "Clôture", icon: "mdi-tune-vertical" },
         { key: "frais", label: "Frais de scolarité", icon: "mdi-cash-multiple" },
+        { key: "alertes", label: "Alertes SMS", icon: "mdi-message-alert-outline" },
         { key: "collaborateurs", label: "Collaborateurs", icon: "mdi-account-multiple-plus-outline", founderOnly: true },
       ],
 
@@ -1192,6 +1383,7 @@ export default {
             { key: "MesEnseignants", label: "Mes Enseignants" },
             { key: "EnseignantParclasse", label: "Répartition Enseignants/Classes" },
             { key: "subjectsManager", label: "Matières" },
+            { key: "ProgrammesMatieres", label: "Programmes des matières" },
           ],
         },
         { key: "ParentManagement", label: "Parents", children: [] },
@@ -1204,6 +1396,19 @@ export default {
 
       confirmDialog: false,
       reportDialog: false,
+      // Clôture : empreinte du rapport relu, nom de l'année à retaper,
+      // travaux restants, dernière clôture (annulable ?).
+      empreinteRapport: null,
+      nomAnneeACloturer: "",
+      confirmationSaisie: "",
+      aFaire: [],
+      derniereCloture: null,
+      annulationDialog: false,
+      annulationEnCours: false,
+      // Listes dépliées du rapport (tout voir).
+      blocagesOuverts: {},
+      groupesOuverts: {},
+      classesOuvertes: {},
 
       isAdding: false,
       isPreparingReport: false,
@@ -1341,6 +1546,15 @@ export default {
     reportDetailsGroupes() {
       return this.reportData?.detailsGroupes || [];
     },
+    reportSortants() {
+      return this.reportData?.sortants || [];
+    },
+    reportAOrienter() {
+      return this.reportData?.aOrienter || [];
+    },
+    reportOrientations() {
+      return this.reportData?.orientations || [];
+    },
 
     filteredRapportParClasse() {
       const search = (this.searchClasse || "").toLowerCase().trim();
@@ -1422,6 +1636,13 @@ export default {
 
   created() {
     this.loadSettings();
+    // Section relue dans l'adresse : on charge ses données comme au clic
+    // (les collaborateurs restent réservés au fondateur).
+    if (!this.visibleSections.some((section) => section.key === this.activeSection)) {
+      this.activeSection = "annee";
+    } else if (this.activeSection !== "annee") {
+      this.selectSection(this.activeSection);
+    }
   },
 
   methods: {
@@ -1489,6 +1710,7 @@ export default {
 
     selectSection(key) {
       this.activeSection = key;
+      if (key === "cloture") this.chargerDerniereCloture();
       if (key === "frais" && this.promotionsFrais.length === 0) {
         this.fetchPromotionsFrais();
       }
@@ -1681,7 +1903,7 @@ export default {
         effectifMaxParClasse: Math.max(1, Number(this.settings.effectifMaxParClasse) || 1),
         effectifMinNouvelleClasse: Math.max(1, Number(this.settings.effectifMinNouvelleClasse) || 1),
         activerCreationAutoClasse: parseBoolean(this.settings.activerCreationAutoClasse, true),
-        activerRepartitionIntelligente: parseBoolean(this.settings.activerRepartitionIntelligente, true),
+        activerRepartitionIntelligente: true,
         noteInterne: String(this.settings.noteInterne || "").trim(),
       };
     },
@@ -1702,6 +1924,11 @@ export default {
 
     resetReportState() {
       this.reportMessage = "";
+      this.aFaire = [];
+      this.confirmationSaisie = "";
+      this.blocagesOuverts = {};
+      this.groupesOuverts = {};
+      this.classesOuvertes = {};
       this.searchClasse = "";
       this.searchEleve = "";
       this.previewReadyForValidation = false;
@@ -1913,6 +2140,61 @@ export default {
       }
     },
 
+    // Élèves regroupés par classe (recherche d'élève appliquée), classes
+    // dans l'ordre naturel, élèves du meilleur au plus faible.
+    parClasse(liste) {
+      const groupes = new Map();
+      this.filterEleves(liste).forEach((e) => {
+        if (!groupes.has(e.classeActuelle)) groupes.set(e.classeActuelle, []);
+        groupes.get(e.classeActuelle).push(e);
+      });
+      return [...groupes]
+        .sort(([a], [b]) => String(a).localeCompare(String(b), "fr", { numeric: true }))
+        .map(([classe, eleves]) => ({ classe, eleves: eleves.sort((x, y) => (y.moyenneAnnuelle ?? -1) - (x.moyenneAnnuelle ?? -1)) }));
+    },
+    basculer(objet, cle) {
+      objet[cle] = !objet[cle];
+    },
+    formatMoy(v) {
+      return v === null || v === undefined ? "—" : `${String(Math.round(Number(v) * 100) / 100).replace(".", ",")}/20`;
+    },
+    // Lien d'un blocage : on ferme le rapport et on va corriger.
+    allerVers(chemin) {
+      this.reportDialog = false;
+      this.$router.push(chemin);
+    },
+
+    async chargerDerniereCloture() {
+      try {
+        const { data } = await axios.get(`${API_BASE}/cloture-annee-scolaire/derniere/${this.etablissementId}`, { headers: this.authHeaders() });
+        this.derniereCloture = data?.cloture || null;
+      } catch (e) {
+        this.derniereCloture = null;
+      }
+    },
+
+    formatDateCloture(date) {
+      return date ? new Date(date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "";
+    },
+
+    async annulerCloture() {
+      this.annulationEnCours = true;
+      try {
+        const { data } = await axios.post(`${API_BASE}/cloture-annee-scolaire/annuler`, { journalId: this.derniereCloture.id }, { headers: this.authHeaders() });
+        this.annulationDialog = false;
+        this.showNotify(data.message, "success");
+        this.currentAnneeScolaire = data.annee;
+        this.currentAnneeScolaireId = data.anneeScolaireId;
+        this.$emit("annee-cloturee", { annee: data.annee, anneeScolaireId: data.anneeScolaireId });
+        await this.chargerDerniereCloture();
+      } catch (error) {
+        this.showNotify(error?.response?.data?.message || "L'annulation a échoué.", "error");
+        await this.chargerDerniereCloture();
+      } finally {
+        this.annulationEnCours = false;
+      }
+    },
+
     async ouvrirRapportCloture() {
       if (!this.currentAnneeScolaireId) {
         this.showNotify("Aucune année scolaire en cours n’est disponible.", "error");
@@ -1945,6 +2227,8 @@ export default {
 
         this.reportData = data?.rapport || this.reportData;
         this.previewReadyForValidation = !!data?.confirmationRequise;
+        this.empreinteRapport = data?.empreinte || null;
+        this.nomAnneeACloturer = data?.nomAnnee || this.currentAnneeScolaire;
         this.reportDialog = true;
       } catch (error) {
         console.error("Erreur prévisualisation clôture :", error);
@@ -1984,6 +2268,7 @@ export default {
             etablissementId: this.etablissementId,
             anneeScolaireId: this.currentAnneeScolaireId,
             confirmation: true,
+            empreinte: this.empreinteRapport,
           },
           { headers: this.authHeaders() }
         );
@@ -2000,11 +2285,19 @@ export default {
           "Année scolaire clôturée avec succès.";
 
         this.reportData = data?.rapport || this.reportData;
+        this.aFaire = data?.aFaire || [];
         this.previewReadyForValidation = false;
+        this.confirmationSaisie = "";
         this.reportDialog = true;
+        this.chargerDerniereCloture();
 
         this.showNotify(this.reportMessage, "success");
 
+        // L'année suivante est ouverte par la clôture : l'écran passe dessus.
+        if (data.nouvelleAnneeId) {
+          this.currentAnneeScolaire = data.nouvelleAnnee;
+          this.currentAnneeScolaireId = data.nouvelleAnneeId;
+        }
         this.$emit("annee-cloturee", {
           annee: this.currentAnneeScolaire,
           anneeScolaireId: this.currentAnneeScolaireId,
@@ -2013,6 +2306,18 @@ export default {
         console.error("Erreur clôture :", error);
 
         const data = error?.response?.data || {};
+        this.confirmationSaisie = "";
+
+        // Les données ont changé depuis le rapport : nouveau rapport à relire.
+        if (data.code === "PLAN_CHANGE") {
+          this.reportMeta = { title: "Rapport mis à jour : à relire", isError: false };
+          this.reportMessage = data.message;
+          this.reportData = data.rapport || this.reportData;
+          this.empreinteRapport = data.empreinte || null;
+          this.previewReadyForValidation = true;
+          this.reportDialog = true;
+          return;
+        }
 
         this.reportMeta = {
           title: "Échec de la clôture",
@@ -2057,7 +2362,7 @@ export default {
 .toolbar-icon-box {
   width: 42px;
   height: 42px;
-  border-radius: 14px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2160,6 +2465,24 @@ export default {
   }
 }
 
+.fin-cycle :deep(.v-expansion-panel) { border: 1px solid #e3e9f1; }
+.fin-cycle-titre { display: flex; align-items: center; flex-wrap: wrap; }
+.fin-cycle-classe { min-height: 40px !important; font-weight: 600; }
+.fin-cycle-nb { margin-left: 8px; font-weight: 400; font-size: 0.8rem; color: #5f6b7a; }
+.blocage-card { border: 1px solid #f5c2c0; background: #fff8f7; }
+.blocage-titre { font-weight: 800; font-size: 0.95rem; color: #b71c1c; }
+.blocage-explication { font-size: 0.86rem; color: #37474f; }
+.voir-tout { background: none; border: 0; padding: 0; color: #1565c0; font-weight: 700; font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
+.liste-eleves-classe { margin-top: 6px; max-height: 320px; overflow-y: auto; border-top: 1px solid #e3e9f1; padding-top: 4px; }
+.eleve-moyenne { display: flex; gap: 8px; align-items: center; font-size: 0.82rem; padding: 2px 4px; border-radius: 4px; }
+.eleve-moyenne .eleve-name { flex: 1; min-width: 0; }
+.eleve-moyenne.is-redouble { background: #fdecea; }
+.eleve-moy { font-weight: 700; white-space: nowrap; }
+.eleve-decision { font-size: 0.72rem; font-weight: 700; min-width: 62px; text-align: right; }
+.is-admis .eleve-decision { color: #2e7d32; }
+.is-redouble .eleve-decision { color: #c62828; }
+.annulation-card { border: 1px solid #cfe0f5; background: #f7faff; }
+.liste-compacte { margin: 4px 0 0; padding-left: 18px; font-size: 0.85rem; }
 .cloture-cta {
   background: linear-gradient(180deg, #fff6f6 0%, #fff0f0 100%) !important;
   border: 1px solid #ffd9d9 !important;
@@ -2205,7 +2528,7 @@ export default {
 .year-card {
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   border: 1px solid #dbe8f6;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .year-label {
@@ -2242,7 +2565,7 @@ export default {
 .section-icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2316,7 +2639,7 @@ export default {
 .frais-global {
   background: #ffffff;
   border: 1px solid #e5edf6;
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 10px 12px;
 }
 
@@ -2326,7 +2649,7 @@ export default {
   gap: 10px;
   background: #ffffff;
   border: 1px solid #e5edf6;
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 6px;
 }
@@ -2422,7 +2745,7 @@ export default {
 .class-report-card {
   background: #ffffff;
   border: 1px solid #e5edf6;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   height: 100%;
 }
 
@@ -2431,7 +2754,7 @@ export default {
 }
 
 .mini-stat-box {
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 14px 10px;
   text-align: center;
   height: 100%;
@@ -2469,14 +2792,14 @@ export default {
 .affectation-card {
   background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
   border: 1px solid #d8e9f8;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   height: 100%;
 }
 
 .anomaly-card {
   background: linear-gradient(180deg, #fff9f9 0%, #fff4f4 100%);
   border: 1px solid #ffd8d8;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   height: 100%;
 }
 
@@ -2521,7 +2844,7 @@ export default {
 
 .custom-input ::v-deep .v-input__slot {
   background: #ffffff !important;
-  border-radius: 14px !important;
+  border-radius: 10px!important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 

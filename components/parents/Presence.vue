@@ -2,9 +2,6 @@
   <div class="presence-page">
     <!-- Topbar -->
     <div class="topbar">
-      <v-btn icon class="back-btn" @click="$emit('back')" aria-label="Retour">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
 
       <div class="topbar-title">
         <div class="title">Présences</div>
@@ -46,7 +43,7 @@
       <v-card v-else-if="presenceData.length === 0" class="empty-card" variant="outlined">
         <v-card-text class="empty-content">
           <div class="empty-icon">
-            <v-icon size="42">mdi-calendar-remove-outline</v-icon>
+            <v-icon size="24">mdi-calendar-remove-outline</v-icon>
           </div>
           <div class="empty-title">Aucune présence disponible</div>
           <div class="empty-subtitle">Les présences ne sont pas encore disponibles cette année.</div>
@@ -197,10 +194,6 @@
         Enregistrer
       </v-btn>
 
-      <v-btn class="btn-secondary" @click="$emit('back')">
-        <v-icon left>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
     </div>
 
     <!-- Snackbar -->
@@ -220,10 +213,14 @@ export default {
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true },
   },
+  setup() {
+    // Semestres dépliés (indices), conservés dans l'URL (?semestre=0,1).
+    const semestreUrl = useUrlState("semestre", null);
+    return { semestreUrl };
+  },
   data() {
     return {
       semestres: [],
-      selectedPanel: [],
       headers: [
         { title: "Date", value: "date", align: "start", width: "140px" },
         { title: "Matière", value: "matiere", width: "180px" },
@@ -244,6 +241,19 @@ export default {
     };
   },
   computed: {
+    selectedPanel: {
+      get() {
+        return String(this.semestreUrl || "")
+          .split(",")
+          .filter((v) => v !== "")
+          .map(Number)
+          .filter((n) => Number.isInteger(n));
+      },
+      set(value) {
+        const list = Array.isArray(value) ? value : [];
+        this.semestreUrl = list.length ? list.join(",") : null;
+      },
+    },
     modifiedCount() {
       return Object.keys(this.modifiedMotifs).length;
     },
@@ -334,7 +344,7 @@ export default {
       try {
         const token = localStorage.getItem("token");
         if (!token) {
-          this.$router.push("/login");
+          this.$router.push("/parents/connexion");
           return;
         }
 
@@ -413,7 +423,7 @@ export default {
   border-bottom: 1px solid var(--border);
 
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: minmax(0, 1fr) 44px; /* la flèche retour est dans le cadre (PageNav) */
   gap: 10px;
   align-items: center;
 
@@ -468,20 +478,20 @@ export default {
 .empty-card {
   max-width: 640px;
   margin: 18px auto 0;
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
 }
 
 .empty-content {
-  padding: 22px 18px;
+  padding: 14px 12px;
   text-align: center;
 }
 
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
@@ -491,14 +501,14 @@ export default {
 }
 
 .empty-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 900;
   color: var(--text);
 }
 
 .empty-subtitle {
   margin-top: 4px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: var(--muted);
 }
 
@@ -548,11 +558,11 @@ export default {
 }
 
 .semestre-panel {
-  border-radius: 18px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(37, 99, 235, 0.14);
   background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .semestre-title {
@@ -569,7 +579,7 @@ export default {
 .semestre-icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: rgba(37, 99, 235, 0.10);
@@ -623,7 +633,7 @@ export default {
 }
 
 .presence-table {
-  border-radius: 14px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.08);
   min-width: 980px; /* pour scroll mobile */
@@ -711,7 +721,7 @@ export default {
 
 .btn-primary {
   flex: 1;
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--primary);
   color: #fff;
   font-weight: 950;
@@ -723,7 +733,7 @@ export default {
 
 .btn-secondary {
   flex: 1;
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(37, 99, 235, 0.08);
   color: var(--primary-600);
   border: 1px solid rgba(37, 99, 235, 0.18);
@@ -745,7 +755,7 @@ export default {
   .semestre-icon {
     width: 40px;
     height: 40px;
-    border-radius: 14px;
+    border-radius: 10px;
   }
 
   .presence-table {

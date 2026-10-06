@@ -2,10 +2,6 @@
   <div class="cm-page">
     <!-- TOP BAR -->
     <div class="cm-topbar">
-      <v-btn class="cm-back" variant="tonal" color="black" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        <span class="hide-xs">Retour</span>
-      </v-btn>
 
       <div class="cm-title">
         <div class="cm-h1">
@@ -27,7 +23,7 @@
     </div>
 
     <!-- SEMESTERS -->
-    <v-card class="cm-card" elevation="8">
+    <v-card class="cm-card" elevation="0">
       <div class="cm-card-head">
         <div class="cm-card-head-title">
           <v-icon class="mr-2" color="white">mdi-timeline-clock-outline</v-icon>
@@ -47,7 +43,7 @@
             :key="semester.id"
             class="cm-sem-chip"
             :class="{ 'cm-sem-chip--active': currentSemester === semester.nom }"
-            :color="currentSemester === semester.nom ? 'primary' : 'blue-lighten-5'"
+            :color="'primary'"
             :variant="currentSemester === semester.nom ? 'flat' : 'tonal'"
             @click="changeSemester(semester.nom)"
           >
@@ -63,12 +59,12 @@
     </v-card>
 
     <!-- TOOLS -->
-    <v-card class="cm-card" elevation="8">
+    <v-card class="cm-card" elevation="0">
       <v-card-text class="cm-tools">
         <v-text-field
           v-model="search"
           variant="outlined"
-          density="comfortable"
+          density="compact"
           color="primary"
           prepend-inner-icon="mdi-magnify"
           label="Rechercher un élève"
@@ -91,7 +87,7 @@
     </v-card>
 
     <!-- DESKTOP TABLE -->
-    <v-card class="cm-card cm-table-wrap hide-xs" elevation="10">
+    <v-card class="cm-card cm-table-wrap hide-xs" elevation="0">
       <div class="cm-card-head cm-card-head--alt">
         <div class="cm-card-head-title">
           <v-icon class="mr-2" color="white">mdi-table</v-icon>
@@ -105,7 +101,7 @@
         item-key="studentId"
         :items-per-page="itemsPerPage"
         class="cm-table"
-        density="comfortable"
+        density="compact"
       >
         <template #item.studentId="{ item }">
           <div class="cm-student-cell">
@@ -182,7 +178,7 @@
     </v-card>
 
     <!-- MOBILE CARDS -->
-    <v-card class="cm-card show-xs" elevation="10">
+    <v-card class="cm-card show-xs" elevation="0">
       <div class="cm-card-head cm-card-head--alt">
         <div class="cm-card-head-title">
           <v-icon class="mr-2" color="white">mdi-format-list-bulleted</v-icon>
@@ -285,10 +281,6 @@
 
     <!-- BOTTOM BAR (mobile) -->
     <div class="cm-bottom-bar show-xs">
-      <v-btn variant="tonal" color="black" class="cm-bottom-btn" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
 
       <div class="cm-spacer" />
 
@@ -346,9 +338,13 @@ export default {
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true },
   },
+  setup() {
+    // Période (semestre) affichée : conservée dans l'URL (?periode=).
+    const currentSemester = useUrlState("periode", "");
+    return { currentSemester };
+  },
   data() {
     return {
-      currentSemester: "",
       semesters: [],
       headers: [
         { title: "Élève", value: "studentId", sortable: true },
@@ -470,7 +466,9 @@ export default {
       try {
         const response = await axios.get(`${this.API_BASE}/api/semesters/${this.etablissementId}`);
         this.semesters = response.data || [];
-        if (this.semesters.length > 0) this.currentSemester = this.semesters[0].nom;
+        if (this.semesters.length > 0 && !this.semesters.some((s) => s.nom === this.currentSemester)) {
+          this.currentSemester = this.semesters[0].nom;
+        }
       } catch (error) {
         console.error("Erreur récupération semestres", error);
         this.setSnack("Impossible de charger les semestres.", "error");
@@ -566,7 +564,7 @@ export default {
   background: radial-gradient(900px 500px at 20% 10%, rgba(25,118,210,.14), transparent 55%),
               radial-gradient(800px 500px at 85% 0%, rgba(11,46,74,.10), transparent 55%),
               linear-gradient(180deg, #eef6ff 0%, #f7fbff 45%, #ffffff 100%);
-  border-radius: 18px;
+  border-radius: 10px;
 }
 
 /* Topbar */
@@ -575,9 +573,9 @@ export default {
   gap: 12px;
   align-items: center;
   padding: 14px;
-  border-radius: 18px;
+  border-radius: 10px;
   background: linear-gradient(90deg, #1976d2 0%, #0b2e4a 100%);
-  box-shadow: 0 16px 50px rgba(11, 46, 74, 0.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   border: 1px solid rgba(255,255,255,.12);
   margin-bottom: 14px;
   flex-wrap: wrap;
@@ -620,12 +618,12 @@ export default {
 .cm-save {
   border-radius: 999px !important;
   font-weight: 950;
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 /* Cards */
 .cm-card {
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   overflow: hidden;
   border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.90);
@@ -675,7 +673,7 @@ export default {
 }
 
 .cm-sem-chip--active {
-  box-shadow: 0 10px 22px rgba(25,118,210,.25);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 /* Tools */
@@ -763,7 +761,7 @@ export default {
 }
 
 .cm-mobile-card {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
   border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.94);
   padding: 12px;
@@ -842,7 +840,7 @@ export default {
 
 /* Dialog */
 .cm-dialog {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
 }
 
 /* Visibility helpers */
@@ -853,13 +851,13 @@ export default {
 @media (max-width: 600px) {
   .cm-page {
     padding: 10px;
-    border-radius: 14px;
+    border-radius: 10px;
     padding-bottom: 86px;
   }
 
   .cm-topbar {
     padding: 12px;
-    border-radius: 14px;
+    border-radius: 10px;
     gap: 10px;
   }
 
@@ -896,6 +894,169 @@ export default {
 
   .cm-bottom-btn {
     padding-inline: 12px;
+  }
+}
+
+/* =====================================================================
+   Interface fine : en-têtes dégradés bas (≤ 40 px), cartes et marges
+   réduites, polices raisonnables. Placé en fin de fichier pour
+   l'emporter sur les règles plus haut.
+   ===================================================================== */
+.cm-page {
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0;
+}
+
+.cm-topbar {
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.cm-back,
+.cm-save {
+  height: 30px !important;
+  font-weight: 700;
+}
+
+.cm-back {
+  border-radius: 8px !important;
+}
+
+.cm-h1 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.cm-sub {
+  margin-top: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.cm-card {
+  border-radius: 8px !important;
+  backdrop-filter: none;
+  margin-bottom: 10px;
+}
+
+.cm-card-head {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.cm-card-head-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cm-card-body,
+.cm-tools {
+  padding: 8px 10px !important;
+  gap: 8px;
+}
+
+.cm-sem-chip,
+.cm-info-chip,
+.cm-chip-year,
+.cm-hours-chip {
+  font-weight: 700;
+}
+
+.cm-student-name,
+.cm-mobile-name {
+  font-weight: 700;
+}
+
+.cm-empty,
+.cm-empty-mobile {
+  padding: 10px 8px;
+  font-weight: 700;
+}
+
+.cm-mobile-list {
+  padding: 8px 0 !important;
+}
+
+.cm-mobile-card {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.cm-mobile-head {
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cm-page-indicator {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cm-bottom-bar {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.cm-bottom-btn {
+  font-weight: 700;
+}
+
+.cm-mobile-grid {
+  gap: 8px;
+}
+
+.cm-mobile-field :deep(.v-field) {
+  border-radius: 8px;
+}
+
+@media (max-width: 600px) {
+  /* Barre de boutons fixe en bas : place réservée sous le contenu. */
+  .cm-page {
+    padding: 0 0 52px !important;
+  }
+
+  .cm-topbar {
+    min-height: 36px;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .cm-h1 {
+    font-size: 15px;
+  }
+
+  /* Pas de grand cadre autour des blocs : contenu posé sur la page. */
+  .cm-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible;
+    margin-bottom: 8px;
+  }
+
+  .cm-card-head {
+    height: 32px;
+    min-height: 32px;
+    border-radius: 8px;
+  }
+
+  .cm-card-body,
+.cm-tools {
+    padding: 6px 0 !important;
+  }
+
+  /* Champs deux par ligne ; la zone de texte garde toute la ligne. */
+  .cm-mobile-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cm-textarea {
+    grid-column: 1 / -1;
   }
 }
 </style>

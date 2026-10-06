@@ -2,10 +2,6 @@
   <v-container class="info-page">
     <!-- Back button top -->
     <div class="topbar">
-      <v-btn class="pill-back" variant="tonal" color="primary" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
     </div>
 
     <!-- Title -->
@@ -18,29 +14,25 @@
     </div>
 
     <!-- Carte élève -->
-    <v-card class="student-card" elevation="12">
+    <v-card class="student-card" elevation="0">
       <div class="student-accent" aria-hidden="true"></div>
 
-      <v-img :src="child.photo || defaultPhoto" class="student-img" cover>
-        <div class="img-overlay"></div>
-
-        <div class="student-badge">
+      <div class="student-profil">
+        <EleveAvatar :photo="child.photo || ''" :prenom="child.prenom" :nom="child.nom" :size="84" />
+        <div class="student-badge student-badge--static">
           <v-icon size="16">mdi-school</v-icon>
           <span class="ml-1">{{ child.class || "Classe" }}</span>
         </div>
-      </v-img>
+      </div>
 
       <v-card-text class="student-body">
         <div class="student-name">{{ child.prenom }} {{ child.nom }}</div>
-        <div class="student-meta">
-          <v-icon size="16" class="mr-1">mdi-identifier</v-icon>
-          ID : {{ child.id || "-" }}
-        </div>
+        <div class="student-classe"><v-icon size="14" class="mr-1">mdi-school</v-icon>{{ child.class || "Classe" }}</div>
       </v-card-text>
     </v-card>
 
     <!-- ✅ Actions (2/ligne mobile, 3 md, 3 lg — jamais 4) + centré -->
-    <v-card class="actions-shell" elevation="12">
+    <v-card class="actions-shell" elevation="0">
       <div class="shell-accent" aria-hidden="true"></div>
 
       <v-card-text class="shell-body">
@@ -55,7 +47,7 @@
           </v-chip>
         </div>
 
-        <v-divider class="my-4" />
+        <v-divider class="my-2" />
 
         <div class="grid-center">
           <v-row class="grid-row" dense justify="center" align="stretch">
@@ -70,7 +62,7 @@
             >
               <v-card
                 class="action-card"
-                elevation="10"
+                elevation="0"
                 @click="navigateTo(label.route)"
               >
                 <div class="action-accent" :class="`accent-${label.tone}`"></div>
@@ -96,10 +88,6 @@
 
     <!-- Bouton Retour bas -->
     <div class="text-center mt-4">
-      <v-btn class="pill-back" color="primary" variant="tonal" @click="goBack">
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
     </div>
   </v-container>
 </template>
@@ -122,7 +110,7 @@ export default {
         { name: "Présence", route: "presence", icon: "mdi-calendar-check-outline", tone: "green" },
         { name: "Conduite", route: "conduite", icon: "mdi-account-check-outline", tone: "amber" },
         { name: "Scolarité", route: "scolarite", icon: "mdi-school-outline", tone: "blue" },
-        { name: "Programme", route: "programme", icon: "mdi-book-open-page-variant-outline", tone: "purple" },
+        { name: "Emploi du temps", route: "programme", icon: "mdi-calendar-clock", tone: "purple" },
         { name: "Demande de Permission", route: "permission", icon: "mdi-file-sign", tone: "purple" },
         { name: "Activité", route: "activite", icon: "mdi-run", tone: "amber" },
         { name: "Assistances", route: "assistances", icon: "mdi-account-voice", tone: "green" },
@@ -143,27 +131,29 @@ export default {
 </script>
 
 <style scoped>
-/* ✅ Charte app */
+.student-profil { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 12px 4px; }
+.student-badge--static { position: static !important; }
+/* ✅ Charte app — version fine */
 .info-page {
-  padding-top: 12px;
-  padding-bottom: 18px;
+  padding-top: 8px;
+  padding-bottom: 12px;
 }
 
 /* Top bar */
 .topbar {
   display: flex;
   justify-content: flex-start;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 .pill-back {
   border-radius: 999px !important;
-  font-weight: 900;
+  font-weight: 800;
   text-transform: none;
 }
 
 /* Title block */
 .page-head {
-  padding: 6px 6px 10px;
+  padding: 2px 2px 8px;
 }
 .title {
   display: flex;
@@ -171,89 +161,80 @@ export default {
   font-weight: 900;
   color: #0b2e4a;
   letter-spacing: 0.2px;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
 }
 .subtitle {
-  margin-top: 6px;
+  margin-top: 2px;
   color: #455a64;
-  font-size: 0.95rem;
+  font-size: 0.86rem;
 }
 
-/* Student card */
+/* Student card : vignette + nom sur une ligne */
 .student-card {
-  border-radius: 22px !important;
+  display: grid !important;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+  column-gap: 12px;
+  padding: 8px;
+  border-radius: 10px !important;
   overflow: hidden;
   border: 1px solid rgba(25, 118, 210, 0.12);
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 70px rgba(11, 46, 74, 0.12);
-  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  margin-bottom: 10px;
 }
 .student-accent {
-  height: 6px;
-  width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25,118,210,0.22), #1976d2);
+  display: none;
 }
 .student-img {
-  height: 200px;
+  width: 72px;
+  height: 72px !important;
+  border-radius: 8px;
 }
+.student-img :deep(.v-responsive__sizer) { padding-bottom: 0 !important; }
 .img-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.28) 100%);
+  display: none;
 }
 .student-badge {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(25, 118, 210, 0.16);
-  color: #0b2e4a;
-  font-weight: 900;
-  font-size: 0.85rem;
+  display: none;
 }
 .student-body {
-  padding: 14px 14px 16px !important;
+  padding: 0 !important;
 }
 .student-name {
   font-weight: 900;
   color: #0b2e4a;
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
-.student-meta {
-  margin-top: 6px;
-  display: inline-flex;
+.student-classe {
+  display: flex;
   align-items: center;
+  margin-top: 2px;
   color: #607d8b;
+  font-size: 0.82rem;
   font-weight: 700;
-  font-size: 0.9rem;
 }
-
 /* Actions shell */
 .actions-shell {
-  border-radius: 22px !important;
+  border-radius: 10px !important;
   overflow: hidden;
   border: 1px solid rgba(25, 118, 210, 0.12);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 18px 70px rgba(11, 46, 74, 0.12);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 .shell-accent {
-  height: 6px;
+  height: 3px;
   width: 100%;
   background: linear-gradient(90deg, #1976d2, rgba(25,118,210,0.18), #1976d2);
 }
 .shell-body {
-  padding: 16px !important;
+  padding: 10px 12px !important;
 }
 .shell-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .shell-title {
@@ -261,10 +242,11 @@ export default {
   align-items: center;
   font-weight: 900;
   color: #0b2e4a;
+  font-size: 0.95rem;
 }
 .chip {
   border-radius: 999px !important;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 /* ✅ centrer le grid */
@@ -280,83 +262,97 @@ export default {
   display: flex;
 }
 
-/* Action card */
+/* Action card : tuile basse, barre de couleur fine à gauche */
 .action-card {
+  position: relative;
   width: 100%;
-  border-radius: 18px !important;
+  border-radius: 8px !important;
   overflow: hidden;
   border: 1px solid rgba(25, 118, 210, 0.12);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  transition: box-shadow 0.16s ease, border-color 0.16s ease;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.95);
 }
 .action-card:hover {
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 18px 55px rgba(11, 46, 74, 0.16) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
   border-color: rgba(25, 118, 210, 0.28);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .action-card:hover {
-    transform: none;
-  }
-}
 .action-accent {
-  height: 6px;
-  width: 100%;
-  opacity: 0.95;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  height: auto;
 }
 .action-body {
-  min-height: 98px;
-  padding: 14px 12px 12px;
-  display: grid;
+  min-height: 44px;
+  padding: 6px 10px 6px 12px;
+  display: flex;
+  align-items: center;
   gap: 8px;
-  align-content: center;
-  justify-items: center;
-  text-align: center;
+  text-align: left;
 }
 .action-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(25, 118, 210, 0.12);
 }
+.action-icon :deep(.v-icon) {
+  font-size: 16px !important;
+}
 .action-title {
-  font-weight: 900;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 800;
   color: #0b2e4a;
-  font-size: 0.98rem;
+  font-size: 0.9rem;
+  line-height: 1.2;
 }
 .action-cta {
   display: inline-flex;
   align-items: center;
-  font-weight: 800;
+  font-weight: 700;
   color: #1976d2;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 /* Tones (couleurs cohérentes sans casser la charte) */
-.accent-blue { background: linear-gradient(90deg, #1976d2, rgba(25,118,210,0.22), #1976d2); }
+.accent-blue { background: #1976d2; }
 .icon-blue { background: rgba(25,118,210,0.08); color: #1976d2; }
 
-.accent-blue2 { background: linear-gradient(90deg, #0b2e4a, rgba(11,46,74,0.18), #0b2e4a); }
+.accent-blue2 { background: #0b2e4a; }
 .icon-blue2 { background: rgba(11,46,74,0.08); color: #0b2e4a; }
 
-.accent-green { background: linear-gradient(90deg, #2e7d32, rgba(46,125,50,0.18), #2e7d32); }
+.accent-green { background: #2e7d32; }
 .icon-green { background: rgba(46,125,50,0.10); color: #2e7d32; }
 
-.accent-amber { background: linear-gradient(90deg, #ed6c02, rgba(237,108,2,0.18), #ed6c02); }
+.accent-amber { background: #ed6c02; }
 .icon-amber { background: rgba(237,108,2,0.10); color: #ed6c02; }
 
-.accent-purple { background: linear-gradient(90deg, #6a1b9a, rgba(106,27,154,0.18), #6a1b9a); }
+.accent-purple { background: #6a1b9a; }
 .icon-purple { background: rgba(106,27,154,0.10); color: #6a1b9a; }
 
-/* ✅ petits téléphones */
-@media (max-width: 480px) {
-  .student-img { height: 160px; }
-  .shell-body { padding: 14px !important; }
-  .action-body { min-height: 90px; padding: 12px 10px; }
-  .action-title { font-size: 0.94rem; }
+/* Téléphone : pas de grand cadre, tuiles posées sur la page */
+@media (max-width: 600px) {
+  .info-page { padding: 8px !important; }
+  .title { font-size: 1rem; }
+  .actions-shell {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .shell-accent { display: none; }
+  .shell-body { padding: 0 !important; }
+  .grid-row { margin: 0 -3px !important; }
+  .grid-row > .card-col { padding: 3px !important; }
+  .action-body { min-height: 40px; padding: 4px 6px 4px 10px; gap: 6px; }
+  .action-cta { font-size: 0; }
+  .action-cta :deep(.v-icon) { font-size: 16px !important; margin: 0 !important; }
+  .action-title { font-size: 0.84rem; }
 }
 </style>

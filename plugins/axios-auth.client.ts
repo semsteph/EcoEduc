@@ -38,6 +38,21 @@ function loginPathFor(currentPath: string): string | null {
 export default defineNuxtPlugin(() => {
   const router = useRouter()
 
+  // Jeton joint d'office à chaque appel de l'API : les routes qui étaient
+  // ouvertes sans connexion exigent désormais un jeton, et certains écrans
+  // ne l'envoyaient pas.
+  axios.interceptors.request.use((config) => {
+    const headers: any = config.headers || {}
+    const already = typeof headers.get === 'function' ? headers.get('Authorization') : headers.Authorization
+    const token = localStorage.getItem('token')
+    if (!already && token && /\/api\//.test(String(config.url || ''))) {
+      if (typeof headers.set === 'function') headers.set('Authorization', `Bearer ${token}`)
+      else headers.Authorization = `Bearer ${token}`
+      config.headers = headers
+    }
+    return config
+  })
+
   axios.interceptors.response.use(
     (response) => response,
     (error) => {

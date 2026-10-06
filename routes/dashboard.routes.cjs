@@ -11,6 +11,7 @@ const router = express.Router();
 
 const jwt = require('jsonwebtoken');
 const dayjs = require('dayjs');
+const db = require('../server-lib/db.cjs');
 
 // Auth établissement / collaborateur (mêmes tokens que le reste de l'admin)
 function authenticateStaff(req, res, next) {
@@ -65,7 +66,7 @@ router.get('/stats/:etablissementId/:anneeScolaireId', authenticateStaff, async 
       absencesRows,
     ] = await Promise.all([
       db.query('SELECT COUNT(*) AS n FROM eleve WHERE etablissement_id = ? AND Annee_scolaire_id = ?', [etablissementId, anneeScolaireId]).then(([r]) => r),
-      db.query('SELECT COUNT(*) AS n FROM enseignants WHERE etablissement_id = ?', [etablissementId]).then(([r]) => r),
+      db.query('SELECT COUNT(*) AS n FROM enseignants WHERE etablissement_id = ? AND actif = 1', [etablissementId]).then(([r]) => r),
       db.query('SELECT COUNT(*) AS n FROM classes WHERE etablissement_id = ?', [etablissementId]).then(([r]) => r),
       db.query('SELECT COUNT(*) AS n FROM parents WHERE etablissement_id = ? AND Annee_scolaire_id = ?', [etablissementId, anneeScolaireId]).then(([r]) => r),
 
@@ -166,6 +167,43 @@ router.get('/stats/:etablissementId/:anneeScolaireId', authenticateStaff, async 
   } catch (err) {
     console.error('Erreur GET /dashboard/stats :', err);
     res.status(500).json({ message: 'Erreur lors du chargement des statistiques.' });
+  }
+});
+
+// Mise en place de l'établissement : étapes faites / à faire (carte
+// « Premiers pas » du tableau de bord, visible tant que tout n'est pas fait).
+router.get('/demarrage', authenticateStaff, async (req, res) => {
+  const etab = Number(req.user.etablissementId);
+  if (!etab) return res.status(403).json({ message: 'Accès refusé.' });
+  try {
+    const one = async (sql, params) => Number((await db.query(sql, params))[0][0].n);
+    const [[annee]] = await db.query("SELECT id, nom_annee FROM annee_scolaire WHERE etablissement_id = ? AND statut = 'ouverte' ORDER BY id DESC LIMIT 1", [etab]);
+    const anneeId = annee ? annee.id : 0;
+    const counts = {
+      annee: annee ? 1 : 0,
+      classes: await one('SELECT COUNT(*) n FROM classes WHERE etablissement_id = ?', [etab]),
+      matieres: await one('SELECT COUNT(*) n FROM matieres WHERE etablissement_id = ?', [etab]),
+      enseignants: await one('SELECT COUNT(*) n FROM enseignants WHERE etablissement_id = ? AND actif = 1', [etab]),
+      repartition: await one('SELECT COUNT(*) n FROM enseigner WHERE etablissement_id = ? AND Annee_scolaire_id = ?', [etab, anneeId]),
+      eleves: await one("SELECT COUNT(*) n FROM eleve WHERE etablissement_id = ? AND statut = 'actif'", [etab]),
+      frais: await one('SELECT COUNT(*) n FROM echeance WHERE etablissement_id = ? AND annee_scolaire_id = ?', [etab, anneeId]),
+      photos: await one("SELECT COUNT(*) n FROM eleve WHERE etablissement_id = ? AND statut = 'actif' AND photo_url IS NOT NULL AND photo_url <> ''", [etab]),
+    };
+    const D = '/administration/dashbord';
+    const etapes = [
+      { cle: 'annee', titre: "Créer l'année scolaire", aide: 'Ex. 2025-2026', lien: `${D}/parametres?onglet=annee` },
+      { cle: 'classes', titre: 'Créer les classes', aide: 'De la 6ème à la Terminale', lien: `${D}/classes` },
+      { cle: 'matieres', titre: 'Ajouter les matières', aide: 'Français, Mathématiques…', lien: `${D}/enseignants/matieres` },
+      { cle: 'enseignants', titre: 'Ajouter les enseignants', aide: 'Leurs identifiants de connexion', lien: `${D}/enseignants/liste` },
+      { cle: 'repartition', titre: 'Répartir enseignants et matières', aide: 'Qui enseigne quoi, dans quelle classe, avec quel coefficient', lien: `${D}/enseignants` },
+      { cle: 'eleves', titre: 'Inscrire les élèves', aide: 'Avec le compte de leurs parents', lien: `${D}/eleves/inscription` },
+      { cle: 'frais', titre: 'Fixer les frais de scolarité', aide: 'Facultatif', lien: `${D}/parametres?onglet=frais`, facultatif: true },
+      { cle: 'photos', titre: 'Photos et cartes scolaires', aide: 'Facultatif : photos de la classe en une fois, puis impression des cartes', lien: `${D}/eleves/cartes-scolaires`, facultatif: true },
+    ].map((e) => ({ ...e, fait: counts[e.cle] > 0, nombre: counts[e.cle] }));
+    res.json({ annee: annee ? annee.nom_annee : null, etapes, termine: etapes.every((e) => e.fait || e.facultatif) });
+  } catch (error) {
+    console.error('Erreur démarrage :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
 

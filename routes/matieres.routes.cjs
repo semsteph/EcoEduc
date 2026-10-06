@@ -87,7 +87,7 @@ router.delete('/Matieres/:id', authenticateJWT, async (req, res) => {
 });
 
 // Route pour récupérer les classes (ID, nom)
-router.get('/Coefficient', async (req, res) => {
+router.get('/Coefficient', authenticateJWT, async (req, res) => {
   try {
     const [coefficient] = await req.db.query('SELECT id, valeur FROM coefficient');
     res.status(200).json(coefficient)
@@ -113,7 +113,7 @@ router.get('/Matieres/:etablissementId', authenticateJWT, async (req, res) => {
 });
 
 // Route pour récupérer les matières par ID de classe
-router.get('/matiere/:classId', async (req, res) => {
+router.get('/matiere/:classId', authenticateJWT, async (req, res) => {
   const classId = req.params.classId;
 
   if (!classId) {
@@ -122,10 +122,11 @@ router.get('/matiere/:classId', async (req, res) => {
 
   try {
     const [results] = await req.db.query(`
-      SELECT m.id, m.nom 
+      SELECT DISTINCT m.id, m.nom
       FROM matieres m
       JOIN enseigner e ON m.id = e.matiere_id
       WHERE e.Classes_id = ?
+      ORDER BY m.nom
     `, [classId]);
 
     res.json(results);

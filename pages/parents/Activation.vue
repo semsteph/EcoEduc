@@ -1,235 +1,123 @@
 <template>
-  <v-container fluid class="activation-container">
-    <!-- Décor -->
-    <div class="bg-orb orb-1" aria-hidden="true"></div>
-    <div class="bg-orb orb-2" aria-hidden="true"></div>
-    <div class="bg-grid" aria-hidden="true"></div>
+  <AuthLayout
+    role="parents"
+    :before-back="backStep"
+    title="Activer mon compte"
+    subtitle="Première connexion : vérifiez votre e-mail puis choisissez votre mot de passe."
+  >
+    <div class="auth-steps" role="list" aria-label="Étapes">
+      <span class="auth-step" :class="{ 'is-active': step === 1 }" role="listitem">E-mail</span>
+      <span class="auth-step-line" aria-hidden="true"></span>
+      <span class="auth-step" :class="{ 'is-active': step === 2 }" role="listitem">Code</span>
+      <span class="auth-step-line" aria-hidden="true"></span>
+      <span class="auth-step" :class="{ 'is-active': step === 3 }" role="listitem">Mot de passe</span>
+    </div>
 
-    <v-row justify="center" align="center" class="fill-height ma-0 pa-2">
-      <v-col cols="12" sm="10" md="7" lg="5" xl="4" class="pa-0">
-        <!-- Header -->
-        <div class="text-center mb-5 px-2 px-sm-5">
-          <div class="brand-badge mx-auto mb-3">
-            <v-icon size="22">mdi-account-check-outline</v-icon>
-          </div>
-          <div class="welcome-title">Activation du compte</div>
-          <div class="welcome-subtitle">
-            Finalisez l’accès à votre espace parent <span class="brand-name">EchoEducation</span>.
-          </div>
-        </div>
+    <v-alert v-if="errorMessage" type="error" variant="tonal" density="comfortable" class="auth-alert">
+      {{ errorMessage }}
+    </v-alert>
+    <v-alert v-if="successMessage" type="success" variant="tonal" density="comfortable" class="auth-alert">
+      {{ successMessage }}
+    </v-alert>
 
-        <!-- Card -->
-        <v-card class="card" elevation="12">
-          <div class="card-accent" aria-hidden="true"></div>
+    <!-- Étape 1 : e-mail et établissement -->
+    <v-form v-if="step === 1" @submit.prevent="canSendCode && sendCode()">
+      <v-text-field
+        v-model="email"
+        label="Adresse e-mail"
+        prepend-inner-icon="mdi-email-outline"
+        autocomplete="email"
+        hide-details="auto"
+        class="auth-field"
+      />
 
-          <v-card-text class="content">
-            <!-- Stepper mini -->
-            <div class="mini-steps mb-4" role="list" aria-label="Étapes">
-              <div class="step" :class="{ active: step === 1 }" role="listitem">
-                <span class="dot"></span><span>Email</span>
-              </div>
-              <div class="line"></div>
-              <div class="step" :class="{ active: step === 2 }" role="listitem">
-                <span class="dot"></span><span>Code</span>
-              </div>
-              <div class="line"></div>
-              <div class="step" :class="{ active: step === 3 }" role="listitem">
-                <span class="dot"></span><span>Mot de passe</span>
-              </div>
-            </div>
+      <v-select
+        v-model="etablissementId"
+        :items="etablissements"
+        item-title="nom"
+        item-value="id"
+        label="Établissement"
+        prepend-inner-icon="mdi-school-outline"
+        hide-details="auto"
+        class="auth-field"
+      />
 
-            <!-- Alert -->
-            <v-alert
-              v-if="errorMessage"
-              type="error"
-              variant="tonal"
-              border="start"
-              density="comfortable"
-              class="mb-3"
-            >
-              {{ errorMessage }}
-            </v-alert>
+      <v-btn type="submit" color="primary" class="auth-submit" :loading="loading" :disabled="loading || !canSendCode">
+        Envoyer le code
+      </v-btn>
 
-            <v-alert
-              v-if="successMessage"
-              type="success"
-              variant="tonal"
-              border="start"
-              density="comfortable"
-              class="mb-3"
-            >
-              {{ successMessage }}
-            </v-alert>
+      <p class="auth-hint">
+        <v-icon size="16">mdi-information-outline</v-icon>
+        Le code expire dans 10 minutes.
+      </p>
+    </v-form>
 
-            <!-- STEP 1 -->
-            <div v-if="step === 1">
-              <v-text-field
-                v-model="email"
-                label="Adresse e-mail"
-                variant="outlined"
-                density="comfortable"
-                prepend-inner-icon="mdi-email-outline"
-                class="rounded-field"
-                hide-details="auto"
-                autocomplete="email"
-              />
+    <!-- Étape 2 : code reçu par e-mail -->
+    <v-form v-else-if="step === 2" @submit.prevent="canVerifyCode && verifyCode()">
+      <v-text-field
+        v-model="code"
+        label="Code de vérification"
+        prepend-inner-icon="mdi-shield-key-outline"
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        hide-details="auto"
+        class="auth-field"
+      />
 
-              <v-select
-                v-model="etablissementId"
-                :items="etablissements"
-                item-title="nom"
-                item-value="id"
-                label="Établissement"
-                variant="outlined"
-                density="comfortable"
-                prepend-inner-icon="mdi-school"
-                class="rounded-field"
-                hide-details="auto"
-              />
+      <v-btn type="submit" color="primary" class="auth-submit" :loading="loading" :disabled="loading || !canVerifyCode">
+        Vérifier le code
+      </v-btn>
 
-              <v-btn
-                color="primary"
-                block
-                size="large"
-                class="mt-3 action-btn"
-                :loading="loading"
-                :disabled="loading || !canSendCode"
-                @click="sendCode"
-              >
-                Envoyer le code
-              </v-btn>
 
-              <div class="text-center mt-2 hint">
-                <v-icon size="16" class="mr-1">mdi-information-outline</v-icon>
-                Le code expire dans 10 minutes.
-              </div>
-            </div>
+      <div class="text-center mt-3">
+        <button type="button" class="auth-link" :disabled="loading || !canSendCode" @click="resendCode">
+          Renvoyer un code
+        </button>
+      </div>
+    </v-form>
 
-            <!-- STEP 2 -->
-            <div v-else-if="step === 2">
-              <v-text-field
-                v-model="code"
-                label="Code de vérification"
-                variant="outlined"
-                density="comfortable"
-                prepend-inner-icon="mdi-shield-key-outline"
-                class="rounded-field"
-                hide-details="auto"
-                inputmode="numeric"
-              />
+    <!-- Étape 3 : mot de passe -->
+    <v-form v-else @submit.prevent="canSetPassword && setPassword()">
+      <v-text-field
+        v-model="password"
+        :type="showPassword ? 'text' : 'password'"
+        label="Nouveau mot de passe"
+        prepend-inner-icon="mdi-lock-outline"
+        :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+        autocomplete="new-password"
+        hide-details="auto"
+        class="auth-field"
+        @click:append-inner="showPassword = !showPassword"
+      />
 
-              <v-btn
-                color="primary"
-                block
-                size="large"
-                class="mt-3 action-btn"
-                :loading="loading"
-                :disabled="loading || !canVerifyCode"
-                @click="verifyCode"
-              >
-                Vérifier le code
-              </v-btn>
+      <v-text-field
+        v-model="confirmPassword"
+        :type="showConfirmPassword ? 'text' : 'password'"
+        label="Confirmer le mot de passe"
+        prepend-inner-icon="mdi-lock-check-outline"
+        :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
+        autocomplete="new-password"
+        hide-details="auto"
+        class="auth-field"
+        @click:append-inner="showConfirmPassword = !showConfirmPassword"
+      />
 
-              <v-btn
-                variant="tonal"
-                color="black"
-                block
-                class="mt-2 cancel-btn"
-                :disabled="loading"
-                @click="step = 1"
-              >
-                Retour
-              </v-btn>
+      <v-btn type="submit" color="primary" class="auth-submit" :loading="loading" :disabled="loading || !canSetPassword">
+        Activer mon compte
+      </v-btn>
 
-              <div class="text-center mt-3">
-                <v-btn
-                  variant="text"
-                  class="link-btn"
-                  color="primary"
-                  :disabled="loading || !canSendCode"
-                  @click="resendCode"
-                >
-                  Renvoyer un code
-                </v-btn>
-              </div>
-            </div>
 
-            <!-- STEP 3 -->
-            <div v-else>
-              <v-text-field
-                v-model="password"
-                :type="showPassword ? 'text' : 'password'"
-                label="Nouveau mot de passe"
-                variant="outlined"
-                density="comfortable"
-                prepend-inner-icon="mdi-lock-outline"
-                :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                @click:append-inner="showPassword = !showPassword"
-                class="rounded-field"
-                hide-details="auto"
-                autocomplete="new-password"
-              />
+      <p class="auth-hint">
+        <v-icon size="16">mdi-shield-check-outline</v-icon>
+        Choisissez au moins 6 caractères.
+      </p>
+    </v-form>
 
-              <v-text-field
-                v-model="confirmPassword"
-                :type="showConfirmPassword ? 'text' : 'password'"
-                label="Confirmer le mot de passe"
-                variant="outlined"
-                density="comfortable"
-                prepend-inner-icon="mdi-lock-check-outline"
-                :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                @click:append-inner="showConfirmPassword = !showConfirmPassword"
-                class="rounded-field"
-                hide-details="auto"
-                autocomplete="new-password"
-              />
-
-              <v-btn
-                color="primary"
-                block
-                size="large"
-                class="mt-3 action-btn"
-                :loading="loading"
-                :disabled="loading || !canSetPassword"
-                @click="setPassword"
-              >
-                Activer mon compte
-              </v-btn>
-
-              <v-btn
-                variant="tonal"
-                color="black"
-                block
-                class="mt-2 cancel-btn"
-                :disabled="loading"
-                @click="step = 2"
-              >
-                Retour
-              </v-btn>
-
-              <div class="text-center mt-3 hint">
-                <v-icon size="16" class="mr-1">mdi-shield-check-outline</v-icon>
-                Choisissez au moins 6 caractères.
-              </div>
-            </div>
-          </v-card-text>
-
-          <!-- Overlay -->
-          <v-overlay :model-value="loading" class="overlay" contained persistent>
-            <div class="overlay-box">
-              <v-progress-circular indeterminate size="28" />
-              <div class="overlay-text">Traitement en cours…</div>
-            </div>
-          </v-overlay>
-        </v-card>
-
-        <!-- Footer -->
-        <div class="text-center mt-4 footer-note px-2 px-sm-6">
-          © {{ new Date().getFullYear() }} — EchoEducation
-        </div>
-      </v-col>
-    </v-row>
-  </v-container>
+    <template #footer>
+      <span class="footer-text">Compte déjà activé ?</span>
+      <NuxtLink to="/parents/connexion" class="auth-link">Se connecter</NuxtLink>
+    </template>
+  </AuthLayout>
 </template>
 
 <script>
@@ -241,7 +129,7 @@ export default {
     return {
       step: 1,
       email: "",
-      etablissementId: "",
+      etablissementId: null,
       etablissements: [],
       code: "",
       password: "",
@@ -287,6 +175,13 @@ export default {
   },
 
   methods: {
+    // Flèche retour : étape précédente (code → e-mail, mot de passe → code).
+    backStep() {
+      if (this.step <= 1 || this.loading) return this.step > 1;
+      this.step -= 1;
+      return true;
+    },
+
     clearAlerts() {
       this.errorMessage = "";
       this.successMessage = "";
@@ -381,204 +276,19 @@ export default {
 </script>
 
 <style scoped>
-/* Même charte que la page login */
-
-.activation-container {
-  min-height: 100vh;
-  padding: 14px;
-  position: relative;
-  overflow: hidden;
-
-  background:
-    radial-gradient(900px 500px at 20% 15%, rgba(25, 118, 210, 0.22), transparent 60%),
-    radial-gradient(700px 500px at 80% 10%, rgba(25, 118, 210, 0.14), transparent 55%),
-    linear-gradient(180deg, #eaf2ff 0%, #ffffff 45%, #f6f9ff 100%);
-}
-
-/* décor */
-.bg-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(30px);
-  opacity: 0.85;
-  pointer-events: none;
-  z-index: 0;
-}
-.orb-1 {
-  width: 280px;
-  height: 280px;
-  top: -90px;
-  left: -110px;
-  background: rgba(25, 118, 210, 0.22);
-}
-.orb-2 {
-  width: 240px;
-  height: 240px;
-  bottom: -110px;
-  right: -100px;
-  background: rgba(11, 46, 74, 0.12);
-}
-.bg-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(25, 118, 210, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(25, 118, 210, 0.06) 1px, transparent 1px);
-  background-size: 34px 34px;
-  mask-image: radial-gradient(closest-side, rgba(0,0,0,0.55), transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-:deep(.v-row),
-:deep(.v-col),
-.card {
-  position: relative;
-  z-index: 1;
-}
-
-/* Header */
-.brand-badge {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: rgba(25, 118, 210, 0.12);
-  border: 1px solid rgba(25, 118, 210, 0.18);
-  color: #1976d2;
-}
-.welcome-title {
-  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
-  font-weight: 900;
-  color: #0b2e4a;
-}
-.welcome-subtitle {
-  margin-top: 6px;
-  font-size: clamp(0.92rem, 1.4vw, 1rem);
-  color: #455a64;
-  line-height: 1.4rem;
-}
-.brand-name {
-  font-weight: 900;
-  color: #1976d2;
-}
-
-/* Card */
-.card {
-  border-radius: 20px !important;
-  background: rgba(255, 255, 255, 0.94) !important;
-  border: 1px solid rgba(25, 118, 210, 0.14);
-  box-shadow: 0 18px 60px rgba(11, 46, 74, 0.14);
-  overflow: hidden;
-}
-.card-accent {
-  height: 6px;
-  width: 100%;
-  background: linear-gradient(90deg, #1976d2, rgba(25, 118, 210, 0.2), #1976d2);
-  opacity: 0.9;
-}
-
-.content {
-  padding: 18px !important;
-}
-
-/* Champs */
-.rounded-field :deep(.v-field) {
-  border-radius: 14px !important;
-}
-
-/* Boutons */
-.action-btn {
-  border-radius: 999px !important;
-  font-weight: 900;
-  letter-spacing: 0.3px;
-}
-.cancel-btn {
-  border-radius: 999px !important;
-  font-weight: 800;
-}
-.link-btn {
-  text-transform: none;
-  font-weight: 900;
-}
-
-/* Stepper mini */
-.mini-steps {
+.auth-hint {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-.step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #90a4ae;
-  font-weight: 900;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-.step .dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #cfd8dc;
-}
-.step.active {
-  color: #1976d2;
-}
-.step.active .dot {
-  background: #1976d2;
-}
-.line {
-  flex: 1;
-  height: 2px;
-  background: rgba(25, 118, 210, 0.14);
-  border-radius: 999px;
-}
-
-.hint {
-  display: inline-flex;
-  align-items: center;
+  justify-content: center;
   gap: 6px;
-  font-weight: 900;
-  color: #0b2e4a;
-  opacity: 0.78;
-  font-size: 0.86rem;
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5d6b82;
 }
 
-/* Overlay */
-.overlay {
-  backdrop-filter: blur(4px);
-}
-.overlay-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(25, 118, 210, 0.16);
-  box-shadow: 0 16px 40px rgba(11, 46, 74, 0.16);
-}
-.overlay-text {
-  font-weight: 900;
-  color: #0b2e4a;
-  font-size: 0.95rem;
-}
-
-.footer-note {
-  color: #78909c;
-  font-size: 0.85rem;
-}
-
-/* Mobile */
-@media (max-width: 420px) {
-  .activation-container {
-    padding: 10px;
-  }
-  .content {
-    padding: 14px !important;
-  }
+.footer-text {
+  font-size: 14px;
+  color: #5d6b82;
 }
 </style>

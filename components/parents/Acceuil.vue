@@ -34,12 +34,12 @@
     <!-- ✅ Cards -->
     <v-row class="cards-wrap" dense justify="center">
       <v-col cols="12" sm="10" md="6" lg="4">
-        <v-card class="info-card" elevation="12">
+        <v-card class="info-card" elevation="0">
           <div class="card-accent" aria-hidden="true"></div>
 
           <v-card-text class="card-body">
             <div class="card-icon">
-              <v-icon size="22" color="primary">mdi-chart-line</v-icon>
+              <v-icon size="18" color="primary">mdi-chart-line</v-icon>
             </div>
 
             <div class="card-title">
@@ -54,12 +54,12 @@
       </v-col>
 
       <v-col cols="12" sm="10" md="6" lg="4">
-        <v-card class="info-card" elevation="12">
+        <v-card class="info-card" elevation="0">
           <div class="card-accent" aria-hidden="true"></div>
 
           <v-card-text class="card-body">
             <div class="card-icon">
-              <v-icon size="22" color="primary">mdi-account-group-outline</v-icon>
+              <v-icon size="18" color="primary">mdi-account-group-outline</v-icon>
             </div>
 
             <div class="card-title">
@@ -74,12 +74,12 @@
       </v-col>
 
       <v-col cols="12" sm="10" md="6" lg="4">
-        <v-card class="info-card" elevation="12">
+        <v-card class="info-card" elevation="0">
           <div class="card-accent" aria-hidden="true"></div>
 
           <v-card-text class="card-body">
             <div class="card-icon">
-              <v-icon size="22" color="primary">mdi-trophy-outline</v-icon>
+              <v-icon size="18" color="primary">mdi-trophy-outline</v-icon>
             </div>
 
             <div class="card-title">
@@ -127,9 +127,9 @@ export default {
   margin: 0 auto;
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(25, 118, 210, 0.12);
-  border-radius: 22px;
+  border-radius: 10px;
   padding: 22px 18px;
-  box-shadow: 0 16px 60px rgba(11, 46, 74, 0.12);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(8px);
 }
 
@@ -137,29 +137,28 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 3px 9px;
   border-radius: 999px;
   background: rgba(25, 118, 210, 0.10);
   border: 1px solid rgba(25, 118, 210, 0.18);
   color: #0b2e4a;
-  font-weight: 900;
-  font-size: 0.82rem;
+  font-weight: 700;
+  font-size: 0.76rem;
 }
 
 .hero-title {
   margin: 12px 0 6px;
   color: #0b2e4a;
-  font-weight: 950;
-  letter-spacing: 0.2px;
-  line-height: 1.15;
-  font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1.25;
+  font-size: clamp(1.05rem, 1.8vw, 1.35rem);
 }
 
 .hero-subtitle {
   margin: 0;
   color: #455a64;
   line-height: 1.45;
-  font-size: 0.98rem;
+  font-size: 0.88rem;
   max-width: 60ch;
 }
 
@@ -184,34 +183,34 @@ export default {
 }
 
 .info-card {
-  border-radius: 20px !important;
+  border-radius: 10px!important;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(25, 118, 210, 0.12);
-  box-shadow: 0 18px 70px rgba(11, 46, 74, 0.12);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 .info-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 22px 78px rgba(11, 46, 74, 0.16) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08)!important;
 }
 
 .card-accent {
-  height: 6px;
+  height: 2px;
   width: 100%;
   background: linear-gradient(90deg, #1976d2, rgba(25, 118, 210, 0.22), #1976d2);
   opacity: 0.95;
 }
 
 .card-body {
-  padding: 18px !important;
+  padding: 12px !important;
 }
 
 .card-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   background: rgba(25, 118, 210, 0.10);
@@ -221,17 +220,16 @@ export default {
 
 .card-title {
   color: #0b2e4a;
-  font-weight: 950;
-  letter-spacing: 0.2px;
-  line-height: 1.25;
-  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.3;
+  font-size: 0.95rem;
 }
 
 .card-text {
-  margin-top: 8px;
+  margin-top: 6px;
   color: #546e7a;
-  line-height: 1.5;
-  font-size: 0.95rem;
+  line-height: 1.45;
+  font-size: 0.86rem;
 }
 
 /* ✅ Mobile */
@@ -239,9 +237,12 @@ export default {
   .hero {
     padding: 14px 10px 6px;
   }
+  /* Téléphone : pas de grand cadre autour de l'introduction. */
   .hero-inner {
-    padding: 16px 14px;
-    border-radius: 18px;
+    padding: 4px 2px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
   }
   .hero-subtitle {
     font-size: 0.94rem;
@@ -250,7 +251,7 @@ export default {
     padding: 8px 8px 16px;
   }
   .card-body {
-    padding: 14px !important;
+    padding: 10px !important;
   }
 }
 

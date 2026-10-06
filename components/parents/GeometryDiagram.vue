@@ -149,9 +149,9 @@
           />
 
           <text
-            v-if="element.label && element.x != null && element.y != null"
-            :x="Number(element.x) + 9"
-            :y="Number(element.y) - 9"
+            v-if="element.label && element.labelX != null && element.labelY != null"
+            :x="Number(element.labelX) + 9"
+            :y="Number(element.labelY) - 9"
             class="point-label"
           >{{ element.label }}</text>
         </template>
@@ -220,6 +220,17 @@
           v-else
           :points="polygonPoints"
           :class="diagram.filled === false ? 'shape' : 'shape-fill'"
+        />
+
+        <!-- Quadrillage en carrés-unités (aire = nombre de petits carrés) -->
+        <line
+          v-for="(segment, index) in gridLines"
+          :key="'grid-' + index"
+          :x1="segment.x1"
+          :y1="segment.y1"
+          :x2="segment.x2"
+          :y2="segment.y2"
+          class="unit-grid"
         />
 
         <path
@@ -456,6 +467,30 @@ export default {
       );
     },
 
+    // Lignes intérieures d'un rectangle/carré ABCD découpé en carrés-unités.
+    gridLines() {
+      const grid = this.diagram?.grid;
+      const { A, B, C, D } = this.validPoints;
+      if (!grid || !A || !B || !C || !D) return [];
+
+      const cols = Math.min(15, Number(grid.cols) || 0);
+      const rows = Math.min(15, Number(grid.rows) || 0);
+      const lerp = (p, q, t) => ({ x: Number(p.x) + (Number(q.x) - Number(p.x)) * t, y: Number(p.y) + (Number(q.y) - Number(p.y)) * t });
+      const lines = [];
+
+      for (let i = 1; i < cols; i += 1) {
+        const start = lerp(A, B, i / cols);
+        const end = lerp(D, C, i / cols);
+        lines.push({ x1: start.x, y1: start.y, x2: end.x, y2: end.y });
+      }
+      for (let j = 1; j < rows; j += 1) {
+        const start = lerp(A, D, j / rows);
+        const end = lerp(B, C, j / rows);
+        lines.push({ x1: start.x, y1: start.y, x2: end.x, y2: end.y });
+      }
+      return lines;
+    },
+
     compositeElements() {
       const elements = Array.isArray(this.diagram?.elements)
         ? this.diagram.elements
@@ -464,6 +499,10 @@ export default {
       return elements.slice(0, 20).map((element) => {
         const type = String(element?.type || '').toLowerCase();
 
+        const label = typeof element.label === 'string'
+          ? element.label.slice(0, 60)
+          : '';
+
         if (type === 'point') {
           const source = element.coordinates || element.point || element;
           const x = Number(source?.x);
@@ -471,14 +510,7 @@ export default {
 
           if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
 
-          return {
-            type: 'point',
-            x,
-            y,
-            label: typeof element.label === 'string'
-              ? element.label.slice(0, 20)
-              : ''
-          };
+          return { type: 'point', x, y, label, labelX: x, labelY: y };
         }
 
         if (type === 'segment' || type === 'line') {
@@ -509,9 +541,9 @@ export default {
             type,
             start,
             end,
-            label: typeof element.label === 'string'
-              ? element.label.slice(0, 60)
-              : ''
+            label,
+            labelX: (start.x + end.x) / 2,
+            labelY: (start.y + end.y) / 2,
           };
         }
 
@@ -530,10 +562,18 @@ export default {
 
           if (points.length < 3) return null;
 
+          const centroid = points.reduce(
+            (acc, p) => ({ x: acc.x + p.x / points.length, y: acc.y + p.y / points.length }),
+            { x: 0, y: 0 }
+          );
+
           return {
             type,
             points: points.map((p) => `${p.x},${p.y}`).join(' '),
-            filled: element.filled === false ? false : true
+            filled: element.filled === false ? false : true,
+            label,
+            labelX: centroid.x,
+            labelY: centroid.y,
           };
         }
 
@@ -551,14 +591,18 @@ export default {
             return null;
           }
 
+          const cx = Number(center.x);
+          const cy = Number(center.y);
+          const r = Math.min(radius, 140);
+
           return {
             type,
-            center: {
-              x: Number(center.x),
-              y: Number(center.y)
-            },
-            radius: Math.min(radius, 140),
-            filled: element.filled === true
+            center: { x: cx, y: cy },
+            radius: r,
+            filled: element.filled === true,
+            label,
+            labelX: cx,
+            labelY: cy - r - 8,
           };
         }
 
@@ -576,7 +620,10 @@ export default {
 
           return {
             type,
-            points: points.map((p) => `${p.x},${p.y}`).join(' ')
+            points: points.map((p) => `${p.x},${p.y}`).join(' '),
+            label,
+            labelX: points[1].x,
+            labelY: points[1].y,
           };
         }
 
@@ -599,10 +646,18 @@ export default {
         };
       }
 
-      return {
-        x: (Number(p1.x) + Number(p2.x)) / 2,
-        y: (Number(p1.y) + Number(p2.y)) / 2 - 12,
-      };
+      const vertical = Math.abs(Number(p1.x) - Number(p2.x)) < Math.abs(Number(p1.y) - Number(p2.y));
+
+      // Côté vertical : la mesure est écrite à côté du trait, pas dessus.
+      return vertical
+        ? {
+          x: Math.max(Number(p1.x), Number(p2.x)) + 34,
+          y: (Number(p1.y) + Number(p2.y)) / 2 + 5,
+        }
+        : {
+          x: (Number(p1.x) + Number(p2.x)) / 2,
+          y: Math.max(Number(p1.y), Number(p2.y)) + 22,
+        };
     },
   },
 };
@@ -684,7 +739,7 @@ export default {
 
 .measurement {
   fill: var(--dia-purple);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 800;
   text-anchor: middle;
 }
@@ -693,6 +748,13 @@ export default {
   fill: #6b6b85;
   font-size: 13px;
   font-style: italic;
+}
+
+.unit-grid {
+  stroke: var(--dia-teal);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
 }
 
 .grid-line {

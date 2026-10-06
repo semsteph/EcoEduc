@@ -5,44 +5,56 @@
 const express = require('express');
 const router = express.Router();
 
-const { authenticateJWT } = require('../server-lib/auth.cjs');
+const { authenticateJWT, requireAdminStaff } = require('../server-lib/auth.cjs');
 const db = require('../server-lib/db.cjs');
 const bcrypt = require('bcrypt');
 
-// API pour ajouter une nouvelle année scolaire
-router.post('/annees-scolaires', async (req, res) => {
-  const { annee, etablissementId } = req.body;
+// API pour ajouter une nouvelle année scolaire.
+// - réservée à l'administration de l'établissement connecté ;
+// - une seule année ouverte à la fois (la suivante est créée par la
+//   clôture) : deux années ouvertes faisaient lire l'une ou l'autre selon
+//   l'écran ;
+// - renvoie l'identifiant de l'année créée (l'écran l'attendait).
+router.post('/annees-scolaires', authenticateJWT, requireAdminStaff, async (req, res) => {
+  const etablissementId = Number(req.user.etablissementId);
+  const annee = String(req.body?.annee || '').trim().replace(/\s+/g, '');
 
-  console.log("Données reçues dans le corps de la requête :", req.body);
-
-  // Vérifier si tous les champs nécessaires sont présents
-  if (!annee || !etablissementId) {
-    console.error("Champs manquants : année ou ID établissement non fourni.");
-    return res.status(400).json({ message: "L'année scolaire et l'ID de l'établissement sont requis." });
+  const match = annee.match(/^(\d{4})[-/](\d{4})$/);
+  if (!match || Number(match[2]) !== Number(match[1]) + 1) {
+    return res.status(400).json({ message: "Écrivez l'année sous la forme 2025-2026." });
   }
+  const nomAnnee = `${match[1]}-${match[2]}`;
 
   try {
-    // Vérifier si l'année scolaire existe déjà pour cet établissement
-    console.log("Vérification de l'existence de l'année scolaire pour cet établissement...");
-    const [existingYear] = await db.query(
-      'SELECT * FROM annee_scolaire WHERE nom_annee = ? AND etablissement_id = ?',
-      [annee, etablissementId]
+    const [open] = await db.query(
+      "SELECT nom_annee FROM annee_scolaire WHERE etablissement_id = ? AND statut = 'ouverte'",
+      [etablissementId]
     );
-
+    if (open.length > 0) {
+      return res.status(409).json({
+        message: `L'année ${open[0].nom_annee} est encore ouverte. Clôturez-la : la nouvelle année sera créée automatiquement.`,
+      });
+    }
+    const [existingYear] = await db.query(
+      'SELECT id FROM annee_scolaire WHERE nom_annee = ? AND etablissement_id = ?',
+      [nomAnnee, etablissementId]
+    );
     if (existingYear.length > 0) {
-      console.warn("Année scolaire déjà existante :", existingYear);
       return res.status(409).json({ message: "Cette année scolaire existe déjà pour cet établissement." });
     }
 
-    // Insérer la nouvelle année scolaire dans la base de données
-    console.log("Insertion de la nouvelle année scolaire dans la base de données...");
-    await db.query(
+    const [result] = await db.query(
       'INSERT INTO annee_scolaire (nom_annee, etablissement_id) VALUES (?, ?)',
-      [annee, etablissementId]
+      [nomAnnee, etablissementId]
     );
+    await db.query('UPDATE etablissement SET Annee_scolaire_id = ? WHERE id = ?', [result.insertId, etablissementId]);
 
-    console.log("Nouvelle année scolaire ajoutée avec succès :", { annee, etablissementId });
-    res.status(201).json({ message: "Année scolaire ajoutée avec succès." });
+    res.status(201).json({
+      message: "Année scolaire ajoutée avec succès.",
+      id: result.insertId,
+      anneeScolaireId: result.insertId,
+      annee: nomAnnee,
+    });
   } catch (error) {
     console.error("Erreur lors de l'ajout de l'année scolaire :", error);
     res.status(500).json({ message: "Une erreur est survenue lors de l'ajout de l'année scolaire." });
@@ -145,7 +157,7 @@ router.get('/annees-scolaires/etablissement/:etablissementId', async (req, res) 
 });
 
 // Route pour ajouter un semestre/trimestre
-router.post('/semestres', authenticateJWT, async (req, res) => {
+router.post('/semestres', authenticateJWT, requireAdminStaff, async (req, res) => {
   const { nom, etablissement_id } = req.body;
 
   if (!nom || !etablissement_id) {
@@ -248,8 +260,21 @@ router.post('/etablissements', async (req, res) => {
   if (!nom || !nom_utilisateur || !mot_de_passe) {
     return res.status(400).json({ error: 'Nom, nom d\'utilisateur et mot de passe sont requis.' });
   }
+  if (!['public', 'prive'].includes(statut)) {
+    return res.status(400).json({ error: 'Choisissez le statut : public ou privé.' });
+  }
+  if (String(mot_de_passe).length < 6) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères.' });
+  }
 
   try {
+    // Nom d'utilisateur unique : la connexion lit le premier compte trouvé,
+    // un doublon empêchait l'autre école de se connecter.
+    const [taken] = await db.query('SELECT id FROM etablissement WHERE nom_utilisateur = ?', [nom_utilisateur]);
+    if (taken.length) {
+      return res.status(409).json({ error: 'Ce nom d\'utilisateur est déjà pris. Choisissez-en un autre.' });
+    }
+
     const hashedPassword = await bcrypt.hash(mot_de_passe, 10);
 
     // Ajout de l'établissement dans la table Etablissement

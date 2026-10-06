@@ -6,7 +6,7 @@
         app
         color="primary"
         elevation="0"
-        class="appbar px-3 px-sm-8"
+        class="appbar px-3 px-sm-3"
         height="72"
       >
         <div class="appbar-inner">
@@ -73,7 +73,6 @@
               <div class="hero-cta">
                 <v-btn
                   color="primary"
-                  size="large"
                   class="hero-btn"
                   @click="showLoginDialog"
                 >
@@ -83,7 +82,6 @@
 
                 <v-btn
                   variant="outlined"
-                  size="large"
                   class="hero-btn-outline"
                   @click="goToAbout"
                 >
@@ -101,7 +99,7 @@
 
             <!-- Right: mock/illustration card -->
             <v-col cols="12" md="5">
-              <v-card class="hero-card" rounded="xl" elevation="10">
+              <v-card class="hero-card" rounded="lg" elevation="0">
                 <v-card-title class="hero-card-title">
                   <v-icon color="primary" class="mr-2">mdi-view-dashboard</v-icon>
                   Tableau de bord
@@ -167,9 +165,9 @@
             </p>
           </div>
 
-          <v-row class="mt-6" align="stretch">
+          <v-row class="mt-3" align="stretch">
             <v-col cols="12" sm="6" md="4">
-              <v-card class="info-card" rounded="xl" elevation="6">
+              <v-card class="info-card" rounded="lg" elevation="0">
                 <div class="info-icon">
                   <v-icon size="26" color="primary">mdi-school</v-icon>
                 </div>
@@ -183,7 +181,7 @@
             </v-col>
 
             <v-col cols="12" sm="6" md="4">
-              <v-card class="info-card" rounded="xl" elevation="6">
+              <v-card class="info-card" rounded="lg" elevation="0">
                 <div class="info-icon">
                   <v-icon size="26" color="primary">mdi-teach</v-icon>
                 </div>
@@ -197,7 +195,7 @@
             </v-col>
 
             <v-col cols="12" sm="6" md="4">
-              <v-card class="info-card" rounded="xl" elevation="6">
+              <v-card class="info-card" rounded="lg" elevation="0">
                 <div class="info-icon">
                   <v-icon size="26" color="primary">mdi-account-child</v-icon>
                 </div>
@@ -212,14 +210,14 @@
           </v-row>
 
           <!-- ✅ CTA bas -->
-          <v-sheet class="bottom-cta" rounded="xl">
+          <v-sheet class="bottom-cta" rounded="lg">
             <div class="bottom-cta-text">
               <div class="bottom-cta-title">Prêt à commencer ?</div>
               <div class="bottom-cta-sub">
                 Choisissez votre espace et connectez-vous.
               </div>
             </div>
-            <v-btn color="primary" size="large" class="bottom-cta-btn" @click="showLoginDialog">
+            <v-btn color="primary" class="bottom-cta-btn" @click="showLoginDialog">
               Accéder
               <v-icon end>mdi-arrow-right</v-icon>
             </v-btn>
@@ -229,7 +227,7 @@
 
       <!-- ✅ Dialog Connexion (pro, icônes, responsive) -->
       <v-dialog v-model="loginDialog" max-width="520">
-        <v-card rounded="xl" class="login-card">
+        <v-card rounded="lg" class="login-card">
           <v-card-title class="login-title">
             Choisissez votre espace
           </v-card-title>
@@ -237,19 +235,19 @@
           <v-card-text class="pt-2">
             <v-row class="gy-3">
               <v-col cols="12">
-                <v-btn block size="large" class="login-btn" variant="tonal" color="primary" @click="goToParent">
+                <v-btn block class="login-btn" variant="tonal" color="primary" @click="goToParent">
                   <v-icon start>mdi-account-child</v-icon>
                   Espace Parent
                 </v-btn>
               </v-col>
               <v-col cols="12">
-                <v-btn block size="large" class="login-btn" variant="tonal" color="primary" @click="goToTeacher">
+                <v-btn block class="login-btn" variant="tonal" color="primary" @click="goToTeacher">
                   <v-icon start>mdi-teach</v-icon>
                   Espace Enseignant
                 </v-btn>
               </v-col>
               <v-col cols="12">
-                <v-btn block size="large" class="login-btn" variant="tonal" color="primary" @click="goToSchool">
+                <v-btn block class="login-btn" variant="tonal" color="primary" @click="goToSchool">
                   <v-icon start>mdi-school</v-icon>
                   Espace Établissement
                 </v-btn>
@@ -257,7 +255,7 @@
             </v-row>
           </v-card-text>
 
-          <v-card-actions class="px-2 px-sm-6 pb-5">
+          <v-card-actions class="px-2 px-sm-3 pb-3">
             <v-spacer />
             <v-btn variant="text" @click="loginDialog = false">
               Fermer
@@ -268,7 +266,7 @@
 
       <!-- ✅ Footer simple -->
       <footer class="footer">
-        <v-container class="py-6">
+        <v-container class="py-3">
           <div class="footer-inner">
             <div class="footer-left">
               <span class="footer-brand">EchoEducation</span>
@@ -467,7 +465,7 @@ const goHome = () => {
 
 .hero-btn,
 .hero-btn-outline {
-  border-radius: 14px;
+  border-radius: 10px;
   font-weight: 900;
 }
 
@@ -525,7 +523,7 @@ const goHome = () => {
 
 .stat {
   background: rgba(0, 0, 0, 0.03);
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 10px;
   text-align: center;
 }
@@ -593,7 +591,7 @@ const goHome = () => {
 .info-icon {
   width: 46px;
   height: 46px;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: rgba(var(--v-theme-primary), 0.10);
@@ -634,7 +632,7 @@ const goHome = () => {
 }
 
 .bottom-cta-btn {
-  border-radius: 14px;
+  border-radius: 10px;
   font-weight: 900;
 }
 
@@ -648,7 +646,7 @@ const goHome = () => {
 }
 
 .login-btn {
-  border-radius: 14px;
+  border-radius: 10px;
   font-weight: 900;
 }
 

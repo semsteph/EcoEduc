@@ -6,14 +6,6 @@
     <!-- ============================================================ -->
 
     <div class="topbar">
-      <v-btn
-        icon
-        class="back-btn"
-        @click="$emit('back')"
-        aria-label="Retour"
-      >
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
 
       <div class="topbar-title">
         <div class="title-row">
@@ -34,7 +26,22 @@
         </div>
       </div>
 
-      <div class="topbar-spacer"></div>
+      <!-- Téléchargement de la discussion en PDF (dès que l'élève a écrit) -->
+      <div class="topbar-spacer">
+        <v-btn
+          v-if="peutTelecharger"
+          icon
+          variant="text"
+          size="small"
+          class="pdf-btn"
+          :loading="pdfEnCours"
+          title="Télécharger la discussion en PDF"
+          aria-label="Télécharger la discussion en PDF"
+          @click="telechargerPDF"
+        >
+          <v-icon>mdi-file-download-outline</v-icon>
+        </v-btn>
+      </div>
     </div>
 
     <!-- ============================================================ -->
@@ -92,30 +99,32 @@
               message.segments && message.segments.length
             "
           >
-            <div
-              v-for="(segment, segIndex) in message.segments"
-              :key="'segment-' + segIndex"
-            >
-              <div
-                v-if="segment.text || segment.diagram"
-                class="bubble-row row-assistant"
-              >
-                <div class="assistant-avatar avatar-sm">
-                  <v-icon size="16">mdi-account</v-icon>
-                </div>
+            <!-- Une seule bulle : le texte et les schémas s'enchaînent
+                 dans le corps de l'explication, comme dans un manuel. -->
+            <div class="bubble-row row-assistant">
+              <div class="assistant-avatar avatar-sm">
+                <v-icon size="16">mdi-account</v-icon>
+              </div>
 
-                <div class="bubble bubble-assistant">
+              <div
+                class="bubble bubble-assistant"
+                :class="{ 'bubble-has-visual': message.segments.some((segment) => isWideVisual(segment.diagram)) }"
+              >
+                <template
+                  v-for="(segment, segIndex) in message.segments"
+                  :key="'segment-' + segIndex"
+                >
                   <div
                     v-if="segment.text"
+                    class="segment-text"
                     v-html="formatMessage(segment.text)"
                   ></div>
 
-                  <GeometryDiagram
+                  <TutorVisual
                     v-if="segment.diagram"
                     :diagram="segment.diagram"
-                    class="bubble-diagram"
                   />
-                </div>
+                </template>
               </div>
             </div>
           </template>
@@ -145,29 +154,57 @@
               v-html="formatMessage(message.content)"
             ></div>
           </div>
-        </div>
 
-        <!-- ======================================================== -->
-        <!-- EXERCICE STRUCTURÉ + VRAI SCHÉMA SVG                     -->
-        <!-- ======================================================== -->
+          <!-- ==================================================== -->
+          <!-- EXERCICE RATTACHÉ À CE MESSAGE PRÉCIS               -->
+          <!-- Auparavant affiché dans un bloc unique toujours en bas -->
+          <!-- de la conversation : la réponse de l'élève et la      -->
+          <!-- correction de l'assistant apparaissaient donc AVANT   -->
+          <!-- l'exercice à l'écran. Ici l'exercice reste à sa place -->
+          <!-- exacte dans le fil, juste après le message qui l'a    -->
+          <!-- proposé.                                              -->
+          <!-- ==================================================== -->
+          <div
+            v-if="message.exercise"
+            class="exercise-card"
+          >
+            <div class="exercise-prompt">
+              {{ message.exercise.prompt }}
+            </div>
 
-        <div
-          v-if="currentExercise"
-          class="exercise-card"
-        >
-          <div class="exercise-header">
-            <v-icon size="20">mdi-pencil-outline</v-icon>
-            <span>Exercice</span>
+            <TutorVisual
+              v-if="message.exercise.diagram"
+              :diagram="message.exercise.diagram"
+            />
+
+            <!-- Un exercice peut contenir plusieurs questions, chacune
+                 avec son propre énoncé et son propre schéma (ex : 3
+                 angles différents à identifier). -->
+            <div
+              v-for="(question, qIndex) in message.exercise.questions"
+              :key="'exercise-question-' + (question.id ?? qIndex)"
+              class="exercise-question"
+            >
+              <div
+                v-if="message.exercise.questions.length > 1"
+                class="exercise-question-label"
+              >
+                Question {{ qIndex + 1 }}
+              </div>
+
+              <div
+                v-if="question.prompt && question.prompt !== message.exercise.prompt"
+                class="exercise-question-prompt"
+              >
+                {{ question.prompt }}
+              </div>
+
+              <TutorVisual
+                v-if="question.diagram"
+                :diagram="question.diagram"
+              />
+            </div>
           </div>
-
-          <div class="exercise-prompt">
-            {{ currentExercise.prompt }}
-          </div>
-
-          <GeometryDiagram
-            v-if="currentExercise.diagram"
-            :diagram="currentExercise.diagram"
-          />
         </div>
 
         <!-- ======================================================== -->
@@ -268,13 +305,13 @@
 <script>
 import axios from "axios";
 import dayjs from "dayjs";
-import GeometryDiagram from "./GeometryDiagram.vue";
+import TutorVisual, { DOMAIN_RENDERERS } from "./TutorVisual.vue";
 
 const API = "/api/parent/assistant";
 
 export default {
   components: {
-    GeometryDiagram,
+    TutorVisual,
   },
 
   props: {
@@ -332,8 +369,10 @@ export default {
        */
       inputMode: "question",
       currentExercise: null,
+      pdfEnCours: false,
     };
   },
+
 
   created() {
     this.fetchHistory();
@@ -476,6 +515,7 @@ export default {
             segments: Array.isArray(message.segments)
               ? message.segments
               : [],
+            exercise: message.exercise || null,
           }));
         }
 
@@ -512,7 +552,10 @@ export default {
           "Impossible de charger la conversation.";
       } finally {
         this.loadingHistory = false;
-        this.scrollToBottom();
+        // Discussion vide : on reste en haut pour lire l'accueil en entier.
+        if (this.messages.some((message) => message.role === "user")) {
+          this.scrollToBottom();
+        }
       }
     },
 
@@ -594,6 +637,12 @@ export default {
             segments: Array.isArray(response.data?.explanationSegments)
               ? response.data.explanationSegments
               : [],
+            // Rattaché à CE message précis pour qu'il reste à sa place dans
+            // le fil, juste après le texte qui l'introduit. On utilise
+            // messageExercise (exercice présenté dans ce message) et non
+            // exercise (exercice en cours) : sinon la carte était recopiée
+            // sous chaque correction, puis disparaissait au rechargement.
+            exercise: response.data?.messageExercise || null,
           });
         }
 
@@ -629,7 +678,154 @@ export default {
           "Une erreur est survenue. Réessaie dans quelques instants.";
       } finally {
         this.sending = false;
-        this.scrollToBottom();
+        if (this.messages[this.messages.length - 1]?.role === "assistant") {
+          this.scrollToLastMessage();
+        } else {
+          this.scrollToBottom();
+        }
+      }
+    },
+
+    // ==============================================================
+    // VISUELS
+    // ==============================================================
+
+    // Un schéma de domaine (anatomie...) a besoin de toute la largeur de
+    // la bulle ; une figure géométrique reste compacte.
+    isWideVisual(diagram) {
+      return Boolean(diagram && DOMAIN_RENDERERS[diagram.type]);
+    },
+
+    // ==============================================================
+    // TÉLÉCHARGEMENT EN PDF
+    // ==============================================================
+    //
+    // La discussion est recopiée hors écran à largeur fixe, avec un en-tête
+    // (élève, matière, leçon), puis capturée et découpée en pages A4 entre
+    // deux messages, pour ne jamais couper une bulle en deux quand elle
+    // tient sur une page.
+    // ==============================================================
+
+    async telechargerPDF() {
+      if (this.pdfEnCours) return;
+      this.pdfEnCours = true;
+      let copie = null;
+
+      try {
+        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+          import("html2canvas"),
+          import("jspdf"),
+        ]);
+
+        copie = document.createElement("div");
+        copie.className = "pdf-copie";
+
+        const entete = document.createElement("div");
+        entete.className = "pdf-entete";
+        const titre = document.createElement("div");
+        titre.className = "pdf-titre";
+        titre.textContent = `Assistant ${this.subjectName}`;
+        const lecon = document.createElement("div");
+        lecon.className = "pdf-lecon";
+        lecon.textContent = this.activity || "";
+        const infos = document.createElement("div");
+        infos.className = "pdf-infos";
+        const dateLecon = this.date && dayjs(this.date).isValid() ? ` · leçon du ${dayjs(this.date).format("DD/MM/YYYY")}` : "";
+        infos.textContent = `${this.childName}${dateLecon} · téléchargé le ${dayjs().format("DD/MM/YYYY")}`;
+        entete.append(titre, lecon, infos);
+
+        const fil = this.$refs.messagesEl.cloneNode(true);
+        fil.classList.add("pdf-fil");
+        // Styles « scoped » : les éléments créés ici reçoivent l'attribut du composant.
+        const portee = [...this.$el.attributes].find((a) => a.name.startsWith("data-v-"))?.name;
+        if (portee) [copie, entete, titre, lecon, infos].forEach((el) => el.setAttribute(portee, ""));
+        copie.append(entete, fil);
+        this.$el.appendChild(copie);
+
+        const echelle = 2;
+        // Les coupures entre messages sont mesurées dans la page recopiée par
+        // html2canvas (même mise en page que l'image produite).
+        let coupures = [];
+        const canvas = await html2canvas(copie, {
+          scale: echelle,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          windowWidth: 820,
+          onclone: (doc) => {
+            const racine = doc.querySelector(".pdf-copie");
+            if (!racine) return;
+            const haut = racine.getBoundingClientRect().top;
+            coupures = [...racine.querySelectorAll(".message-item")]
+              .map((el) => Math.round((el.getBoundingClientRect().bottom - haut + 5) * echelle));
+          },
+        });
+
+        // Ligne de pixels sans texte (aucun pixel sombre) : on peut couper là
+        // sans trancher une ligne d'écriture.
+        const lecture = canvas.getContext("2d");
+        // (On ignore la marge gauche, où passe le liseré coloré des bulles ;
+        // un pixel coloré — bulle orange, en-tête de schéma — compte comme plein.)
+        const debutLigne = Math.round(canvas.width * 0.12);
+        const ligneVide = (y) => {
+          const pixels = lecture.getImageData(debutLigne, y, canvas.width - debutLigne, 1).data;
+          for (let i = 0; i < pixels.length; i += 4) {
+            const r = pixels[i];
+            const v = pixels[i + 1];
+            const b = pixels[i + 2];
+            if (r * 0.299 + v * 0.587 + b * 0.114 < 200 || Math.max(r, v, b) - Math.min(r, v, b) > 40) return false;
+          }
+          return true;
+        };
+        const coupeSousTexte = (debut, fin) => {
+          let vides = 0;
+          for (let y = fin - 1; y > debut + (fin - debut) * 0.5; y -= 1) {
+            vides = ligneVide(y) ? vides + 1 : 0;
+            if (vides >= 6) return y + 3;
+          }
+          return fin;
+        };
+
+        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+        const marge = 10;
+        const largeurMm = 210 - 2 * marge;
+        const hauteurPage = Math.floor(((297 - 2 * marge) * canvas.width) / largeurMm);
+
+        let debut = 0;
+        let premiere = true;
+        while (debut < canvas.height - 2) {
+          let fin = Math.min(debut + hauteurPage, canvas.height);
+          if (fin < canvas.height) {
+            const coupe = coupures.filter((c) => c > debut + hauteurPage * 0.6 && c <= fin).pop();
+            fin = coupe || coupeSousTexte(debut, fin);
+          }
+          const morceau = document.createElement("canvas");
+          morceau.width = canvas.width;
+          morceau.height = fin - debut;
+          const ctx = morceau.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, morceau.width, morceau.height);
+          ctx.drawImage(canvas, 0, debut, canvas.width, morceau.height, 0, 0, canvas.width, morceau.height);
+          if (!premiere) pdf.addPage();
+          pdf.addImage(morceau.toDataURL("image/jpeg", 0.9), "JPEG", marge, marge, largeurMm, (morceau.height * largeurMm) / canvas.width);
+          premiere = false;
+          debut = fin;
+        }
+
+        const nettoyer = (texte) =>
+          String(texte || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^A-Za-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "")
+            .slice(0, 50);
+        const prenom = this.childName.split(" ")[0] || this.childName;
+        pdf.save(`Discussion_${nettoyer(prenom)}_${nettoyer(this.subjectName)}_${nettoyer(this.activity) || "lecon"}.pdf`);
+      } catch (err) {
+        console.error("Erreur lors du téléchargement du PDF :", err);
+        this.sendError = "Le PDF n'a pas pu être créé. Réessaie dans un instant.";
+      } finally {
+        if (copie) copie.remove();
+        this.pdfEnCours = false;
       }
     },
 
@@ -637,15 +833,39 @@ export default {
     // SCROLL AUTOMATIQUE
     // ==============================================================
 
+    // Ce n'est pas la liste des messages qui défile mais la zone de page qui
+    // la contient (le cadre de l'espace parent) : on cherche le premier
+    // parent réellement défilable.
+    zoneDefilement() {
+      let el = this.$refs.messagesEl;
+      while (el && el !== document.body) {
+        const style = getComputedStyle(el);
+        if (["auto", "scroll"].includes(style.overflowY) && el.scrollHeight > el.clientHeight + 4) {
+          return el;
+        }
+        el = el.parentElement;
+      }
+      return document.scrollingElement || document.documentElement;
+    },
+
     scrollToBottom() {
       this.$nextTick(() => {
-        const el =
-          this.$refs.messagesEl;
+        const zone = this.zoneDefilement();
+        if (zone) zone.scrollTop = zone.scrollHeight;
+      });
+    },
 
-        if (el) {
-          el.scrollTop =
-            el.scrollHeight;
-        }
+    // Une nouvelle réponse se lit depuis son début : on place son haut juste
+    // sous la barre de titre, plutôt que d'aller tout en bas.
+    scrollToLastMessage() {
+      this.$nextTick(() => {
+        const items = this.$refs.messagesEl?.querySelectorAll(".message-item");
+        const derniere = items && items[items.length - 1];
+        const zone = this.zoneDefilement();
+        if (!derniere || !zone) return;
+        const barre = this.$el.querySelector(".topbar")?.getBoundingClientRect().height || 0;
+        const haut = derniere.getBoundingClientRect().top - zone.getBoundingClientRect().top;
+        zone.scrollTop += haut - barre - 12;
       });
     },
 
@@ -748,6 +968,11 @@ export default {
   // ================================================================
 
   computed: {
+    // Rien à télécharger tant que l'élève n'a pas écrit.
+    peutTelecharger() {
+      return !this.loadingHistory && this.messages.some((message) => message.role === "user");
+    },
+
     // ==============================================================
     // PLACEHOLDER
     // ==============================================================
@@ -875,7 +1100,7 @@ export default {
   z-index: 5;
 
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: minmax(0, 1fr) 44px; /* la flèche retour est dans le cadre (PageNav) */
   align-items: center;
   gap: 10px;
 
@@ -945,9 +1170,7 @@ export default {
 
   color: #fff;
 
-  box-shadow:
-    0 2px 8px
-    rgba(13, 148, 136, 0.4);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .avatar-sm {
@@ -966,6 +1189,67 @@ export default {
 
 .topbar-spacer {
   width: 44px;
+  display: grid;
+  place-items: center;
+}
+
+/* ================================================================= */
+/* COPIE HORS ÉCRAN POUR LE PDF                                      */
+/* ================================================================= */
+
+.pdf-copie {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 780px;
+  padding: 24px 10px 10px;
+  background: #fff;
+}
+
+.pdf-entete {
+  padding: 0 12px 14px;
+  margin-bottom: 6px;
+  border-bottom: 2px solid var(--accent);
+}
+
+.pdf-titre {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.pdf-lecon {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.pdf-infos {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.pdf-fil {
+  max-width: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* html2canvas décale le texte vers le bas sans hauteur de ligne explicite. */
+.pdf-fil :deep(*) {
+  line-height: 1.45 !important;
+}
+
+.pdf-fil .bubble {
+  box-shadow: none;
+}
+
+.pdf-fil .bubble-user {
+  padding: 6px 15px 16px;
+}
+
+.pdf-fil .assistant-avatar {
+  display: none;
 }
 
 /* ================================================================= */
@@ -1016,7 +1300,7 @@ export default {
 
   padding: 11px 15px;
 
-  border-radius: 20px;
+  border-radius: 10px;
 
   font-size: 0.94rem;
   line-height: 1.45;
@@ -1029,7 +1313,7 @@ export default {
   background: linear-gradient(135deg, var(--primary), var(--primary-600));
   color: #fff;
 
-  box-shadow: 0 4px 14px rgba(244, 98, 42, 0.28);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 
   border-bottom-right-radius: 6px;
 }
@@ -1041,7 +1325,7 @@ export default {
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
 
-  box-shadow: 0 3px 12px rgba(42, 42, 60, 0.05);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 
   border-bottom-left-radius: 6px;
 }
@@ -1079,50 +1363,54 @@ export default {
 /* ================================================================= */
 
 .exercise-card {
-  position: relative;
-  width: 100%;
-  max-width: 760px;
-  margin: 4px auto 8px;
-  padding: 18px 16px 16px;
-  background: #ffffff;
+  width: min(92%, 480px);
+  margin: 6px 0 8px 32px;
+  padding: 10px 12px 12px;
+  background: rgba(124, 58, 237, 0.04);
   border: 1px solid rgba(124, 58, 237, 0.14);
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.08);
-  overflow: hidden;
-}
-
-.exercise-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 5px;
-  background: linear-gradient(90deg, var(--primary), var(--accent-2), var(--accent));
-}
-
-.exercise-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--accent-2);
-  font-weight: 900;
-  margin-bottom: 10px;
+  border-radius: 10px;
+  box-sizing: border-box;
 }
 
 .exercise-prompt {
   color: var(--text);
-  font-size: 0.96rem;
-  line-height: 1.55;
+  font-size: 0.9rem;
+  line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.exercise-question {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(124, 58, 237, 0.18);
+}
+
+.exercise-question:first-of-type {
+  margin-top: 8px;
+}
+
+.exercise-question-label {
+  color: var(--accent-2);
+  font-weight: 800;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 3px;
+}
+
+.exercise-question-prompt {
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  margin-bottom: 4px;
 }
 
 @media (max-width: 600px) {
   .exercise-card {
-    margin-left: 8px;
-    margin-right: 8px;
-    width: calc(100% - 16px);
-    padding: 14px;
+    width: calc(100% - 32px);
+    margin-left: 32px;
+    padding: 9px 10px 10px;
   }
 }
 
@@ -1199,7 +1487,7 @@ export default {
 
   background: linear-gradient(90deg, var(--accent), #0b7a70);
   border-radius: 999px;
-  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.28);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 
   font-size: 0.82rem;
   font-weight: 700;
@@ -1242,7 +1530,7 @@ export default {
 }
 
 .composer-input :deep(.v-field) {
-  border-radius: 18px;
+  border-radius: 10px;
 }
 
 .send-btn {
@@ -1250,7 +1538,7 @@ export default {
 
   background: linear-gradient(135deg, var(--primary), var(--primary-600)) !important;
 
-  box-shadow: 0 4px 12px rgba(244, 98, 42, 0.35);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 /* ================================================================= */
@@ -1290,7 +1578,7 @@ export default {
 /* Le schéma vit DANS la bulle, avec le même fond/bordure que le texte —
    pas dans une carte à part — et reste compact, adapté à la taille du
    texte plutôt que de prendre toute la largeur disponible. */
-.bubble :deep(.bubble-diagram.geometry-diagram) {
+:deep(.diagram-compact.geometry-diagram) {
   width: min(100%, 260px);
   margin: 8px 0 0;
   padding: 8px 10px 10px;
@@ -1301,13 +1589,29 @@ export default {
   border-top: 1px dashed rgba(124, 58, 237, 0.18);
 }
 
-.bubble :deep(.bubble-diagram.geometry-diagram .diagram-svg) {
+:deep(.diagram-compact.geometry-diagram .diagram-svg) {
   min-height: 140px;
 }
 
 @media (max-width: 600px) {
-  .bubble :deep(.bubble-diagram.geometry-diagram) {
+  :deep(.diagram-compact.geometry-diagram) {
     width: min(100%, 220px);
+  }
+}
+
+/* Bulle contenant un schéma de domaine : elle prend toute sa largeur
+   maximale au lieu de se caler sur la longueur du texte. */
+.bubble-has-visual {
+  width: 78%;
+}
+
+.segment-text + .segment-text {
+  margin-top: 0.7em;
+}
+
+@media (max-width: 600px) {
+  .bubble-has-visual {
+    width: 86%;
   }
 }
 </style>

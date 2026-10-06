@@ -2,10 +2,6 @@
   <v-container class="ct-page">
     <!-- TOP BAR -->
     <div class="ct-topbar">
-      <v-btn class="ct-back" variant="tonal" color="black" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        <span class="ct-hide-xs">Retour</span>
-      </v-btn>
 
       <div class="ct-title">
         <div class="ct-h1">
@@ -26,8 +22,17 @@
       </v-btn>
     </div>
 
+    <!-- PROGRAMME DE LA MATIÈRE (dépôt une fois, puis partie du jour proposée) -->
+    <ProgrammeMatiere
+      v-if="classeId && subjectId"
+      ref="programme"
+      :classe-id="classeId"
+      :subject-id="subjectId"
+      @charge="programmeCharge"
+    />
+
     <!-- SEMESTERS -->
-    <v-card class="ct-card" elevation="8">
+    <v-card class="ct-card" elevation="0">
       <div class="ct-card-head">
         <div class="ct-card-head-title">
           <v-icon class="mr-2" color="white">mdi-timeline-clock-outline</v-icon>
@@ -47,7 +52,7 @@
             :key="semester.id"
             class="ct-sem-chip"
             :class="{ 'ct-sem-chip--active': currentSemester === semester.nom }"
-            :color="currentSemester === semester.nom ? 'primary' : 'blue-lighten-5'"
+            :color="'primary'"
             :variant="currentSemester === semester.nom ? 'flat' : 'tonal'"
             @click="changeSemester(semester.nom)"
           >
@@ -63,12 +68,12 @@
     </v-card>
 
     <!-- TOOLS -->
-    <v-card class="ct-card" elevation="8">
+    <v-card class="ct-card" elevation="0">
       <v-card-text class="ct-tools">
         <v-text-field
           v-model="search"
           variant="outlined"
-          density="comfortable"
+          density="compact"
           color="primary"
           prepend-inner-icon="mdi-magnify"
           label="Rechercher (activité / horaire / date)"
@@ -97,7 +102,7 @@
     </v-card>
 
     <!-- DESKTOP TABLE -->
-    <v-card class="ct-card ct-table-wrap ct-hide-xs" elevation="10">
+    <v-card class="ct-card ct-table-wrap ct-hide-xs" elevation="0">
       <div class="ct-card-head ct-card-head--alt">
         <div class="ct-card-head-title">
           <v-icon class="mr-2" color="white">mdi-table</v-icon>
@@ -110,7 +115,7 @@
         :items="filteredActivities"
         item-key="id"
         class="ct-table"
-        density="comfortable"
+        density="compact"
         :items-per-page="itemsPerPage"
       >
         <template #item.dateFormatted="{ item }">
@@ -130,7 +135,9 @@
         <template #item.activite="{ item }">
           <div class="ct-activity">
             {{ item.activite || item.activity || "—" }}
+            <v-chip v-if="item.element_termine" size="x-small" color="success" variant="tonal" class="ml-1">terminée</v-chip>
           </div>
+          <div v-if="item.contenu" class="ct-contenu">{{ item.contenu }}</div>
         </template>
 
         <template #item.actions="{ item }">
@@ -150,7 +157,7 @@
     </v-card>
 
     <!-- MOBILE CARDS -->
-    <v-card class="ct-card ct-show-xs" elevation="10">
+    <v-card class="ct-card ct-show-xs" elevation="0">
       <div class="ct-card-head ct-card-head--alt">
         <div class="ct-card-head-title">
           <v-icon class="mr-2" color="white">mdi-format-list-bulleted</v-icon>
@@ -184,7 +191,9 @@
 
           <div class="ct-mobile-activity">
             {{ act.activite || act.activity || "—" }}
+            <v-chip v-if="act.element_termine" size="x-small" color="success" variant="tonal" class="ml-1">terminée</v-chip>
           </div>
+          <div v-if="act.contenu" class="ct-contenu">{{ act.contenu }}</div>
 
           <div class="ct-mobile-actions">
             <v-btn color="error" variant="tonal" block @click="openHideActivityDialog(act)">
@@ -220,10 +229,6 @@
 
     <!-- BOTTOM BAR (mobile) -->
     <div class="ct-bottom-bar ct-show-xs">
-      <v-btn variant="tonal" color="black" class="ct-bottom-btn" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
 
       <div class="ct-spacer" />
 
@@ -239,7 +244,7 @@
         <div class="ct-dialog-head">
           <div class="ct-dialog-title">
             <v-icon class="mr-2" color="white">mdi-plus-circle-outline</v-icon>
-            Ajouter une activité
+            Ajouter une séance
           </div>
           <v-btn icon variant="text" color="white" @click="closeDialog" aria-label="Fermer">
             <v-icon>mdi-close</v-icon>
@@ -255,7 +260,7 @@
                   type="date"
                   label="Date"
                   variant="outlined"
-                  density="comfortable"
+                  density="compact"
                   color="primary"
                   hide-details="auto"
                   :rules="[v => !!v || 'Date obligatoire']"
@@ -268,20 +273,81 @@
                   label="Horaire"
                   placeholder="Ex: 08:00 - 10:00"
                   variant="outlined"
-                  density="comfortable"
+                  density="compact"
                   color="primary"
                   hide-details="auto"
                   :rules="[v => !!v || 'Horaire obligatoire']"
                 />
               </v-col>
 
-              <v-col cols="12">
+              <!-- Partie du programme : déjà proposée, un toucher pour en changer -->
+              <v-col v-if="avecProgramme" cols="12">
+                <div class="ct-partie-label">Partie du programme</div>
+                <div v-if="partieChoisie" class="ct-partie" @click="choixPartie = !choixPartie">
+                  <div class="ct-partie-chemin">{{ partieChoisie.parents }}</div>
+                  <div class="ct-partie-titre">{{ partieChoisie.titre }}</div>
+                  <div class="ct-partie-bas">
+                    <v-chip size="x-small" :color="partieChoisie.dejaCommencee ? 'primary' : 'success'" variant="flat">
+                      {{ partieChoisie.dejaCommencee ? "Suite" : "Nouvelle partie" }}
+                    </v-chip>
+                    <span class="ct-partie-changer">
+                      <v-icon size="16">mdi-swap-horizontal</v-icon>
+                      {{ choixPartie ? "Fermer la liste" : "Changer" }}
+                    </span>
+                  </div>
+                </div>
+                <div v-if="choixPartie || !partieChoisie" class="ct-partie-liste">
+                  <template v-for="x in lignesProgramme" :key="x.element.id">
+                    <div v-if="!x.feuille" class="ct-liste-titre" :style="{ paddingLeft: `${x.chemin.length * 10 - 10}px` }">{{ x.texte }}</div>
+                    <div
+                      v-else
+                      class="ct-liste-feuille"
+                      :class="{ 'ct-liste-feuille--active': x.element.id === newActivity.elementId }"
+                      :style="{ paddingLeft: `${x.chemin.length * 10}px` }"
+                      @click="choisirPartie(x.element.id)"
+                    >
+                      <v-icon size="16" class="mr-1" :color="etatPartie(x.element.id).couleur">{{ etatPartie(x.element.id).icone }}</v-icon>
+                      {{ x.texte }}
+                    </div>
+                  </template>
+                </div>
+                <div class="ct-hors-programme" @click="horsProgramme = true">Séance hors programme (révision, évaluation…) ?</div>
+              </v-col>
+
+              <v-col v-if="avecProgramme" cols="12">
+                <v-textarea
+                  v-model="newActivity.contenu"
+                  label="Ce qui a été fait aujourd'hui (facultatif)"
+                  placeholder="Ex. : définition et exemples, exercice 3 p. 87"
+                  variant="outlined"
+                  density="compact"
+                  color="primary"
+                  auto-grow
+                  rows="2"
+                  hide-details
+                />
+                <v-checkbox v-model="newActivity.termine" label="Cette partie est terminée" color="success" density="compact" hide-details />
+                <v-checkbox
+                  v-if="newActivity.termine && partieSuivante"
+                  v-model="newActivity.aussiSuivante"
+                  :label="`J'ai aussi commencé : ${partieSuivante.texte}`"
+                  color="primary"
+                  density="compact"
+                  hide-details
+                />
+              </v-col>
+
+              <v-col v-else cols="12">
+                <v-alert v-if="programmeData.programme && horsProgramme" type="info" variant="tonal" density="compact" class="mb-2">
+                  Séance hors programme.
+                  <a href="#" @click.prevent="horsProgramme = false">Revenir au programme</a>
+                </v-alert>
                 <v-textarea
                   v-model="newActivity.activite"
                   label="Activité"
                   placeholder="Décrivez l'activité réalisée..."
                   variant="outlined"
-                  density="comfortable"
+                  density="compact"
                   color="primary"
                   auto-grow
                   rows="3"
@@ -346,15 +412,32 @@
 
 <script>
 import axios from "axios";
+import ProgrammeMatiere from "@/components/professeurs/ProgrammeMatiere.vue";
+
+const intitulePartie = (e) => `${e.libelle}${e.numero ? ` ${e.numero}` : ""} : ${e.titre}`;
+function aplatirProgramme(noeuds, chemin = [], sortie = []) {
+  (noeuds || []).forEach((n) => {
+    const c = [...chemin, n];
+    sortie.push({ element: n, chemin: c, feuille: !(n.enfants || []).length, texte: intitulePartie(n) });
+    aplatirProgramme(n.enfants, c, sortie);
+  });
+  return sortie;
+}
 
 export default {
   name: "CahierDeTexteManager",
+  components: { ProgrammeMatiere },
   props: {
     classeId: String,
     subjectId: String,
     etablissementId: Number,
     anneeScolaire: String,
     anneeScolaireId: Number,
+  },
+  setup() {
+    // Période (semestre) affichée : conservée dans l'URL (?periode=).
+    const currentSemester = useUrlState("periode", "");
+    return { currentSemester };
   },
   data() {
     return {
@@ -365,7 +448,6 @@ export default {
 
       adding: false,
 
-      currentSemester: "",
       semesters: [],
       activities: {},
       activityToHide: null,
@@ -382,7 +464,18 @@ export default {
         date: "",
         horaire: "",
         activite: "",
+        elementId: null,
+        contenu: "",
+        termine: false,
+        aussiSuivante: false,
       },
+
+      // Programme de la matière (chargé par la carte du programme)
+      programmeData: { programme: null, arbre: [], progression: {}, suggestion: null },
+      choixPartie: false,
+      horsProgramme: false,
+      // Créneaux de l'emploi du temps de la classe (pour pré-remplir l'horaire)
+      creneaux: [],
 
       tableHeaders: [
         { title: "Date", value: "dateFormatted" },
@@ -395,8 +488,36 @@ export default {
     };
   },
   computed: {
+    avecProgramme() {
+      return !!this.programmeData.programme && this.programmeData.arbre.length > 0 && !this.horsProgramme;
+    },
+    lignesProgramme() {
+      return aplatirProgramme(this.programmeData.arbre);
+    },
+    feuillesProgramme() {
+      return this.lignesProgramme.filter((x) => x.feuille);
+    },
+    partieChoisie() {
+      const x = this.feuillesProgramme.find((f) => f.element.id === this.newActivity.elementId);
+      if (!x) return null;
+      return {
+        parents: x.chemin.slice(0, -1).map(intitulePartie).join(" › "),
+        titre: x.texte,
+        dejaCommencee: !!this.programmeData.progression[x.element.id],
+      };
+    },
+    partieSuivante() {
+      const i = this.feuillesProgramme.findIndex((f) => f.element.id === this.newActivity.elementId);
+      return i >= 0 ? this.feuillesProgramme[i + 1] || null : null;
+    },
     teacherId() {
-      return this.$route.query.id;
+      // Adresse ouverte sans « ?id= » : l'identifiant de l'enseignant est relu dans le token.
+      if (this.$route.query.id) return this.$route.query.id;
+      try {
+        return decodeJwtPayload(localStorage.getItem("token"))?.id ?? null;
+      } catch {
+        return null;
+      }
     },
     currentActivities() {
       return (this.activities[this.currentSemester] || []).filter((a) => !a.hidden);
@@ -421,6 +542,11 @@ export default {
     },
   },
   watch: {
+    // Changement de date : horaire du créneau de ce jour-là, s'il existe.
+    "newActivity.date"(date) {
+      const h = this.horaireDuJour(date);
+      if (h) this.newActivity.horaire = h;
+    },
     search() {
       this.mobilePage = 1;
     },
@@ -437,11 +563,58 @@ export default {
       this.fetchNotesData();
     },
 
+    horaireDuJour(date) {
+      if (!date) return "";
+      const jours = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+      const jour = jours[new Date(`${date}T12:00:00`).getDay()];
+      const c = this.creneaux.find((x) => String(x["matière_id"]) === String(this.subjectId) && x.jour === jour);
+      return c ? c.horaire : "";
+    },
+    async chargerCreneaux() {
+      try {
+        const { data } = await axios.get(`${this.API_BASE}/api/programmes/${this.classeId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        this.creneaux = Array.isArray(data) ? data : [];
+      } catch {
+        this.creneaux = [];
+      }
+    },
+    programmeCharge(donnees) {
+      this.programmeData = donnees;
+    },
+    etatPartie(id) {
+      const p = this.programmeData.progression[id];
+      if (!p) return { icone: "mdi-checkbox-blank-circle-outline", couleur: "grey" };
+      if (p.termine) return { icone: "mdi-check-circle", couleur: "success" };
+      return { icone: "mdi-progress-clock", couleur: "primary" };
+    },
+    choisirPartie(id) {
+      this.newActivity.elementId = id;
+      this.newActivity.aussiSuivante = false;
+      this.choixPartie = false;
+    },
     openAddActivityDialog() {
       if (!this.classeId || !this.subjectId || !this.teacherId || !this.etablissementId || !this.anneeScolaireId) {
         this.errorMessage = true;
         return;
       }
+      // Pré-remplissage : date du jour, horaire de la dernière séance, partie proposée.
+      const aujourdHui = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const toutes = Object.values(this.activities).flat().sort((a, b) => b.originalDate - a.originalDate);
+      this.newActivity = {
+        date: `${aujourdHui.getFullYear()}-${pad(aujourdHui.getMonth() + 1)}-${pad(aujourdHui.getDate())}`,
+        horaire: "",
+        activite: "",
+        elementId: this.programmeData.suggestion,
+        contenu: "",
+        termine: false,
+        aussiSuivante: false,
+      };
+      this.newActivity.horaire = this.horaireDuJour(this.newActivity.date) || toutes[0]?.horaire || "";
+      this.horsProgramme = false;
+      this.choixPartie = !this.programmeData.suggestion;
       this.dialog = true;
     },
     closeDialog() {
@@ -449,7 +622,9 @@ export default {
       this.resetForm();
     },
     resetForm() {
-      this.newActivity = { date: "", horaire: "", activite: "" };
+      this.newActivity = { date: "", horaire: "", activite: "", elementId: null, contenu: "", termine: false, aussiSuivante: false };
+      this.choixPartie = false;
+      this.horsProgramme = false;
     },
 
     openHideActivityDialog(activity) {
@@ -467,7 +642,10 @@ export default {
         this.semesters = response.data || [];
 
         if (this.semesters.length > 0) {
-          this.currentSemester = this.semesters[0].nom;
+          // Garde la période lue dans l'URL si elle existe, sinon la 1ère.
+          if (!this.semesters.some((s) => s.nom === this.currentSemester)) {
+            this.currentSemester = this.semesters[0].nom;
+          }
           await this.fetchNotesData();
         }
       } catch (error) {
@@ -514,13 +692,16 @@ export default {
 
     async addActivity() {
       const form = this.$refs.form;
-      const ok = form?.validate ? form.validate() : true;
-      if (!ok) return;
+      const verification = form?.validate ? await form.validate() : { valid: true };
+      if (!verification.valid) return;
+      if (this.avecProgramme && !this.newActivity.elementId) {
+        this.choixPartie = true;
+        return;
+      }
 
-      const payload = {
+      const base = {
         teacherId: this.teacherId,
         subjectId: this.subjectId,
-        activity: this.newActivity.activite,
         date: this.newActivity.date,
         hours: this.newActivity.horaire,
         classId: this.classeId,
@@ -528,16 +709,29 @@ export default {
         etablissementId: this.etablissementId,
         anneeScolaireId: this.anneeScolaireId,
       };
+      // Avec le programme : la partie choisie (l'intitulé est construit par le
+      // serveur) ; sinon le texte libre comme avant.
+      const seances = this.avecProgramme
+        ? [
+            { ...base, programmeElementId: this.newActivity.elementId, contenu: this.newActivity.contenu, termine: this.newActivity.termine },
+            ...(this.newActivity.termine && this.newActivity.aussiSuivante && this.partieSuivante
+              ? [{ ...base, programmeElementId: this.partieSuivante.element.id, contenu: "", termine: false }]
+              : []),
+          ]
+        : [{ ...base, activity: this.newActivity.activite }];
 
       try {
         this.adding = true;
         const addActivityToken = localStorage.getItem("token");
-        await axios.post(`${this.API_BASE}/api/addActivity`, payload, {
-          headers: { Authorization: `Bearer ${addActivityToken}` },
-        });
+        for (const payload of seances) {
+          await axios.post(`${this.API_BASE}/api/addActivity`, payload, {
+            headers: { Authorization: `Bearer ${addActivityToken}` },
+          });
+        }
         this.successMessage = true;
         this.closeDialog();
         await this.fetchNotesData();
+        this.$refs.programme?.charger();
       } catch (error) {
         this.errorMessage = true;
         console.error("Erreur lors de l'ajout de l'activité :", error.response?.data || error);
@@ -575,41 +769,55 @@ export default {
     }
 
     this.fetchSemesters();
+    this.chargerCreneaux();
   },
 };
 </script>
 
 <style scoped>
+/* Séance rattachée au programme */
+.ct-contenu { color: #607d8b; font-size: 0.85rem; margin-top: 2px; white-space: pre-line; }
+.ct-partie-label { font-size: 0.8rem; font-weight: 700; color: #546e7a; margin-bottom: 4px; }
+.ct-partie { border: 2px solid #1976d2; border-radius: 12px; padding: 10px 12px; background: #f3f8ff; cursor: pointer; }
+.ct-partie-chemin { font-size: 0.8rem; color: #607d8b; }
+.ct-partie-titre { font-weight: 800; color: #0d47a1; margin: 2px 0 6px; }
+.ct-partie-bas { display: flex; align-items: center; justify-content: space-between; }
+.ct-partie-changer { font-size: 0.85rem; color: #1976d2; font-weight: 700; }
+.ct-partie-liste { margin-top: 8px; max-height: 280px; overflow-y: auto; border: 1px solid #e3e8ef; border-radius: 10px; padding: 6px; }
+.ct-liste-titre { font-weight: 800; color: #37474f; font-size: 0.85rem; padding-top: 6px; }
+.ct-liste-feuille { display: flex; align-items: center; padding: 8px 6px; border-radius: 8px; cursor: pointer; font-size: 0.92rem; }
+.ct-liste-feuille:hover { background: #f1f6fd; }
+.ct-liste-feuille--active { background: #e3f0ff; font-weight: 700; }
+.ct-hors-programme { margin-top: 8px; font-size: 0.82rem; color: #78909c; text-decoration: underline; cursor: pointer; }
+
 /* Charte: bleu / blanc / un peu de noir */
 .ct-page {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 14px;
-  padding-bottom: 86px;
-  background: radial-gradient(900px 500px at 20% 10%, rgba(25,118,210,.14), transparent 55%),
-              radial-gradient(800px 500px at 85% 0%, rgba(11,46,74,.10), transparent 55%),
-              linear-gradient(180deg, #eef6ff 0%, #f7fbff 45%, #ffffff 100%);
-  border-radius: 18px;
+  padding: 0;
+  background: transparent;
 }
 
 /* Topbar */
 .ct-topbar {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  padding: 14px;
-  border-radius: 18px;
+  min-height: 40px;
+  padding: 4px 10px;
+  border-radius: 8px;
   background: linear-gradient(90deg, #1976d2 0%, #0b2e4a 100%);
-  box-shadow: 0 16px 50px rgba(11, 46, 74, 0.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   border: 1px solid rgba(255,255,255,.12);
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
 .ct-back {
-  border-radius: 12px !important;
-  font-weight: 900;
+  height: 30px !important;
+  border-radius: 8px !important;
+  font-weight: 700;
   background: rgba(0,0,0,.45) !important;
   color: #fff !important;
   white-space: nowrap;
@@ -621,8 +829,8 @@ export default {
 
 .ct-h1 {
   color: #fff;
-  font-weight: 950;
-  font-size: 1.10rem;
+  font-weight: 800;
+  font-size: 16px;
   display: flex;
   align-items: center;
   white-space: nowrap;
@@ -631,10 +839,10 @@ export default {
 }
 
 .ct-sub {
-  margin-top: 4px;
+  margin-top: 0;
   color: rgba(255,255,255,.88);
-  font-weight: 650;
-  font-size: .92rem;
+  font-weight: 600;
+  font-size: 12.5px;
 }
 
 .ct-spacer {
@@ -642,32 +850,32 @@ export default {
 }
 
 .ct-add {
+  height: 30px !important;
   border-radius: 999px !important;
-  font-weight: 950;
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .ct-add-mobile {
   border-radius: 999px !important;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 /* Cards */
 .ct-card {
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   overflow: hidden;
   border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.90);
-  backdrop-filter: blur(10px);
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .ct-card-head {
-  height: 46px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14px;
+  padding: 0 10px;
   background: linear-gradient(90deg, #1976d2, #0b2e4a);
 }
 
@@ -677,7 +885,8 @@ export default {
 
 .ct-card-head-title {
   color: #fff;
-  font-weight: 950;
+  font-size: 14px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   letter-spacing: .2px;
@@ -685,35 +894,35 @@ export default {
 
 .ct-chip-year {
   border-radius: 999px !important;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .ct-card-body {
-  padding: 12px 14px 14px;
+  padding: 8px 10px !important;
 }
 
 /* Semesters */
 .ct-sem-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
 }
 
 .ct-sem-chip {
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .ct-sem-chip--active {
-  box-shadow: 0 10px 22px rgba(25,118,210,.25);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 /* Tools */
 .ct-tools {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-  padding: 12px 14px;
+  padding: 8px 10px !important;
 }
 
 .ct-search {
@@ -729,7 +938,7 @@ export default {
 }
 
 .ct-info-chip {
-  font-weight: 900;
+  font-weight: 700;
   border: 1px solid rgba(25,118,210,.16);
 }
 
@@ -749,7 +958,7 @@ export default {
 .ct-date {
   display: inline-flex;
   align-items: center;
-  font-weight: 800;
+  font-weight: 700;
   color: #0b2e4a;
 }
 
@@ -758,11 +967,11 @@ export default {
   white-space: normal;
   line-height: 1.35rem;
   color: rgba(0,0,0,.78);
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .ct-hours-chip {
-  font-weight: 900;
+  font-weight: 700;
   border-radius: 999px !important;
 }
 
@@ -770,34 +979,34 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18px;
+  padding: 10px;
   color: #546e7a;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 /* Mobile cards */
 .ct-mobile-list {
-  padding: 12px;
+  padding: 8px 0 !important;
 }
 
 .ct-mobile-card {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
   border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.94);
-  padding: 12px;
-  margin-bottom: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
 }
 
 .ct-mobile-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .ct-mobile-date {
-  font-weight: 950;
+  font-weight: 700;
   color: #0b2e4a;
   display: inline-flex;
   align-items: center;
@@ -806,22 +1015,23 @@ export default {
 
 .ct-mobile-activity {
   color: rgba(0,0,0,.78);
-  font-weight: 650;
-  line-height: 1.35rem;
+  font-weight: 500;
+  font-size: 13.5px;
+  line-height: 1.35;
   white-space: pre-wrap;
 }
 
 .ct-mobile-actions {
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .ct-empty-mobile {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18px 8px;
+  padding: 10px 8px;
   color: #546e7a;
-  font-weight: 900;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -835,9 +1045,9 @@ export default {
 }
 
 .ct-page-indicator {
-  font-weight: 900;
+  font-weight: 700;
   color: rgba(0,0,0,.65);
-  font-size: 0.92rem;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -848,8 +1058,8 @@ export default {
   right: 0;
   bottom: 0;
   z-index: 30;
-  padding: 10px 12px;
-  background: rgba(255,255,255,.88);
+  padding: 6px 10px;
+  background: rgba(255,255,255,.94);
   border-top: 1px solid rgba(25,118,210,.16);
   backdrop-filter: blur(10px);
   display: flex;
@@ -858,37 +1068,38 @@ export default {
 
 .ct-bottom-btn {
   border-radius: 999px !important;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 /* Dialog */
 .ct-dialog {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
   overflow: hidden;
 }
 
 .ct-dialog-head {
-  height: 54px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px 0 14px;
+  padding: 0 4px 0 12px;
   background: linear-gradient(90deg, #1976d2, #0b2e4a);
 }
 
 .ct-dialog-title {
   color: #fff;
-  font-weight: 950;
+  font-size: 15px;
+  font-weight: 700;
   display: flex;
   align-items: center;
 }
 
 .ct-dialog-body {
-  padding-top: 14px;
+  padding-top: 10px !important;
 }
 
 .ct-dialog-actions {
-  padding: 12px 14px 14px;
+  padding: 6px 12px 10px !important;
 }
 
 /* Visibility helpers */
@@ -897,20 +1108,38 @@ export default {
 .ct-hide-sm { display: inline-flex; }
 
 @media (max-width: 600px) {
+  /* Téléphone : barre de boutons fixe en bas → place réservée. */
   .ct-page {
-    padding: 10px;
-    border-radius: 14px;
-    padding-bottom: 86px;
+    padding: 0 0 52px;
   }
 
   .ct-topbar {
-    padding: 12px;
-    border-radius: 14px;
-    gap: 10px;
+    min-height: 36px;
+    padding: 4px 8px;
+    gap: 6px;
   }
 
   .ct-h1 {
-    font-size: 1.02rem;
+    font-size: 15px;
+  }
+
+  /* Pas de grand cadre autour des blocs : contenu posé sur la page. */
+  .ct-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible;
+    margin-bottom: 8px;
+  }
+
+  .ct-card-head {
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .ct-card-body,
+  .ct-tools {
+    padding: 6px 0 !important;
   }
 
   .ct-hide-sm { display: none !important; }
@@ -937,11 +1166,11 @@ export default {
 
 @media (max-width: 360px) {
   .ct-h1 {
-    font-size: 0.98rem;
+    font-size: 14px;
   }
 
   .ct-page-indicator {
-    font-size: 0.86rem;
+    font-size: 12.5px;
   }
 
   .ct-bottom-btn {

@@ -1,19 +1,10 @@
 <template>
-  <v-container fluid class="pa-4 bg-grey-lighten-4 fill-height align-start">
-    <v-row align="center" class="mb-6">
+  <v-container fluid class="pa-3 bg-grey-lighten-4 fill-height align-start">
+    <v-row align="center" class="mb-3">
       <v-col cols="auto">
-        <v-btn
-          icon
-          variant="elevated"
-          color="white"
-          @click="selectedClassId ? clearSelection() : $emit('back')"
-          elevation="2"
-        >
-          <v-icon color="error">mdi-arrow-left</v-icon>
-        </v-btn>
       </v-col>
       <v-col>
-        <h1 class="text-h5 font-weight-bold text-error d-flex align-center">
+        <h1 class="text-h6 font-weight-bold text-error d-flex align-center">
           <v-icon start size="32" color="error">mdi-gavel</v-icon>
           {{ selectedClassId ? 'Détails des Sanctions' : 'Cahiers de Punition' }}
         </h1>
@@ -25,15 +16,15 @@
 
     <v-window v-model="activeTab" disabled>
       <v-window-item value="list">
-        <v-card border flat class="rounded-xl overflow-hidden">
-          <v-toolbar color="error-lighten-5" flat px-4>
+        <v-card border flat class="rounded-lg overflow-hidden">
+          <v-toolbar height="40" color="error-lighten-5" flat px-3>
             <v-icon start color="error" class="ml-4">mdi-filter-variant</v-icon>
             <span class="text-subtitle-1 font-weight-bold text-error">
               Sélectionnez une classe pour gérer les punitions
             </span>
           </v-toolbar>
 
-          <v-card-text class="pa-4 pa-md-6">
+          <v-card-text class="pa-3 pa-md-3">
             <v-row v-if="loading" justify="center" class="py-12">
               <v-progress-circular indeterminate color="error" size="50"></v-progress-circular>
             </v-row>
@@ -51,13 +42,13 @@
                   <v-card
                     variant="tonal"
                     color="error"
-                    class="punishment-card rounded-lg border-sm py-4"
+                    class="punishment-card rounded-lg border-sm py-3"
                     @click="goToClass(classe.id)"
                     ripple
                   >
                     <v-card-text class="text-center">
-                      <v-avatar color="error" variant="elevated" size="52" class="mb-3">
-                        <v-icon color="white">mdi-google-classroom</v-icon>
+                      <v-avatar color="error" variant="elevated" size="32" class="mb-3">
+                        <v-icon size="18" color="white">mdi-google-classroom</v-icon>
                       </v-avatar>
                       
                       <div class="text-h6 font-weight-black mb-1">{{ classe.nom }}</div>
@@ -94,6 +85,8 @@
         <punishment-detail
           v-if="selectedClassId"
           :class-id="selectedClassId"
+          :eleve-id="eleveId"
+          @ouvrir-eleve="$emit('ouvrir-eleve', $event)"
           :annee-scolaire="anneeScolaire"
           :annee-scolaire-id="anneeScolaireId"
           :etablissement-id="etablissementId"
@@ -115,14 +108,32 @@ export default {
     etablissementId: { type: Number, required: true },
     etablissementNom: { type: String, required: true },
     anneeScolaire: { type: String, required: true },
-    anneeScolaireId: { type: Number, required: true }
+    anneeScolaireId: { type: Number, required: true },
+    classeId: { type: Number, default: null },
+    eleveId: { type: Number, default: null }
   },
+  emits: ['back', 'ouvrir-classe', 'ouvrir-eleve'],
   data() {
     return {
       classes: [],
-      selectedClassId: null,
       loading: false,
       activeTab: 'list'
+    }
+  },
+  computed: {
+    // Classe ouverte : donnée par la route (…/<classeId>). La changer émet
+    // « ouvrir-classe » et la page va vers la nouvelle adresse.
+    selectedClassId: {
+      get() { return this.classeId },
+      set(id) { this.$emit('ouvrir-classe', id) }
+    },
+  },
+  watch: {
+    classeId: {
+      handler(id) {
+        this.activeTab = id ? 'detail' : 'list'
+      },
+      immediate: true
     }
   },
   methods: {
@@ -134,6 +145,10 @@ export default {
           headers: { Authorization: `Bearer ${token}` },
         })
         this.classes = response.data
+        // Classe inconnue dans l'adresse : retour à la liste des classes.
+        if (this.classeId && !this.classes.some((c) => Number(c.id) === this.classeId)) {
+          this.selectedClassId = null
+        }
       } catch (error) {
         console.error('Erreur API:', error)
       } finally {
@@ -142,11 +157,9 @@ export default {
     },
     goToClass(classId) {
       this.selectedClassId = classId
-      this.activeTab = 'detail'
     },
     clearSelection() {
       this.selectedClassId = null
-      this.activeTab = 'list'
     }
   },
   created() {

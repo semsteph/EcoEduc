@@ -1,89 +1,46 @@
 <template>
   <div class="eleve-item">
-    <v-btn icon @click="$emit('back')" class="back-button">
-      <v-icon>mdi-arrow-left</v-icon>
-    </v-btn>
     <div id="bulletin" class="eleve-details">
-      <div class="eleve-info">
-        <h3 class="no-pdf">
-          Détails de l'élève
-          <button @click="downloadPDF" class="download-btn no-pdf">
-            Télécharger PDF
-          </button>
-        </h3>
-        <p><strong>Nom :</strong> {{ childNom }}</p>
-        <p><strong>Prénom :</strong> {{ childPrenom }}</p>
-        <p><strong>Classe :</strong> {{ childClasse }}</p>
-      </div>
-
-      <div class="semestres">
+      <div v-if="annees.length" class="annee-choix no-pdf">
+        <span>Année :</span>
         <button
-          v-for="semestre in semestres"
-          :key="semestre.semestre_id"
-          @click="selectSemestre(semestre.semestre_id)"
-          :class="{ active: selectedSemestre === semestre.semestre_id }"
-          class="semestre-btn no-pdf"
-        >
-          {{ semestre.nom }}
-        </button>
+          v-for="a in annees"
+          :key="a.id"
+          type="button"
+          class="semestre-btn"
+          :class="{ active: anneeChoisie === a.id }"
+          @click="choisirAnnee(a.id)"
+        >{{ a.nom }}</button>
       </div>
 
-      <div v-if="filteredData.length" class="table-container">
-        <table class="notes-table">
-          <thead>
-            <tr>
-              <th>Matière</th>
-              <th>Coef</th>
-              <th>Moy</th>
-              <th>Moy Coef</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(data, index) in filteredData" :key="index">
-              <td>{{ data.matiere }}</td>
-              <td>{{ data.coef }}</td>
-              <td>{{ data.moy }}</td>
-              <td>{{ data.moycoef }}</td>
-            </tr>
-            <tr>
-              <td><strong>Conduite</strong></td>
-              <td>1</td>
-              <td>{{ conduite }}</td>
-              <td>{{ conduite }}</td>
-            </tr>
-            <tr>
-              <td colspan="2">Moyenne Semestrielle</td>
-              <td colspan="2">{{ moySem }}</td>
-            </tr>
-            <tr v-if="isLastSemestre(selectedSemestre)">
-              <td colspan="2">Moyenne Annuelle</td>
-              <td colspan="2">{{ moyAn }}</td>
-            </tr>
-            <tr v-if="isLastSemestre(selectedSemestre)">
-              <td colspan="2">Décision</td>
-              <td colspan="2">{{ decision || 'Non définie' }}</td>
-            </tr>
-            <tr>
-              <td colspan="2">Rang</td>
-              <td colspan="2">{{ rang }}</td>
-            </tr>
-            <tr>
-              <td colspan="2">Mention</td>
-              <td colspan="2">{{ mention }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-if="!semestres.length" class="no-data">
+        Aucun bulletin pour {{ nomAnnee }} pour l'instant.
       </div>
-      <div v-else class="no-data">Aucune donnée disponible pour ce semestre.</div>
+
+      <template v-else>
+        <div class="semestres">
+          <button
+            v-for="semestre in semestres"
+            :key="semestre.semestre_id"
+            @click="selectSemestre(semestre.semestre_id)"
+            :class="{ active: selectedSemestre === semestre.semestre_id }"
+            class="semestre-btn no-pdf"
+          >
+            {{ semestre.nom }}
+          </button>
+        </div>
+        <BulletinOfficiel v-if="bulletinCourant" v-bind="bulletinCourant" />
+      </template>
+      <div v-if="semestres.length && !bulletinCourant" class="no-data">Aucune donnée disponible pour ce semestre.</div>
     </div>
   </div>
 </template>
 <script>
 import axios from "axios";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import BulletinOfficiel from "@/components/BulletinOfficiel.vue";
 
 export default {
+  components: { BulletinOfficiel },
   props: {
     childId: {
       type: Number,
@@ -98,10 +55,14 @@ export default {
       required: true
     },
   },
+  setup() {
+    // Semestre affiché, conservé dans l'URL (?semestre=...).
+    const selectedSemestre = useUrlState("semestre", null, { type: "number" });
+    return { selectedSemestre };
+  },
   data() {
     return {
       semestres: [],
-      selectedSemestre: null,
       filteredData: [],
       moySem: 0,
       moyAn: null,
@@ -112,17 +73,46 @@ export default {
       childNom: "",
       childPrenom: "",
       childClasse: "",
+      annees: [],
+      anneeChoisie: null,
+      donnees: null,
     };
   },
+  computed: {
+    bulletinCourant() {
+      const d = this.donnees;
+      const sem = this.semestres.find((x) => x.semestre_id === this.selectedSemestre);
+      if (!d || !sem) return null;
+      return {
+        ecole: { nom: d.etablissementNom || '', annee: d.anneeNom || this.nomAnnee },
+        eleve: { nom: d.eleveNom, prenom: d.elevePrenom, classe: d.classeNom, matricule: d.matricule, sexe: d.sexe, dateNaissance: d.dateNaissance, photo: d.photo },
+        periode: sem.nom,
+        lignes: (sem.bulletins || []).map((b) => ({ matiere: b.matiere, coef: b.coef, moy: b.moy, moycoef: b.moycoef })),
+        conduite: sem.conduite,
+        resultats: { moyenne: sem.moySem, rang: sem.rang, mention: sem.mention, moyenneAnnuelle: sem.moyAn, rangAnnuel: sem.rangAnnuel, effectifAnnuel: sem.effectifAnnuel, decision: sem.decision },
+        stats: sem.stats || null,
+      };
+    },
+    nomAnnee() {
+      const a = this.annees.find((x) => x.id === this.anneeChoisie);
+      return a ? a.nom : this.anneeScolaire;
+    },
+  },
   methods: {
+    choisirAnnee(id) {
+      this.anneeChoisie = id;
+      this.selectedSemestre = null;
+      this.fetchData();
+    },
     async fetchData() {
   try {
     const token = localStorage.getItem("token");
     const response = await axios.get(
-      `/api/bulletined/${this.childId}/${this.anneeScolaireId}`,
+      `/api/bulletined/${this.childId}/${this.anneeChoisie || this.anneeScolaireId}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const data = response.data;
+    this.donnees = data && data.semestres ? data : null;
 
     // Vérification si data est vide ou non structuré comme prévu
     if (!data || !data.semestres || data.semestres.length === 0) {
@@ -144,6 +134,9 @@ export default {
       mention: semestre.mention,
       conduite: semestre.conduite,
       decision: semestre.decision,
+      stats: semestre.stats,
+      rangAnnuel: semestre.rangAnnuel,
+      effectifAnnuel: semestre.effectifAnnuel,
     }));
 
     this.childNom = data.eleveNom;
@@ -151,7 +144,11 @@ export default {
     this.childClasse = data.classeNom;
 
     if (this.semestres.length > 0) {
-      this.selectedSemestre = this.semestres[0].semestre_id;
+      // Semestre de l'URL s'il existe, sinon le premier.
+      const fromUrl = this.semestres.find(
+        (s) => Number(s.semestre_id) === this.selectedSemestre
+      );
+      this.selectedSemestre = fromUrl ? fromUrl.semestre_id : this.semestres[0].semestre_id;
       this.filterBySemestre();
     }
   } catch (error) {
@@ -190,85 +187,18 @@ export default {
     isLastSemestre(semestreId) {
       return this.semestres[this.semestres.length - 1]?.semestre_id === semestreId;
     },
-    async downloadPDF() {
-  const bulletinElement = document.getElementById("bulletin");
-
-  // Cloner l'élément bulletin
-  const clone = bulletinElement.cloneNode(true);
-  document.body.appendChild(clone);
-
-  // Supprimer les éléments marqués comme "no-pdf"
-  const noPdfElements = clone.querySelectorAll(".no-pdf");
-  noPdfElements.forEach((element) => element.remove());
-
-  // Identifier le bouton actif parmi les boutons de semestre
-  const allSemestreButtons = clone.querySelectorAll(".semestre-btn");
-  const activeButton = [...allSemestreButtons].find((button) =>
-    button.classList.contains("active")
-  );
-
-  // Positionner le bouton actif au-dessus du tableau
-  if (activeButton) {
-    const activeButtonClone = activeButton.cloneNode(true); // Cloner le bouton actif
-    activeButtonClone.style.textAlign = "center"; // Centrer le bouton
-    activeButtonClone.style.marginBottom = "10px"; // Ajouter un espacement en bas
-    activeButtonClone.style.fontWeight = "bold"; // Rendre le texte en gras
-    activeButtonClone.style.display = "block"; // Forcer un affichage en ligne bloqué
-    activeButtonClone.style.backgroundColor = "#f5f5f5"; // Optionnel : couleur de fond du bouton
-    activeButtonClone.style.padding = "5px 10px"; // Optionnel : espacement interne
-    activeButtonClone.style.border = "1px solid #ddd"; // Optionnel : bordure pour un style clair
-
-    // Insérer le bouton au-dessus du tableau principal
-    const tableau = clone.querySelector(".tableau"); // Remplacez ".tableau" par le sélecteur du tableau
-    if (tableau) {
-      tableau.parentNode.insertBefore(activeButtonClone, tableau);
-    }
-  }
-
-  // Supprimer tous les autres boutons de semestre
-  allSemestreButtons.forEach((button) => {
-    if (!button.classList.contains("active")) {
-      button.remove();
-    }
-  });
-
-  // Appliquer un fond uniforme sur toute la page
-  const backgroundColor = getComputedStyle(
-    document.querySelector(".eleve-item")
-  ).backgroundColor;
-  clone.style.backgroundColor = backgroundColor;
-
-  const allChildren = clone.querySelectorAll("*");
-  allChildren.forEach((child) => {
-    child.style.backgroundColor = backgroundColor; // Appliquer la couleur uniformément
-  });
-
-  // Ajuster la hauteur pour éliminer les zones blanches
-  clone.style.minHeight = "200vh";
-  clone.style.padding = "150px"; 
-
-  // Générer le PDF
-  try {
-    const canvas = await html2canvas(clone, { scale: 2 });
-    const imgData = canvas.toDataURL("image/png");
-
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`Bulletin_${this.childNom}_${this.childPrenom}.pdf`);
-  } catch (error) {
-    console.error("Erreur lors de la génération du PDF :", error);
-  } finally {
-    clone.remove();
-  }
-}
-
-
-
   },
-  mounted() {
+  async mounted() {
+    // Année affichée : l'année en cours si elle a déjà des bulletins, sinon
+    // la plus récente qui en a (après une clôture : l'année terminée).
+    try {
+      const { data } = await axios.get(`/api/bulletined/${this.childId}/annees`);
+      this.annees = Array.isArray(data) ? data : [];
+    } catch (e) {
+      this.annees = [];
+    }
+    const courante = this.annees.find((a) => a.id === this.anneeScolaireId);
+    this.anneeChoisie = courante ? courante.id : (this.annees[0]?.id || this.anneeScolaireId);
     this.fetchData();
   },
 };
@@ -278,14 +208,17 @@ export default {
 
   
 <style scoped>
+.notes-table { font-size: 0.82rem; width: 100%; }
+.notes-table th, .notes-table td { padding: 6px 4px !important; }
+.annee-choix { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-weight: 600; }
 /* Conteneur principal */
 .eleve-item {
-  margin: 20px auto;
-  padding: 15px;
-  border: 1px solid #007bff;
-  border-radius: 10px;
-  background-color: #e3f2fd;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin: 12px auto;
+  padding: 12px;
+  border: 1px solid rgba(25, 118, 210, 0.18);
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   max-width: 100%;
 }
 
@@ -302,12 +235,12 @@ export default {
   background-color: #4caf50;
   color: white;
   border: none;
-  padding: 10px 15px;
-  border-radius: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   transition: background-color 0.3s ease;
-  min-height: 40px;
+  min-height: 32px;
 }
 
 .download-btn:hover {
@@ -374,11 +307,22 @@ export default {
   }
 }
 
+@media (max-width: 600px) {
+  /* Téléphone : pas de grand cadre autour du bulletin. */
+  .eleve-item {
+    margin: 4px 0;
+    padding: 4px 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
 @media (max-width: 480px) {
   .semestre-btn {
     font-size: 13px;
-    padding: 8px 6px;
-    min-height: 40px;
+    padding: 6px;
+    min-height: 32px;
     flex: 0 1 calc(50% - 8px); /* Sur mobiles, deux boutons par ligne */
   }
 

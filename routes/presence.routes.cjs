@@ -7,9 +7,11 @@ const router = express.Router();
 
 const { authenticateJWT, getEleveDuParentOr403 } = require('../server-lib/auth.cjs');
 const db = require('../server-lib/db.cjs');
+const notesService = require('../server-lib/notes-service.cjs');
+const evenements = require('../server-lib/alertes-evenements.cjs');
 const moment = require('moment');
 
-router.get('/absents', async (req, res) => {
+router.get('/absents', authenticateJWT, async (req, res) => {
   const { classeId, etablissementId, anneeScolaireId } = req.query;
 
   if (!classeId || !etablissementId || !anneeScolaireId) {
@@ -48,41 +50,78 @@ router.get('/absents', async (req, res) => {
   }
 });
 
+// Enregistre l'appel : seules les absences sont stockées. Un même élève,
+// même jour, même matière n'a qu'une ligne (avant : doublons à chaque
+// nouvel enregistrement, taux d'absence faussés). Statut « Présent »
+// = l'absence notée par erreur est retirée.
 router.post('/presence', authenticateJWT, async (req, res) => {
-  const presences = req.body;
+  const presences = Array.isArray(req.body) ? req.body : [];
+  if (!presences.length) return res.status(400).json({ error: 'Aucune présence à enregistrer.' });
+  if (presences.length > 500) return res.status(400).json({ error: 'Trop de lignes en une fois.' });
 
+  const STATUTS = { absent: 'Absent', permissionnaire: 'Permissionnaire', permissionaire: 'Permissionnaire', present: null, 'présent': null };
   let connection;
 
   try {
-    connection = await req.db.getConnection();
+    connection = await db.getConnection();
+    const etablissementId = Number(req.user.etablissementId);
+    const first = presences[0];
+    if (!(await notesService.canWriteNotes(connection, req.user, { classeId: first.classeId, matiereId: first.subjectId, anneeScolaireId: first.anneeScolaireId }))) {
+      return res.status(403).json({ error: "Vous n'enseignez pas cette matière dans cette classe." });
+    }
     await connection.beginTransaction();
 
-    for (let presence of presences) {
-      const { date, status, eleveId, subjectId, classeId, semesterName, etablissementId, anneeScolaireId } = presence;
+    let enregistrees = 0;
+    for (const presence of presences) {
+      const { date, status, eleveId, subjectId, classeId, semesterName, anneeScolaireId } = presence;
+      const key = String(status || '').trim().toLowerCase();
+      if (!(key in STATUTS) || !/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) {
+        throw Object.assign(new Error('Statut ou date invalide.'), { code: 'VALIDATION' });
+      }
+      if (new Date(`${date}T00:00:00`) > new Date()) {
+        throw Object.assign(new Error('La date ne peut pas être dans le futur.'), { code: 'VALIDATION' });
+      }
+      if (Number(classeId) !== Number(first.classeId) || Number(subjectId) !== Number(first.subjectId)) {
+        throw Object.assign(new Error('Un appel concerne une seule classe et une seule matière.'), { code: 'VALIDATION' });
+      }
 
       const [semesterResult] = await connection.query(
         `SELECT id FROM semestre WHERE nom = ? AND etablissement_id = ?`,
         [semesterName, etablissementId]
       );
-
       if (!semesterResult.length) {
-        throw new Error(`Semestre non trouvé pour le nom: ${semesterName}`);
+        throw Object.assign(new Error(`Période introuvable : ${semesterName}`), { code: 'VALIDATION' });
       }
 
-      const semesterId = semesterResult[0].id;
-
       await connection.query(
-        `INSERT INTO presence (date, statut, eleve_id, matieres_id, classe_id, semestre_id, etablissement_id, Annee_scolaire_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [date, status, eleveId, subjectId, classeId, semesterId, etablissementId, anneeScolaireId]
+        'DELETE FROM presence WHERE eleve_id = ? AND date = ? AND matieres_id = ? AND Annee_scolaire_id = ?',
+        [eleveId, date, subjectId, anneeScolaireId]
       );
+      if (STATUTS[key]) {
+        await connection.query(
+          `INSERT INTO presence (date, statut, eleve_id, matieres_id, classe_id, semestre_id, etablissement_id, Annee_scolaire_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [date, STATUTS[key], eleveId, subjectId, classeId, semesterResult[0].id, etablissementId, anneeScolaireId]
+        );
+        enregistrees += 1;
+      }
     }
 
+    // Trace de l'appel (dénominateur du taux de présence).
+    await connection.query(
+      'INSERT IGNORE INTO appel (classe_id, matiere_id, date, etablissement_id, Annee_scolaire_id) VALUES (?, ?, ?, ?, ?)',
+      [first.classeId, first.subjectId, first.date, etablissementId, first.anneeScolaireId]
+    );
+
     await connection.commit();
-    res.status(201).json({ message: 'Présences enregistrées avec succès.' });
+    // Parents prévenus (application, téléphone, SMS si activé) ; une
+    // correction (élève finalement présent) retire l'alerte non lue.
+    evenements.plusTard(evenements.absencesDuJour, presences.map((p) => Number(p.eleveId)), first.date);
+    res.status(201).json({ message: enregistrees ? `${enregistrees} absence(s) enregistrée(s).` : 'Appel enregistré : aucun absent.', enregistrees });
   } catch (error) {
+    if (connection) { try { await connection.rollback(); } catch (_) {} }
+    if (error.code === 'VALIDATION') return res.status(400).json({ error: error.message });
     console.error('Erreur lors de l\'enregistrement des présences :', error);
-    if (connection) await connection.rollback();
     res.status(500).json({ error: 'Une erreur est survenue lors de l\'enregistrement des présences.' });
   } finally {
     if (connection) connection.release();

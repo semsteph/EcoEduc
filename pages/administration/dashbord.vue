@@ -1,5 +1,5 @@
 <template>
-  <v-app class="no-scroll-x">
+  <v-app class="no-scroll-x admin-space">
     <v-navigation-drawer
       v-model="drawer"
       :permanent="mdAndUp"
@@ -7,7 +7,7 @@
       fixed
       color="primary"
       dark
-      elevation="2"
+      elevation="0"
       width="260"
     >
       <v-toolbar flat color="primary" class="d-flex justify-center pt-4">
@@ -40,8 +40,8 @@
         <v-list-item
           v-for="item in visibleMenuItems"
           :key="item.title"
-          @click="changeComponent(item.component)"
-          :class="{ 'active-item': currentComponent === item.component }"
+          @click="ouvrirSection(item.chemin)"
+          :class="{ 'active-item': section === item.chemin }"
         >
           <template #prepend>
             <v-icon :icon="item.icon" color="white"></v-icon>
@@ -51,7 +51,7 @@
       </v-list>
 
       <template #append>
-        <div class="pa-4">
+        <div class="pa-3">
           <v-btn block color="rgba(255,255,255,0.1)" depressed @click="showLogoutDialog">
             <v-icon left color="red lighten-1">mdi-logout</v-icon>
             Déconnexion
@@ -60,7 +60,7 @@
       </template>
     </v-navigation-drawer>
 
-    <v-app-bar app fixed color="white" elevation="1" height="64">
+    <v-app-bar app fixed color="white" elevation="0" height="52" class="admin-bar">
       <v-app-bar-nav-icon
         v-if="!mdAndUp"
         @click.stop="drawer = !drawer"
@@ -74,7 +74,7 @@
       <v-btn icon @click="showMessages">
         <v-badge
           :content="permissionCount"
-          :model-value="permissionCount > 0 && currentComponent !== 'MessageComponent'"
+          :model-value="permissionCount > 0 && section !== '/messages'"
           color="deep-orange"
           overlap
         >
@@ -85,7 +85,7 @@
       <v-btn icon @click="showNotifications">
         <v-badge
           :content="notificationCount"
-          :model-value="notificationCount > 0 && currentComponent !== 'NotificationComponent'"
+          :model-value="notificationCount > 0 && section !== '/notifications'"
           color="deep-orange accent-3"
           overlap
         >
@@ -96,16 +96,16 @@
       <v-btn
         icon
         @click="showNoteRequests"
-        :class="{ 'note-alert-shake': noteRequestCount > 0 && currentComponent !== 'NoteModificationRequests' }"
+        :class="{ 'note-alert-shake': noteRequestCount > 0 && section !== '/demandes-notes' }"
       >
         <v-badge
           :content="noteRequestCount"
-          :model-value="noteRequestCount > 0 && currentComponent !== 'NoteModificationRequests'"
+          :model-value="noteRequestCount > 0 && section !== '/demandes-notes'"
           color="red-darken-2"
           overlap
           class="note-alert-badge"
         >
-          <v-icon :color="noteRequestCount > 0 && currentComponent !== 'NoteModificationRequests' ? 'red-darken-2' : 'primary'">
+          <v-icon :color="noteRequestCount > 0 && section !== '/demandes-notes' ? 'red-darken-2' : 'primary'">
             mdi-shield-alert-outline
           </v-icon>
         </v-badge>
@@ -117,32 +117,29 @@
     </v-app-bar>
 
     <v-main class="main-scroll-area bg-grey-lighten-4">
-      <v-container fluid class="pa-2 pa-sm-6 main-content">
-        <div v-if="currentComponent === 'Dashboard'">
-          <DashboardHome
-            v-if="etablissementId && anneeScolaireId"
-            :etablissement-id="etablissementId"
-            :etablissement-nom="etablissementNom"
-            :annee-scolaire-id="anneeScolaireId"
-          />
-        </div>
+      <v-container fluid class="pa-2 pa-sm-3 main-content">
+        <!-- Écran courant : une route enfant de /administration/dashbord
+             (pages/administration/dashbord/...), créée une fois l'établissement
+             et l'année scolaire connus. -->
+        <!-- Fil d'Ariane et flèche de retour, en haut et en bas de chaque écran -->
+        <PageNav :crumbs="crumbs" position="top" />
 
-        <div v-else>
-          <component
-            :is="componentsMap[currentComponent]"
-            :etablissement-id="etablissementId"
-            :etablissement-nom="etablissementNom"
-            :annee-scolaire-id="anneeScolaireId"
-            :annee-scolaire="anneeScolaireNom"
-            :permissions="filteredPermissions"
-            :modules-autorises="modulesAutorises"
-            @component-selected="selectComponent"
-            @back="currentComponent = previousComponent || 'Dashboard'"
-            @update-notification-count="fetchNotificationCount"
-            @update-permission-count="fetchPermissions"
-            @update-request-count="setNoteRequestCount"
-          />
-        </div>
+        <NuxtPage
+          v-if="pret"
+          :etablissement-id="etablissementId"
+          :etablissement-nom="etablissementNom"
+          :annee-scolaire-id="anneeScolaireId"
+          :annee-scolaire="anneeScolaireNom"
+          :permissions="filteredPermissions"
+          :modules-autorises="modulesAutorises"
+          @update-notification-count="fetchNotificationCount"
+          @update-permission-count="fetchPermissions"
+          @update-request-count="setNoteRequestCount"
+          @annee-ajoutee="fetchAnneeScolaire"
+          @annee-cloturee="fetchAnneeScolaire"
+        />
+
+        <PageNav :crumbs="crumbs" position="bottom" />
       </v-container>
     </v-main>
 
@@ -151,32 +148,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed, watch, provide } from "vue";
 import { useDisplay } from "vuetify";
 import { useRoute, useRouter } from "vue-router";
 import axios from "axios";
 
-// IMPORTATION DE TOUS LES COMPOSANTS
-import ParentManagement from "@/components/administration/ParentManagement.vue";
-import MessageComponent from "@/components/administration/MessageComponent.vue";
-import NotificationComponent from "@/components/administration/NotificationComponent.vue";
-import NoteModificationRequests from "@/components/administration/NoteModificationRequests.vue";
 import LogoutDialog from "@/components/administration/LogoutDialog.vue";
-import ClassManagement from "@/components/administration/ClassManagement.vue";
-import StudentManagement from "@/components/administration/StudentManagement.vue";
-import TeacherManagement from "@/components/administration/TeacherManagement.vue";
-import Inscription from "@/components/administration/Inscription.vue";
-import PresenceManagement from "@/components/administration/PresenceManagement.vue";
-import PunishmentManagement from "@/components/administration/PunishmentManagement.vue";
-import NoteConsultation from "@/components/administration/NoteConsultation.vue";
-import BulletinManagement from "@/components/administration/BulletinManagement.vue";
-import Parametre from "@/components/administration/Parametre.vue";
-import Reinscription from "@/components/administration/Reinscription.vue";
-import MesEleves from "@/components/administration/MesEleves.vue";
-import CarteScolaire from "~/components/administration/CarteScolaire.vue";
-import ScolariteManager from "~/components/administration/ScolariteManager.vue";
-import MonProfil from "@/components/administration/MonProfil.vue";
-import DashboardHome from "@/components/administration/DashboardHome.vue";
+import PageNav from "@/components/PageNav.vue";
+import { providePageNav, buildCrumbs } from "@/composables/usePageNav";
 
 const API_BASE = "";
 
@@ -185,8 +164,10 @@ const drawer = ref(null);
 const route = useRoute();
 const router = useRouter();
 
-const currentComponent = ref("Dashboard");
-const previousComponent = ref(null);
+// Vrai une fois l'année scolaire chargée : l'écran courant n'est créé
+// qu'avec l'établissement et l'année connus (sinon, ouvert directement ou
+// rechargé, il chargerait ses données avec des identifiants vides).
+const pret = ref(false);
 const etablissementId = ref(null);
 const etablissementNom = ref("");
 const anneeScolaireNom = ref("");
@@ -301,35 +282,15 @@ const handleNoteRequestCountChange = (newCount) => {
   }
 };
 
-// MAP DE TOUS LES COMPOSANTS POUR LE RENDU DYNAMIQUE
-const componentsMap = {
-  ParentManagement,
-  MessageComponent,
-  NotificationComponent,
-  NoteModificationRequests,
-  ClassManagement,
-  StudentManagement,
-  TeacherManagement,
-  Inscription,
-  PresenceManagement,
-  PunishmentManagement,
-  NoteConsultation,
-  BulletinManagement,
-  Reinscription,
-  Parametre,
-  MesEleves,
-  CarteScolaire,
-  ScolariteManager,
-  MonProfil,
-};
-
+// Chaque entrée du menu est une route enfant : /administration/dashbord<chemin>.
 const menuItems = [
-  { title: "Tableau de bord", component: "Dashboard", icon: "mdi-view-dashboard" },
-  { title: "Classes", component: "ClassManagement", icon: "mdi-school-outline" },
-  { title: "Elèves", component: "StudentManagement", icon: "mdi-account-group-outline" },
-  { title: "Enseignants", component: "TeacherManagement", icon: "mdi-teach" },
-  { title: "Parents", component: "ParentManagement", icon: "mdi-account-child-outline" },
-  { title: "Paramètres", component: "Parametre", icon: "mdi-cog-outline" },
+  { title: "Tableau de bord", component: "Dashboard", chemin: "", icon: "mdi-view-dashboard" },
+  { title: "Classes", component: "ClassManagement", chemin: "/classes", icon: "mdi-school-outline" },
+  { title: "Elèves", component: "StudentManagement", chemin: "/eleves", icon: "mdi-account-group-outline" },
+  { title: "Enseignants", component: "TeacherManagement", chemin: "/enseignants", icon: "mdi-teach" },
+  { title: "Parents", component: "ParentManagement", chemin: "/parents", icon: "mdi-account-child-outline" },
+  { title: "Paramètres", component: "Parametre", chemin: "/parametres", icon: "mdi-cog-outline" },
+  { title: "Guide d'utilisation", component: "Guide", chemin: "/guide", icon: "mdi-help-circle-outline" },
 ];
 
 // ✅ Contrôle d'accès collaborateurs : un compte "administration" (comptable, secrétaire...)
@@ -342,35 +303,170 @@ const visibleMenuItems = computed(() => {
     return menuItems;
   }
   const filtered = menuItems.filter(
-    (item) => item.component === "Dashboard" || modulesAutorises.value.includes(item.component)
+    (item) => item.component === "Dashboard" || item.component === "Guide" || modulesAutorises.value.includes(item.component)
   );
-  filtered.push({ title: "Mon profil", component: "MonProfil", icon: "mdi-account-cog-outline" });
+  filtered.push({ title: "Mon profil", component: "MonProfil", chemin: "/profil", icon: "mdi-account-cog-outline" });
   return filtered;
 });
 
-const changeComponent = (component) => {
-  previousComponent.value = currentComponent.value;
-  currentComponent.value = component;
+// ===== NAVIGATION PAR ROUTES =====
+const BASE = "/administration/dashbord";
+
+// Section active (« /eleves », « /messages »... ou « » pour l'accueil),
+// déduite de la route courante.
+const section = computed(() => {
+  const reste = route.path.startsWith(BASE) ? route.path.slice(BASE.length) : "";
+  const premier = reste.split("/").filter(Boolean)[0];
+  return premier ? `/${premier}` : "";
+});
+
+// Identifiants de connexion gardés dans l'adresse de toutes les routes enfants.
+const queryConnexion = () => {
+  const query = {};
+  if (route.query.etablissement_id) query.etablissement_id = route.query.etablissement_id;
+  if (route.query.etablissement_nom) query.etablissement_nom = route.query.etablissement_nom;
+  return query;
+};
+
+// Va vers /administration/dashbord<chemin> (chemin : « /eleves/presences/12 »).
+// `extra` : petits états internes à garder (ex. l'année choisie des bulletins).
+const aller = (chemin = "", extra = {}) => {
+  const query = { ...queryConnexion() };
+  Object.entries(extra).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") query[key] = value;
+  });
+  return router.push({ path: `${BASE}${chemin}`, query });
+};
+// Identifiant lu dans la route (« classeId », « eleveId »...) : null s'il est
+// absent, -1 s'il n'est pas un nombre valide (l'écran le traite alors comme un
+// élément inconnu et revient à sa liste).
+const idRoute = (nom) =>
+  computed(() => {
+    const brut = route.params[nom];
+    if (!brut) return null;
+    const id = Number(brut);
+    return Number.isInteger(id) && id > 0 ? id : -1;
+  });
+// « Retour » des écrans ouverts depuis la barre du haut (messages,
+// notifications, demandes de notes) : l'écran précédent du tableau de bord
+// s'il y en a un dans l'historique, sinon l'accueil.
+const retourPrecedent = () => {
+  const precedent = window.history.state?.back;
+  if (typeof precedent === "string" && precedent.startsWith(BASE)) router.back();
+  else aller();
+};
+provide("adminNav", { aller, idRoute, retourPrecedent });
+
+// ===== FIL D'ARIANE =====
+const pageNav = providePageNav();
+const CRUMB_LABELS = {
+  classes: "Classes",
+  conduite: "Conduite",
+  programmes: "Programmes",
+  eleves: "Élèves",
+  inscription: "Inscription",
+  presences: "Présences",
+  punitions: "Punitions",
+  notes: "Notes",
+  bulletins: "Bulletins",
+  reinscriptions: "Réinscriptions",
+  "cartes-scolaires": "Cartes scolaires",
+  educmaster: "EducMaster",
+  orientation: "Orientation en 2nde",
+  scolarite: "Scolarité",
+  enseignants: "Enseignants",
+  "cahiers-de-texte": "Cahiers de texte",
+  repartition: "Répartition",
+  matieres: "Matières",
+  "programmes-matieres": "Programmes des matières",
+  parents: "Parents",
+  parametres: "Paramètres",
+  guide: "Guide d'utilisation",
+  messages: "Messages",
+  notifications: "Notifications",
+  "demandes-notes": "Demandes de notes",
+  profil: "Mon profil",
+};
+// « liste » dépend de la section : Mes classes, Nos élèves, Mes enseignants.
+const LIST_LABELS = { classes: "Mes classes", eleves: "Nos élèves", enseignants: "Mes enseignants" };
+
+// Noms des classes (le fil d'Ariane affiche « 6ème 1 », pas l'identifiant).
+const classNames = ref({});
+const chargerNomsClasses = async () => {
+  if (!etablissementId.value) return;
+  try {
+    const res = await axios.get(`${API_BASE}/api/classe/${etablissementId.value}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    classNames.value = Object.fromEntries((Array.isArray(res.data) ? res.data : []).map((c) => [String(c.id), c.nom]));
+  } catch (_) {
+    classNames.value = {};
+  }
+};
+watch(etablissementId, chargerNomsClasses);
+
+const crumbs = computed(() =>
+  buildCrumbs(route.path, BASE, "Tableau de bord", (segment, previous) => {
+    if (segment === "liste") return LIST_LABELS[previous[0]] || "Liste";
+    if (/^\d+$/.test(segment)) {
+      // Premier identifiant après l'écran : une classe ; le second : un élève.
+      const ids = previous.filter((p) => /^\d+$/.test(p)).length;
+      return ids === 0 ? classNames.value[segment] || "Classe" : "Élève";
+    }
+    return CRUMB_LABELS[segment] || null;
+  }, { query: queryConnexion(), labels: pageNav.labels })
+);
+
+const ouvrirSection = (chemin) => {
+  aller(chemin);
   if (!mdAndUp.value) drawer.value = false;
 };
 
-const selectComponent = (component) => {
-        console.log("Reçu :", component)
-
-  if (component === "Scolarite") {
-    component = "ScolariteManager"
-  }
-
-
-  previousComponent.value = currentComponent.value;
-  currentComponent.value = component;
-
-  console.log("Component trouvé :", componentsMap[component])
+// Un collaborateur (compte « administration ») ne voit que les modules que le
+// fondateur lui a attribués : une adresse d'un autre module le ramène à l'accueil.
+const MODULE_PAR_CHEMIN = {
+  "/classes": "ClassManagement",
+  "/eleves": "StudentManagement",
+  "/eleves/inscription": "Inscription",
+  "/eleves/liste": "MesEleves",
+  "/eleves/presences": "PresenceManagement",
+  "/eleves/punitions": "PunishmentManagement",
+  "/eleves/notes": "NoteConsultation",
+  "/eleves/bulletins": "BulletinManagement",
+  "/eleves/reinscriptions": "Reinscription",
+  "/eleves/cartes-scolaires": "CarteScolaire",
+  "/eleves/scolarite": "ScolariteManager",
+  "/eleves/educmaster": "NoteConsultation",
+  "/eleves/orientation": "Reinscription",
+  "/enseignants": "TeacherManagement",
+  "/enseignants/cahiers-de-texte": "CahierDeTexte",
+  "/enseignants/liste": "MesEnseignants",
+  "/enseignants/repartition": "EnseignantParclasse",
+  "/enseignants/matieres": "subjectsManager",
+  "/enseignants/programmes-matieres": "ProgrammesMatieres",
+  "/parents": "ParentManagement",
+  "/parametres": "Parametre",
 };
 
-const showMessages = () => changeComponent("MessageComponent");
-const showNotifications = () => changeComponent("NotificationComponent");
-const showNoteRequests = () => changeComponent("NoteModificationRequests");
+const routeAutorisee = () => {
+  if (userType.value !== "administration" || !Array.isArray(modulesAutorises.value)) return true;
+  const segments = route.path.slice(BASE.length).split("/").filter(Boolean);
+  const modules = [1, 2]
+    .map((n) => MODULE_PAR_CHEMIN[`/${segments.slice(0, n).join("/")}`])
+    .filter(Boolean);
+  return modules.every((key) => modulesAutorises.value.includes(key));
+};
+
+watch(
+  () => route.path,
+  () => {
+    if (pret.value && !routeAutorisee()) router.replace({ path: BASE, query: queryConnexion() });
+  }
+);
+
+const showMessages = () => ouvrirSection("/messages");
+const showNotifications = () => ouvrirSection("/notifications");
+const showNoteRequests = () => ouvrirSection("/demandes-notes");
 // Appelé par NoteModificationRequests quand l'admin ouvre/traite la liste :
 // on coupe immédiatement toute l'alerte (son, clignotement, badge).
 const setNoteRequestCount = (count) => { handleNoteRequestCountChange(count); };
@@ -462,8 +558,10 @@ const fetchNoteRequestCount = async () => {
 let permissionInterval, notificationInterval, noteRequestInterval;
 
 onMounted(async () => {
-  etablissementId.value = parseInt(route.query.etablissement_id, 10);
-  etablissementNom.value = route.query.etablissement_nom || "";
+  // Adresse ouverte sans les paramètres de connexion : on les relit dans la
+  // session (posés par la page de connexion).
+  etablissementId.value = parseInt(route.query.etablissement_id || localStorage.getItem("etablissement_id"), 10);
+  etablissementNom.value = route.query.etablissement_nom || localStorage.getItem("etablissement_nom") || "";
 
   userType.value = localStorage.getItem("user_type") || "etablissement";
   if (userType.value === "administration") {
@@ -485,6 +583,8 @@ onMounted(async () => {
 
   // 1) Charger l'année scolaire
   await fetchAnneeScolaire();
+  if (!routeAutorisee()) router.replace({ path: BASE, query: queryConnexion() });
+  pret.value = true;
 
   // 2) Permissions + notif init
   fetchPermissions();
@@ -529,13 +629,21 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Fixation pour s'assurer que Header et Sidebar ne bougent pas */m,
+/* Fixation pour s'assurer que Header et Sidebar ne bougent pas */
 header.v-app-bar.v-app-bar--fixed,
 nav.v-navigation-drawer--fixed {
   z-index: 1000 !important;
 }
 
 /* Alerte "demande de modification de note" : doit être impossible à manquer */
+.admin-bar {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1) !important;
+}
+
+.admin-bar :deep(.v-toolbar-title) {
+  font-size: 17px;
+}
+
 .note-alert-shake {
   animation: note-alert-shake 0.6s ease-in-out infinite;
 }
@@ -557,5 +665,25 @@ nav.v-navigation-drawer--fixed {
   0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
   70% { box-shadow: 0 0 0 8px rgba(211, 47, 47, 0); }
   100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
+}
+</style>
+
+<style>
+/* =====================================================================
+   Espace administration — interface fine.
+   Règles non « scoped » mais limitées à .admin-space (racine de ce
+   gabarit) : titres des écrans plafonnés (20 px ordinateur, 18 px
+   téléphone), quel que soit le composant enfant qui les dessine.
+   ===================================================================== */
+.admin-space .main-content :is(.text-h1, .text-h2, .text-h3, .text-h4, .text-h5, .text-h6) {
+  font-size: 20px !important;
+  line-height: 1.3 !important;
+  letter-spacing: 0 !important;
+}
+
+@media (max-width: 600px) {
+  .admin-space .main-content :is(.text-h1, .text-h2, .text-h3, .text-h4, .text-h5, .text-h6) {
+    font-size: 18px !important;
+  }
 }
 </style>

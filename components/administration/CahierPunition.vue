@@ -1,12 +1,12 @@
 <template>
-  <v-container fluid class="pa-0 pa-sm-4 bg-grey-lighten-4 fill-height align-start">
+  <v-container fluid class="pa-0 pa-sm-3 bg-grey-lighten-4 fill-height align-start">
     <v-row justify="center" class="ma-0 w-100">
       <v-col cols="12" md="10" lg="8" class="pa-2">
         
-        <v-card class="mb-4 rounded-xl elevation-2 overflow-hidden" border>
-          <v-toolbar color="error-darken-1" flat>
+        <v-card class="mb-4 rounded-lg elevation-2 overflow-hidden" border>
+          <v-toolbar height="40" color="error-darken-1" flat>
             <v-icon start class="ms-4">mdi-gavel</v-icon>
-            <v-toolbar-title class="font-weight-bold text-body-1 text-sm-h6">
+            <v-toolbar-title class="font-weight-bold text-body-1 text-sm-h6 text-subtitle-1">
               {{ studentPrenom }} {{ studentNom }}
             </v-toolbar-title>
             <v-spacer></v-spacer>
@@ -23,7 +23,7 @@
             </v-btn>
           </v-toolbar>
 
-          <v-card-text class="pa-4 bg-white">
+          <v-card-text class="pa-3 bg-white">
             <div class="text-caption text-grey-darken-1 mb-2 text-uppercase font-weight-bold">
               Sélectionnez la période :
             </div>
@@ -31,7 +31,7 @@
               v-model="currentSemestre"
               color="error"
               align-tabs="start"
-              density="comfortable"
+              density="compact"
             >
               <v-tab
                 v-for="semestre in semestres"
@@ -45,13 +45,13 @@
           </v-card-text>
         </v-card>
 
-        <v-card v-if="loadingData" class="rounded-xl pa-3 pa-sm-10 text-center" border>
+        <v-card v-if="loadingData" class="rounded-lg pa-3 pa-sm-10 text-center" border>
           <v-progress-circular indeterminate color="error"></v-progress-circular>
           <div class="mt-2 text-grey">Chargement des punitions...</div>
         </v-card>
 
         <template v-else>
-          <v-card v-if="$vuetify.display.mdAndUp" class="rounded-xl elevation-2" border>
+          <v-card v-if="$vuetify.display.mdAndUp" class="rounded-lg elevation-2" border>
             <v-data-table
               :headers="headers"
               :items="punishmentData"
@@ -104,30 +104,30 @@
     </v-row>
 
     <v-dialog v-model="showAddPunishmentForm" max-width="500px" persistent>
-      <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="error" flat>
+      <v-card class="rounded-lg overflow-hidden">
+        <v-toolbar height="40" color="error" flat>
           <v-btn icon @click="showAddPunishmentForm = false"><v-icon>mdi-close</v-icon></v-btn>
-          <v-toolbar-title class="font-weight-bold">Saisie d'un incident</v-toolbar-title>
+          <v-toolbar-title class="font-weight-bold text-subtitle-1">Saisie d'un incident</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-2 pa-sm-6">
+        <v-card-text class="pa-2 pa-sm-3">
           <v-form ref="form" v-model="isFormValid">
-            <v-text-field v-model="newPunishment.auteur" label="Auteur" variant="outlined" density="comfortable" required />
+            <v-text-field v-model="newPunishment.auteur" label="Auteur" variant="outlined" density="compact" required />
             <v-row dense>
               <v-col cols="12" sm="6">
-                <v-text-field v-model="newPunishment.date" label="Date" type="date" variant="outlined" density="comfortable" required />
+                <v-text-field v-model="newPunishment.date" label="Date" type="date" variant="outlined" density="compact" required />
               </v-col>
               <v-col cols="12" sm="6">
-                <v-text-field v-model="newPunishment.heure" label="Heure" type="time" variant="outlined" density="comfortable" required />
+                <v-text-field v-model="newPunishment.heure" label="Heure" type="time" variant="outlined" density="compact" required />
               </v-col>
             </v-row>
-            <v-select v-model="newPunishment.punition" :items="punishmentOptions" label="Type" variant="outlined" density="comfortable" required />
-            <v-textarea v-model="newPunishment.motif" label="Motif" variant="outlined" density="comfortable" rows="3" required />
+            <v-select v-model="newPunishment.punition" :items="punishmentOptions" label="Type" variant="outlined" density="compact" required />
+            <v-textarea v-model="newPunishment.motif" label="Motif" variant="outlined" density="compact" rows="3" required />
           </v-form>
           <v-alert v-if="errorMessage" type="error" variant="tonal" class="mt-4 rounded-lg" density="compact">{{ errorMessage }}</v-alert>
         </v-card-text>
 
-        <v-card-actions class="pa-4 bg-grey-lighten-4">
+        <v-card-actions class="pa-3 bg-grey-lighten-4">
           <v-spacer></v-spacer>
           <v-btn variant="text" @click="showAddPunishmentForm = false">Annuler</v-btn>
           <v-btn color="error" variant="elevated" rounded="pill" :disabled="!isFormValid" @click="addPunishment">Enregistrer</v-btn>
@@ -151,9 +151,13 @@ export default {
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true }
   },
+  setup() {
+    // Période (onglet) affichée, conservée dans l'adresse (?periode=...).
+    const currentSemestre = useUrlState('periode', null)
+    return { currentSemestre }
+  },
   data() {
     return {
-      currentSemestre: null,
       semestres: [],
       punishmentData: [],
       loadingData: false,
@@ -189,7 +193,12 @@ export default {
         const response = await axios.get(`/api/semesters/${this.etablissementId}`);
         this.semestres = response.data.map(sem => ({ nom: sem.nom }));
         if (this.semestres.length > 0) {
-          this.currentSemestre = this.semestres[0].nom;
+          if (this.semestres.some(s => s.nom === this.currentSemestre)) {
+            // Période relue dans l'adresse : le watcher ne se déclenche pas.
+            this.fetchSemestreData();
+          } else {
+            this.currentSemestre = this.semestres[0].nom;
+          }
         }
       } catch (error) {
         console.error('Erreur semestres:', error);

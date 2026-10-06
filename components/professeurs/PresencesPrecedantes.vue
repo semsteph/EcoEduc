@@ -2,15 +2,6 @@
   <div class="page">
     <!-- Top bar -->
     <div class="topbar">
-      <v-btn
-        variant="tonal"
-        color="primary"
-        class="back-btn"
-        @click="$emit('back')"
-      >
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
 
       <div class="titles">
         <div class="title">
@@ -41,11 +32,11 @@
     </div>
 
     <!-- Content -->
-    <v-card class="card" elevation="10">
+    <v-card class="card" elevation="0">
       <v-card-text class="card-body">
         <!-- Loading -->
         <div v-if="loading" class="state">
-          <v-progress-circular indeterminate color="primary" size="42" />
+          <v-progress-circular indeterminate color="primary" size="28" />
           <div class="state-text">Chargement des données…</div>
         </div>
 
@@ -240,7 +231,7 @@ export default {
 }
 
 .back-btn {
-  border-radius: 14px !important;
+  border-radius: 10px!important;
   font-weight: 800;
 }
 
@@ -283,10 +274,10 @@ export default {
 
 /* Card */
 .card {
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   background: var(--bg);
   border: 1px solid var(--border);
-  box-shadow: 0 18px 60px rgba(11, 46, 74, 0.10) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08)!important;
 }
 
 .card-body {
@@ -329,7 +320,7 @@ export default {
 
 /* Table */
 .table {
-  border-radius: 14px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.06);
 }
@@ -366,6 +357,89 @@ export default {
   }
   .search-wrap {
     justify-content: stretch;
+  }
+}
+
+/* Interface fine */
+.page {
+  padding: 0;
+}
+
+.topbar {
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.back-btn {
+  border-radius: 8px !important;
+  font-weight: 700;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.subtitle {
+  font-size: 13px;
+}
+
+.chip {
+  font-weight: 700;
+}
+
+.card {
+  border-radius: 8px !important;
+}
+
+.card-body {
+  padding: 10px 12px !important;
+}
+
+.state {
+  padding: 16px 10px;
+  gap: 8px;
+}
+
+.meta {
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.table {
+  border-radius: 8px;
+}
+
+.cell-strong {
+  font-weight: 700;
+}
+
+.cell {
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 0;
+  }
+
+  .title {
+    font-size: 15px;
+  }
+
+  .subtitle {
+    font-size: 12.5px;
+  }
+
+  /* Pas de grand cadre autour du contenu sur téléphone. */
+  .card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .card-body {
+    padding: 0 !important;
   }
 }
 </style>

@@ -55,7 +55,7 @@ function selectRelevantProgression(programmeRows, currentActivity, currentTopic,
   return selected.map(({ date, activity }) => ({ date, activity }));
 }
 
-function buildPedagogicalContext({ eleve, test, programmeRows }) {
+function buildPedagogicalContext({ eleve, test, programmeRows, programmeTexte = '' }) {
   const { level, series } = deriveLevelAndSeries(test.promotionName || test.className);
   const currentActivity = String(test.activity || '').replace(/\s+/g, ' ').trim() || null;
   const currentTopic = extractExplicitTopic(currentActivity);
@@ -77,6 +77,8 @@ function buildPedagogicalContext({ eleve, test, programmeRows }) {
       topic: currentTopic,
     },
     priorProgression: selectRelevantProgression(programmeRows, currentActivity, currentTopic),
+    // Programme de la matière et avancement (séance rattachée au programme).
+    programmeTexte: programmeTexte || '',
   };
 }
 
@@ -107,7 +109,7 @@ Activité actuelle (prioritaire) :
 - ${topic}
 
 Progression antérieure utile (contexte, non prioritaire) :
-${progression}`;
+${progression}${context.programmeTexte ? `\n\n${context.programmeTexte}` : ''}`;
 }
 
 module.exports = {

@@ -1,5 +1,5 @@
 <template>
-  <v-app-bar dark app elevation="4" density="compact" class="app-toolbar">
+  <v-app-bar dark app elevation="0" density="compact" class="app-toolbar">
     <v-btn icon @click="$emit('toggleDrawer')" class="toolbar-btn" aria-label="Menu">
       <v-icon>mdi-menu</v-icon>
     </v-btn>
@@ -11,7 +11,10 @@
     <v-spacer></v-spacer>
 
     <v-btn icon @click="showMessages" class="toolbar-btn" aria-label="Messages">
-      <v-icon>mdi-message</v-icon>
+      <v-badge v-if="messagesNonLus > 0" :content="messagesNonLus" color="red" overlap>
+        <v-icon>mdi-message</v-icon>
+      </v-badge>
+      <v-icon v-else>mdi-message</v-icon>
     </v-btn>
 
     <v-btn icon @click="handleNotificationClick" class="toolbar-btn" aria-label="Notifications">
@@ -29,6 +32,7 @@
 </template>
 
 <script>
+import axios from "axios";
 import { EventBus } from "@/event-bus";
 
 export default {
@@ -38,6 +42,8 @@ export default {
   data() {
     return {
       badgeCount: 0,
+      messagesNonLus: 0,
+      pollMessages: null,
     };
   },
   mounted() {
@@ -45,36 +51,39 @@ export default {
 
     // ✅ On reçoit un nombre "sticky" déjà calculé côté parent
     EventBus.on("badge:set", this.setBadgeCount);
+    EventBus.on("messages:lus", this.messagesLus);
+    // Messagerie : nouvelles notes, changements d'emploi du temps.
+    this.compterMessages();
+    this.pollMessages = setInterval(this.compterMessages, 60000);
   },
   beforeUnmount() {
     EventBus.off("badge:set", this.setBadgeCount);
+    EventBus.off("messages:lus", this.messagesLus);
+    clearInterval(this.pollMessages);
   },
   watch: {
     initialBadgeCount(newVal) {
-      // ✅ ne jamais descendre automatiquement
-      const current = Number(this.badgeCount || 0);
-      const n = Number(newVal || 0);
-      this.badgeCount = Math.max(current, n);
+      this.badgeCount = Number(newVal || 0);
     },
   },
   methods: {
     setBadgeCount(value) {
-      // ✅ ne jamais descendre automatiquement
-      const current = Number(this.badgeCount || 0);
-      const n = Number(value || 0);
-      this.badgeCount = Math.max(current, n);
+      this.badgeCount = Number(value || 0);
+    },
+    async compterMessages() {
+      try {
+        const token = localStorage.getItem("token");
+        const { data } = await axios.get("/api/parent/messages/non-lus", { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        this.messagesNonLus = Number(data?.nonLus || 0);
+      } catch (e) { /* compteur indisponible : pas de badge */ }
+    },
+    messagesLus() {
+      this.messagesNonLus = 0;
     },
     showMessages() {
       this.$emit("showComponent", "MessagesComponent");
     },
     handleNotificationClick() {
-      // ✅ ici seulement on efface
-      this.badgeCount = 0;
-
-      // ✅ dit au parent : "j’ai ouvert les notifications"
-      this.$emit("notificationsOpened");
-
-      // ✅ navigue vers le composant notifications
       this.$emit("showComponent", "NotificationsComponent");
     },
   },

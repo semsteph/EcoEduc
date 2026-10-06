@@ -1,10 +1,10 @@
 <!-- ParentManagement.vue (COMPLET CORRIGÉ - HEADERS VISIBLES) -->
 <template>
-  <v-container class="pa-2 pa-sm-4 pa-md-8" fluid>
-    <v-card class="mx-auto rounded-xl elevation-2 overflow-hidden" max-width="1200">
-      <v-toolbar flat color="primary" dark class="px-2">
-        <v-icon large left>mdi-account-group-outline</v-icon>
-        <v-toolbar-title class="font-weight-bold text-h6 text-md-h5">
+  <v-container class="pa-1 pa-sm-3" fluid>
+    <v-card class="mx-auto rounded-lg elevation-0 overflow-hidden pm-shell" max-width="1200">
+      <v-toolbar flat color="primary" dark height="40" class="px-2">
+        <v-icon size="20" class="mr-2">mdi-account-group-outline</v-icon>
+        <v-toolbar-title class="font-weight-bold text-subtitle-1 text-subtitle-1">
           Gestion des Parents
         </v-toolbar-title>
         <v-spacer></v-spacer>
@@ -13,15 +13,15 @@
         </v-chip>
       </v-toolbar>
 
-      <v-card-text class="pt-6 px-4 px-sm-8">
-        <v-row align="center" class="mb-6">
-          <v-col cols="12" sm="auto">
+      <v-card-text class="pt-2 px-2 px-sm-3">
+        <v-row align="center" dense class="mb-1">
+          <v-col cols="6" sm="auto">
             <v-btn
               :color="showForm ? 'secondary' : 'primary'"
               @click="showForm ? (showForm = false) : openForm()"
               block
-              elevation="2"
-              class="rounded-lg px-2 px-sm-6"
+              elevation="0"
+              class="rounded-lg px-2 px-sm-3"
             >
               <v-icon left>{{ showForm ? 'mdi-view-list' : 'mdi-account-plus' }}</v-icon>
               {{ showForm ? 'Voir la liste' : 'Inscrire un Parent' }}
@@ -30,7 +30,7 @@
 
           <v-spacer></v-spacer>
 
-          <v-col v-if="!showForm" cols="12" sm="4" md="3">
+          <v-col v-if="!showForm" cols="6" sm="4" md="3">
             <v-text-field
               v-model="search"
               append-icon="mdi-magnify"
@@ -38,21 +38,20 @@
               single-line
               hide-details
               density="compact"
-              variant="filled"
-              rounded
+              variant="outlined"
               class="search-bar"
             />
           </v-col>
         </v-row>
 
-        <v-divider class="mb-6"></v-divider>
+        <v-divider class="mb-2"></v-divider>
 
         <v-expand-transition mode="out-in">
           <!-- FORM -->
           <div v-if="showForm" key="form">
             <v-form class="form-container" @submit.prevent="registerParent">
-              <v-sheet elevation="0" color="grey-lighten-4" class="pa-4 pa-md-6 rounded-lg border">
-                <h3 class="text-subtitle-1 font-weight-bold mb-4 primary--text">
+              <v-sheet elevation="0" color="grey-lighten-4" class="pa-3 pa-md-3 rounded-lg border">
+                <h3 class="text-subtitle-2 font-weight-bold mb-2 text-primary">
                   Informations du compte parent
                 </h3>
 
@@ -156,16 +155,16 @@
                   </v-col>
                 </v-row>
 
-                <v-row class="mt-4 px-2" justify="end">
-                  <v-btn color="grey-lighten-1" class="mr-3 rounded-lg" @click="cancelForm" variant="flat">
+                <v-row class="mt-2 px-2" justify="end">
+                  <v-btn color="grey-lighten-1" class="mr-2 rounded-lg" @click="cancelForm" variant="flat">
                     Annuler
                   </v-btn>
 
                   <v-btn
                     color="success"
                     type="submit"
-                    class="rounded-lg px-2 px-sm-8"
-                    elevation="2"
+                    class="rounded-lg px-2 px-sm-3"
+                    elevation="0"
                     :loading="saving"
                   >
                     <v-icon left>mdi-check-circle</v-icon>
@@ -262,15 +261,15 @@
         <v-card-title class="headline text-error">
           <v-icon color="error" left>mdi-alert-circle</v-icon> Attention
         </v-card-title>
-        <v-card-text class="py-4 text-body-1">
+        <v-card-text class="py-3 text-body-1">
           Voulez-vous vraiment supprimer le parent
           <strong>{{ parentToDelete ? `${parentToDelete.name} ${parentToDelete.firstName || ''}` : '' }}</strong> ?
           Cette action peut être irréversible.
         </v-card-text>
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
           <v-btn variant="text" @click="confirmDeleteDialog = false">Annuler</v-btn>
-          <v-btn color="error" variant="flat" @click="confirmDelete" class="px-2 px-sm-6 rounded-md" :loading="deleting">
+          <v-btn color="error" variant="flat" @click="confirmDelete" class="px-2 px-sm-3 rounded-md" :loading="deleting">
             Supprimer
           </v-btn>
         </v-card-actions>
@@ -281,11 +280,11 @@
     <v-dialog v-model="dialog" max-width="400">
       <v-card class="rounded-lg">
         <v-card-title class="text-h6 grey-lighten-4">Notification</v-card-title>
-        <v-card-text class="text-body-1 pt-6 text-center">
+        <v-card-text class="text-body-1 pt-3 text-center">
           {{ dialogMessage }}
         </v-card-text>
         <v-card-actions class="justify-center pb-4">
-          <v-btn color="primary" variant="flat" class="px-2 px-sm-8 rounded-lg" @click="dialog = false">OK</v-btn>
+          <v-btn color="primary" variant="flat" class="px-2 px-sm-3 rounded-lg" @click="dialog = false">OK</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -293,6 +292,7 @@
 </template>
 
 <script>
+import { ref } from "vue";
 import axios from "axios";
 
 export default {
@@ -303,10 +303,18 @@ export default {
     etablissementNom: { type: String, required: true },
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true },
+    // Faux quand le composant est affiché dans un dialogue (Inscription.vue) :
+    // le formulaire ouvert n'est alors pas écrit dans l'adresse.
+    garderDansAdresse: { type: Boolean, default: true },
+  },
+  setup(props) {
+    // Formulaire ouvert, gardé dans l'adresse : ?parent=nouveau (inscription)
+    // ou ?parent=<id> (modification de ce parent).
+    const formulaire = props.garderDansAdresse ? useUrlState("parent", null) : ref(null);
+    return { formulaire };
   },
   data() {
     return {
-      showForm: false,
       confirmDeleteDialog: false,
       dialog: false,
       dialogMessage: "",
@@ -339,7 +347,37 @@ export default {
       parents: [],
     };
   },
+  computed: {
+    showForm: {
+      get() {
+        return !!this.formulaire;
+      },
+      set(open) {
+        if (!open) this.formulaire = null;
+        else if (!this.formulaire) this.formulaire = "nouveau";
+      },
+    },
+  },
+  watch: {
+    // Précédent / suivant du navigateur : le formulaire suit l'adresse.
+    formulaire() {
+      this.restaurerFormulaire();
+    },
+  },
   methods: {
+    // Adresse « ?parent=<id> » (rechargement, lien) : on remplit le formulaire
+    // de modification avec ce parent une fois la liste chargée.
+    restaurerFormulaire() {
+      if (!this.formulaire || this.formulaire === "nouveau") {
+        if (this.newParent.id) this.resetForm(!!this.formulaire);
+        return;
+      }
+      if (Number(this.newParent.id) === Number(this.formulaire)) return;
+      const parent = this.parents.find((p) => Number(p.id) === Number(this.formulaire));
+      if (parent) this.editParent(parent);
+      else if (this.parents.length) this.formulaire = null;
+    },
+
     openForm() {
       this.resetForm(true);
     },
@@ -352,6 +390,11 @@ export default {
         })
         .then((response) => {
           this.parents = response.data || [];
+          if (this.formulaire && this.formulaire !== "nouveau") {
+            // Parent de l'adresse introuvable : retour à la liste.
+            if (!this.parents.length) this.formulaire = null;
+            else this.restaurerFormulaire();
+          }
         })
         .catch((error) => {
           this.showError("Erreur lors de la récupération des parents");
@@ -466,7 +509,7 @@ export default {
     editParent(parent) {
       this.newParent = { ...parent, password: "" };
       this.confirmPassword = "";
-      this.showForm = true;
+      this.formulaire = String(parent.id);
     },
 
     resetForm(open = false) {
@@ -511,20 +554,16 @@ export default {
 .custom-table :deep(.v-data-table__th) {
   background: #f2f4f7 !important;
   color: #111827 !important;
-  font-weight: 800 !important;
+  font-weight: 700 !important;
   text-transform: uppercase;
-  font-size: 0.78rem !important;
-  letter-spacing: 0.6px;
-  height: 52px !important;
+  font-size: 12px !important;
+  letter-spacing: 0.3px;
+  height: 36px !important;
 }
 
 /* ✅ cellules */
 .custom-table :deep(td) {
-  font-size: 0.92rem;
-}
-
-.search-bar :deep(.v-field__input) {
-  min-height: 40px !important;
+  font-size: 13.5px;
 }
 
 .custom-table :deep(tr:hover) {
@@ -534,11 +573,11 @@ export default {
 
 @media (max-width: 600px) {
   .v-toolbar-title {
-    font-size: 1.1rem !important;
+    font-size: 15px !important;
   }
   .custom-table :deep(td) {
     font-size: 13px !important;
-    padding: 8px !important;
+    padding: 0 8px !important;
   }
 }
 </style>

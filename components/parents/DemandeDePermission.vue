@@ -1,8 +1,5 @@
 <template>
   <v-container class="custom-table-container">
-    <v-btn icon @click="$emit('back')" class="back-button">
-      <v-icon>mdi-arrow-left</v-icon>
-    </v-btn>
     <v-toolbar flat class="toolbar">
       <v-spacer></v-spacer>
       <v-btn color="primary" @click="dialog = true" class="add-button">
@@ -11,7 +8,7 @@
     </v-toolbar>
     
     <div class="table-wrap">
-      <v-simple-table class="custom-table">
+      <v-table class="custom-table">
         <thead>
           <tr>
             <th class="custom-header">Date</th>
@@ -24,7 +21,7 @@
         </thead>
         <tbody>
           <tr v-for="permission in permissions" :key="permission.id" class="custom-row">
-            <td class="custom-cell">{{ formatDate(permission.Date) }}</td>
+            <td class="custom-cell">{{ periode(permission) }}</td>
             <td class="custom-cell">{{ permission.Motif }}</td>
             <td class="custom-cell">{{ permission.Duree }}</td>
             <td class="custom-cell">{{ permission.Contact }}</td>
@@ -43,7 +40,7 @@
             </td>
           </tr>
         </tbody>
-      </v-simple-table>
+      </v-table>
     </div>
 
     <v-dialog v-model="dialog" max-width="500px">
@@ -53,16 +50,27 @@
         </v-card-title>
         <v-card-text>
           <v-form ref="form" v-model="formValid">
-            <v-text-field v-model="newPermission.date" label="Date" type="date" required></v-text-field>
-            <v-text-field v-model="newPermission.motif" label="Motif" required></v-text-field>
-            <v-text-field v-model="newPermission.duree" label="Durée" required></v-text-field>
-            <v-text-field v-model="newPermission.contact" label="Contact" required></v-text-field>
+            <div class="perm-label">Absence de</div>
+            <v-btn-toggle v-model="newPermission.type" mandatory color="primary" variant="outlined" density="compact" class="perm-types mb-3">
+              <v-btn value="journee">Une journée</v-btn>
+              <v-btn value="jours">Plusieurs jours</v-btn>
+              <v-btn value="heures">Quelques heures</v-btn>
+            </v-btn-toggle>
+            <v-text-field v-model="newPermission.date" :label="newPermission.type === 'jours' ? 'Du' : 'Le'" type="date" :min="aujourdhui" variant="outlined" density="compact" />
+            <v-text-field v-if="newPermission.type === 'jours'" v-model="newPermission.dateFin" label="Au (inclus)" type="date" :min="newPermission.date || aujourdhui" variant="outlined" density="compact" />
+            <div v-if="newPermission.type === 'heures'" class="d-flex ga-2">
+              <v-text-field v-model="newPermission.heureDebut" label="De" type="time" variant="outlined" density="compact" />
+              <v-text-field v-model="newPermission.heureFin" label="À" type="time" variant="outlined" density="compact" />
+            </div>
+            <v-text-field v-model="newPermission.motif" label="Motif" variant="outlined" density="compact" />
+            <v-text-field v-model="newPermission.contact" label="Téléphone pour vous joindre" type="tel" variant="outlined" density="compact" />
+            <v-alert v-if="erreurForm" type="error" variant="tonal" density="compact">{{ erreurForm }}</v-alert>
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="blue darken-1" text @click="dialog = false">Annuler</v-btn>
-          <v-btn color="blue darken-1" text :disabled="!formValid" @click="addPermission">Ajouter</v-btn>
+          <v-btn color="primary" variant="flat" :disabled="!formulaireComplet" :loading="envoi" @click="addPermission">Envoyer la demande</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -72,7 +80,6 @@
       <v-btn color="white" text @click="snackbarVisible = false">Fermer</v-btn>
     </v-snackbar>
 
-    <v-btn block color="secondary" @click="$emit('back')" class="mt-4">Retour</v-btn>
   </v-container>
 </template>
 
@@ -106,12 +113,10 @@ export default {
       dialog: false, // Contrôle de l'affichage du dialogue
       formValid: false, // Validation du formulaire
       permissions: [], // Tableau qui va contenir les données récupérées
-      newPermission: {
-        date: '',
-        motif: '',
-        duree: '',
-        contact: ''
-      },
+      newPermission: { type: 'journee', date: '', dateFin: '', heureDebut: '', heureFin: '', motif: '', contact: '' },
+      erreurForm: '',
+      envoi: false,
+      aujourdhui: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
       snackbarVisible: false, // Contrôle de la visibilité du snackbar
       snackbarMessage: '', // Message du snackbar
       snackbarColor: '', // Couleur du snackbar
@@ -119,9 +124,17 @@ export default {
   
   },
 
+  computed: {
+    formulaireComplet() {
+      const p = this.newPermission;
+      if (!p.date || !p.motif.trim() || !p.contact.trim()) return false;
+      if (p.type === 'jours') return Boolean(p.dateFin);
+      if (p.type === 'heures') return Boolean(p.heureDebut && p.heureFin);
+      return true;
+    },
+  },
   mounted() {
     this.fetchPermissions();
-    console.log(this.anneeScolaireId);
   },
   methods: {
     fetchPermissions() {
@@ -139,42 +152,42 @@ export default {
     },
     formatDate(date) {
       const options = { year: 'numeric', month: 'long', day: 'numeric' };
-      return new Date(date).toLocaleDateString(undefined, options);
+      return new Date(date).toLocaleDateString('fr-FR', options);
+    },
+    // « 12 octobre 2026 », « du 12 au 14 octobre 2026 », « 12 octobre 2026, 8h00-10h00 ».
+    periode(p) {
+      if (p.date_fin && String(p.date_fin).slice(0, 10) !== String(p.Date).slice(0, 10)) return `du ${this.formatDate(p.Date)} au ${this.formatDate(p.date_fin)}`;
+      if (p.heure_debut && p.heure_fin) return `${this.formatDate(p.Date)}, ${String(p.heure_debut).slice(0, 5).replace(':', 'h')}-${String(p.heure_fin).slice(0, 5).replace(':', 'h')}`;
+      return this.formatDate(p.Date);
     },
   
-    addPermission() {
-      const token = localStorage.getItem('token');
-      axios.post(`/api/permissions/${this.childId}`, {
-        date: this.newPermission.date,
-        motif: this.newPermission.motif,
-        duree: this.newPermission.duree,
-        contact: this.newPermission.contact,
-        statut: 'En attente',
-        childId: this.childId,
-        etablissementId: this.etablissementId,
-        anneeScolaireId: this.anneeScolaireId
-
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then(response => {
-        this.permissions.push({
-          id: response.data.id,
-          Date: this.newPermission.date,
-          Motif: this.newPermission.motif,
-          Duree: this.newPermission.duree,
-          Contact: this.newPermission.contact,
-          Statut: 'En attente'
-        });
+    async addPermission() {
+      const p = this.newPermission;
+      this.erreurForm = '';
+      this.envoi = true;
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post(`/api/permissions/${this.childId}`, {
+          type: p.type,
+          date: p.date,
+          dateFin: p.type === 'jours' ? p.dateFin : null,
+          heureDebut: p.type === 'heures' ? p.heureDebut : null,
+          heureFin: p.type === 'heures' ? p.heureFin : null,
+          motif: p.motif,
+          contact: p.contact,
+          childId: this.childId,
+          etablissementId: this.etablissementId,
+          anneeScolaireId: this.anneeScolaireId,
+        }, { headers: { Authorization: `Bearer ${token}` } });
         this.dialog = false;
-        this.showSnackbar('Permission ajoutée avec succès', 'success');
+        this.showSnackbar('Demande envoyée à l\'établissement.', 'success');
         this.resetForm();
-      
-      })
-      .catch(error => {
-        console.error('Erreur lors de l\'ajout de la permission:', error);
-      });
- 
+        this.fetchPermissions();
+      } catch (error) {
+        this.erreurForm = error?.response?.data?.message || 'La demande n\'a pas pu être envoyée.';
+      } finally {
+        this.envoi = false;
+      }
     },
     deletePermission(permissionId) {
       const token = localStorage.getItem('token');
@@ -190,13 +203,8 @@ export default {
         });
     },
     resetForm() {
-      this.newPermission = {
-        date: '',
-        motif: '',
-        duree: '',
-        contact: ''
-      };
-      this.$refs.form.resetValidation();
+      this.newPermission = { type: 'journee', date: '', dateFin: '', heureDebut: '', heureFin: '', motif: '', contact: '' };
+      this.erreurForm = '';
     },
     goBack() {
       this.$emit("default", "InfoDetails");
@@ -211,11 +219,14 @@ export default {
 </script>
 
 <style>
+.perm-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+.perm-types { width: 100%; }
+.perm-types .v-btn { flex: 1; text-transform: none; font-size: 0.78rem; }
 .custom-table-container {
   padding: 20px;
   background-color: #f9f9f9;
   border-radius: 10px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   max-width: 100%;
   margin: 0 auto;
 }

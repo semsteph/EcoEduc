@@ -1,10 +1,10 @@
 <template>
   <v-app-bar
     app
-    elevation="6"
+    elevation="0"
     class="topbar"
     color="primary"
-    density="comfortable"
+    density="compact"
   >
     <!-- Drawer -->
     <v-btn
@@ -69,9 +69,7 @@ const props = defineProps({
 });
 
 const unreadCount = computed(() => {
-  return (props.notifications || []).filter(
-    (n) => n?.isRead === 0 || n?.isRead === false || n?.isRead === null || n?.isRead === undefined
-  ).length;
+  return (props.notifications || []).filter((n) => !n?.lu).length;
 });
 </script>
 
@@ -96,15 +94,15 @@ const unreadCount = computed(() => {
 }
 
 .logo {
-  width: 180px;
-  height: 44px;
+  width: 150px;
+  height: 34px;
 }
 
 /* Responsive: logo plus petit sur mobile */
 @media (max-width: 600px) {
   .logo {
-    width: 130px;
-    height: 40px;
+    width: 120px;
+    height: 32px;
   }
 }
 </style>

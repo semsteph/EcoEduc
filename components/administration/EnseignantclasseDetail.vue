@@ -1,13 +1,13 @@
 <template>
-  <v-container max-width="960" class="mx-auto pa-4">
+  <v-container max-width="960" class="mx-auto pa-3">
     <!-- Cas spécial : année scolaire manquante = afficher seulement ce message -->
-    <v-row v-if="isAnneeScolaireMissing" justify="center" class="mt-10">
+    <v-row v-if="isAnneeScolaireMissing" justify="center" class="mt-4">
       <v-col cols="12" md="8">
         <v-alert
           type="warning"
           border="left"
-          density="comfortable"
-          elevation="2"
+          density="compact"
+          elevation="0"
           rounded
           class="text-center"
         >
@@ -19,7 +19,7 @@
     <!-- Tout le reste ne s'affiche QUE si l'année scolaire existe -->
     <template v-else>
       <!-- Header -->
-      <v-row align="center" class="mb-6">
+      <v-row align="center" class="mb-3">
         <v-col cols="auto" class="d-flex align-center">
           <v-icon color="primary" size="28" class="mr-2">mdi-school</v-icon>
           <h3 class="font-weight-bold mb-0 text-title">
@@ -35,7 +35,7 @@
             :loading="loading"
             @click="fetchInfos"
             rounded
-            elevation="3"
+            elevation="0"
             class="text-none font-weight-semibold btn-small"
           >
             <v-icon left size="18">mdi-refresh</v-icon>
@@ -45,7 +45,7 @@
       </v-row>
 
       <!-- Spinner de chargement -->
-      <v-row justify="center" v-if="loading" class="my-12">
+      <v-row justify="center" v-if="loading" class="my-4">
         <v-progress-circular
           indeterminate
           color="primary"
@@ -60,10 +60,10 @@
         type="error"
         border="left"
         colored-border
-        density="comfortable"
-        elevation="3"
+        density="compact"
+        elevation="0"
         rounded
-        class="mb-6"
+        class="mb-3"
       >
         <v-icon left size="18">mdi-alert-circle</v-icon>
         {{ error }}
@@ -79,7 +79,7 @@
           md="4"
           class="d-flex"
         >
-          <v-card class="pa-4 elevation-3 rounded-lg card-hover w-100">
+          <v-card class="pa-3 elevation-3 rounded-lg card-hover w-100">
             <!-- Infos enseignant -->
             <div class="d-flex align-center mb-3">
               <v-icon color="#1565c0" size="22" class="mr-2">mdi-account</v-icon>
@@ -112,16 +112,6 @@
             <v-divider class="my-3" />
             <div class="d-flex justify-end">
               <v-icon
-                color="blue darken-2"
-                size="20"
-                class="mr-3 icon-action"
-                @click="modifierEnseignement(item)"
-                title="Modifier"
-              >
-                mdi-pencil
-              </v-icon>
-
-              <v-icon
                 color="red darken-2"
                 size="20"
                 class="icon-action"
@@ -140,10 +130,10 @@
         v-else-if="!loading && !enseignements.length && !error"
         type="info"
         border="left"
-        density="comfortable"
-        elevation="2"
+        density="compact"
+        elevation="0"
         rounded
-        class="mt-8"
+        class="mt-3"
       >
         <v-icon left color="#1565c0" size="18">mdi-information</v-icon>
         Aucune donnée trouvée pour cette classe et cette année scolaire.
@@ -174,6 +164,7 @@
 </template>
 
 <script>
+import axios from "axios";
 export default {
   name: "EnseignantclasseDetail",
   props: {
@@ -231,14 +222,7 @@ export default {
           url
         });
 
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          const message = await response.text();
-          throw new Error(message || "Erreur lors du chargement des enseignements");
-        }
-
-        const data = await response.json();
+        const { data } = await axios.get(url);
 
         console.log("📥 Données reçues :", data);
 
@@ -271,19 +255,12 @@ export default {
       this.dialog = false;
 
       try {
-        const res = await fetch(`/api/enseignements/delete`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            Enseignants_id,
-            Classes_id,
-            matiere_id
-          })
+        await axios.post(`/api/enseignements/delete`, {
+          Enseignants_id,
+          Classes_id,
+          matiere_id,
+          anneeScolaireId: this.anneeScolaireId,
         });
-
-        if (!res.ok) {
-          throw new Error("Erreur lors de la suppression");
-        }
 
         this.enseignements = this.enseignements.filter(
           (e) =>
@@ -309,7 +286,7 @@ export default {
 }
 
 .card-hover:hover {
-  box-shadow: 0 10px 20px rgba(21, 101, 192, 0.25);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   transform: translateY(-4px);
 }
 

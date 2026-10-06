@@ -35,8 +35,18 @@ const authenticateJWT = (req, res, next) => {
       return res.status(403).json({ message: msg });
     }
 
-    // decoded contient { id, etablissementId, role, iat, exp }
+    // Jeton de réinitialisation de mot de passe : jamais une session.
+    if (decoded.purpose) {
+      return res.status(403).json({ message: "Token invalide" });
+    }
+    // decoded contient { id, etablissementId, role, iat, exp }. Le jeton
+    // enseignant porte « etablissement » : on expose aussi etablissementId
+    // pour que toutes les routes lisent l'école au même endroit.
     req.user = decoded;
+    if (req.user.etablissementId === undefined && decoded.etablissement !== undefined) {
+      req.user.etablissementId = decoded.etablissement;
+      req.user.role = req.user.role || 'enseignant';
+    }
     next();
   });
 };
@@ -63,6 +73,12 @@ const requireAdminStaff = (req, res, next) => {
 // renvoie l'élève si oui, sinon répond 404/403 et renvoie null.
 // Même pattern que getEleveDuParentOr403() dans routes/scolarite.routes.cjs.
 async function getEleveDuParentOr403(req, res, eleveId) {
+  // Un jeton enseignant porte aussi un « id » : sans ce contrôle, un
+  // enseignant n° 5 lisait les enfants du parent n° 5.
+  if (!req.user || req.user.role !== 'parent') {
+    res.status(403).json({ message: "Accès réservé aux parents." });
+    return null;
+  }
   const [rows] = await db.query(
     `SELECT id, nom, prenom, classe_id, etablissement_id, Annee_scolaire_id, Parents_id
      FROM eleve WHERE id = ?`,

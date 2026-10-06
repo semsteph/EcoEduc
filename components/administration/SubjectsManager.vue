@@ -1,14 +1,14 @@
 <template>
-  <v-card class="rounded-xl shadow-soft">
-    <v-toolbar :color="toolbarColor" dark flat>
-      <v-toolbar-title class="font-weight-bold">{{ title }}</v-toolbar-title>
+  <v-card class="rounded-lg shadow-soft">
+    <v-toolbar height="40" :color="toolbarColor" dark flat>
+      <v-toolbar-title class="font-weight-bold text-subtitle-1">{{ title }}</v-toolbar-title>
       <v-spacer />
       <v-btn icon @click="$emit('close')">
         <v-icon>mdi-close</v-icon>
       </v-btn>
     </v-toolbar>
 
-    <v-card-text class="pa-2 pa-sm-6">
+    <v-card-text class="pa-2 pa-sm-3">
       <v-row dense class="mb-4">
         <v-col cols="12" md="6">
           <v-text-field
@@ -88,12 +88,12 @@
 
     <!-- ✅ Dialog suppression matière -->
     <v-dialog v-model="deleteSubjectDialog" max-width="480px">
-      <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="red" dark flat>
-          <v-toolbar-title class="font-weight-bold">Supprimer la matière</v-toolbar-title>
+      <v-card class="rounded-lg overflow-hidden">
+        <v-toolbar height="40" color="red" dark flat>
+          <v-toolbar-title class="font-weight-bold text-subtitle-1">Supprimer la matière</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-2 pa-sm-6">
+        <v-card-text class="pa-2 pa-sm-3">
           <v-alert type="warning" outlined class="mb-4">Cette action est irréversible.</v-alert>
           <p class="mb-0">
             Confirmer la suppression de : <strong>{{ subjectToDelete?.nom }}</strong> ?
@@ -101,13 +101,13 @@
         </v-card-text>
 
         <v-divider />
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-btn text @click="deleteSubjectDialog = false">Annuler</v-btn>
           <v-spacer />
           <v-btn
             color="red"
             dark
-            class="rounded-lg px-2 px-sm-6"
+            class="rounded-lg px-2 px-sm-3"
             :loading="loadingDeleteSubject"
             @click="deleteSubjectInline"
           >
@@ -119,19 +119,19 @@
 
     <!-- ✅ Dialog SUCCÈS -->
     <v-dialog v-model="successDialog" max-width="520px" persistent>
-      <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar :color="toolbarColor" dark flat>
-          <v-toolbar-title class="font-weight-bold">Succès</v-toolbar-title>
+      <v-card class="rounded-lg overflow-hidden">
+        <v-toolbar height="40" :color="toolbarColor" dark flat>
+          <v-toolbar-title class="font-weight-bold text-subtitle-1">Succès</v-toolbar-title>
           <v-spacer />
           <v-btn icon @click="successDialog = false">
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-toolbar>
 
-        <v-card-text class="pa-2 pa-sm-6">
+        <v-card-text class="pa-2 pa-sm-3">
           <div class="d-flex align-start">
-            <v-avatar color="success" size="44" class="mr-4">
-              <v-icon color="white">mdi-check</v-icon>
+            <v-avatar color="success" size="32" class="mr-2">
+              <v-icon size="18" color="white">mdi-check</v-icon>
             </v-avatar>
 
             <div style="flex: 1;">
@@ -142,9 +142,9 @@
         </v-card-text>
 
         <v-divider />
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer />
-          <v-btn :color="toolbarColor" dark class="rounded-lg px-2 px-sm-6" @click="successDialog = false">
+          <v-btn :color="toolbarColor" dark class="rounded-lg px-2 px-sm-3" @click="successDialog = false">
             OK
           </v-btn>
         </v-card-actions>
@@ -153,59 +153,34 @@
 
     <!-- ✅ Dialog ERREUR (messages clairs + détails localhost optionnels) -->
     <v-dialog v-model="errorDialog" max-width="560px">
-      <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="red" dark flat>
-          <v-toolbar-title class="font-weight-bold">Erreur</v-toolbar-title>
+      <v-card class="rounded-lg overflow-hidden">
+        <v-toolbar height="40" color="red" dark flat>
+          <v-toolbar-title class="font-weight-bold text-subtitle-1">Erreur</v-toolbar-title>
           <v-spacer />
           <v-btn icon @click="errorDialog = false">
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-toolbar>
 
-        <v-card-text class="pa-2 pa-sm-6">
+        <v-card-text class="pa-2 pa-sm-3">
           <div class="d-flex align-start">
-            <v-avatar color="red" size="44" class="mr-4">
-              <v-icon color="white">mdi-alert-circle</v-icon>
+            <v-avatar color="red" size="32" class="mr-2">
+              <v-icon size="18" color="white">mdi-alert-circle</v-icon>
             </v-avatar>
 
             <div style="flex: 1;">
               <div class="text-subtitle-1 font-weight-bold mb-1">{{ errorTitle }}</div>
               <div class="text-body-2" style="white-space: pre-line;">{{ errorMessage }}</div>
 
-              <v-divider class="my-4" />
 
-              <!-- ✅ Détails techniques (localhost) -->
-              <v-expansion-panels flat>
-                <v-expansion-panel>
-                  <v-expansion-panel-title>
-                    <v-icon start>mdi-information-outline</v-icon>
-                    Détails techniques (localhost)
-                  </v-expansion-panel-title>
-                  <v-expansion-panel-text>
-                    <v-chip class="mr-2 mb-2" label>
-                      Status: {{ errorDetails.status ?? '—' }}
-                    </v-chip>
-                    <v-chip class="mr-2 mb-2" label>
-                      Code: {{ errorDetails.code ?? '—' }}
-                    </v-chip>
-                    <v-chip class="mr-2 mb-2" label>
-                      URL: {{ errorDetails.url ?? '—' }}
-                    </v-chip>
-
-                    <v-alert v-if="errorDetails.raw" type="info" outlined class="mt-3">
-                      <div style="white-space: pre-line;">{{ errorDetails.raw }}</div>
-                    </v-alert>
-                  </v-expansion-panel-text>
-                </v-expansion-panel>
-              </v-expansion-panels>
             </div>
           </div>
         </v-card-text>
 
         <v-divider />
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer />
-          <v-btn color="red" dark class="rounded-lg px-2 px-sm-6" @click="errorDialog = false">
+          <v-btn color="red" dark class="rounded-lg px-2 px-sm-3" @click="errorDialog = false">
             Fermer
           </v-btn>
         </v-card-actions>
@@ -252,10 +227,10 @@ export default {
       errorMessage: "",
       errorDetails: { status: null, code: null, url: null, raw: "" },
 
+      // Seulement le nom de la matière (pas d'identifiant interne).
       subjectHeaders: [
-        { text: "ID", value: "id", width: 80 },
-        { text: "Matière", value: "nom" },
-        { text: "Actions", value: "actions", sortable: false, align: "end", width: 120 },
+        { title: "Matière", key: "nom" },
+        { title: "Actions", key: "actions", sortable: false, align: "end", width: 120 },
       ],
     };
   },
@@ -441,6 +416,6 @@ export default {
 
 <style scoped>
 .shadow-soft {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08)!important;
 }
 </style>

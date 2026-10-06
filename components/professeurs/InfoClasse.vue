@@ -10,7 +10,7 @@
       </div>
     </div>
 
-    <v-row>
+    <v-row dense>
       <v-col
         v-for="(item, index) in items"
         :key="index"
@@ -18,7 +18,7 @@
         sm="6"
         md="4"
       >
-        <v-card class="ic-card" elevation="6" @click="navigateTo(item.route)">
+        <v-card class="ic-card" elevation="0" @click="navigateTo(item.route)">
           <div class="ic-card-top" :class="item.topClass">
             <v-icon color="white">{{ item.icon }}</v-icon>
           </div>
@@ -35,11 +35,7 @@
       </v-col>
     </v-row>
 
-    <div class="text-center mt-6">
-      <v-btn color="primary" class="ic-back" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
+    <div class="text-center mt-3">
     </div>
   </v-container>
 </template>
@@ -107,114 +103,135 @@ function navigateTo(view) {
 </script>
 
 <style scoped>
+/* Interface fine : pas de marge de conteneur en plus de la section. */
 .ic-wrap {
-  padding-top: 12px;
-  padding-bottom: 18px;
+  padding: 0 !important;
 }
 
 .ic-header {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(25, 118, 210, 0.12);
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .ic-title {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  font-weight: 950;
+  gap: 4px;
+  font-weight: 800;
   color: #0b2e4a;
-  font-size: 1.05rem;
+  font-size: 15px;
+}
+
+.ic-subtitle {
+  margin-top: 2px;
+  color: #546e7a;
+  font-size: 13px;
+  line-height: 1.3;
 }
 
 .ic-class {
   color: #1976d2;
 }
 
-.ic-subtitle {
-  margin-top: 6px;
-  color: #546e7a;
-  font-size: 0.92rem;
-  line-height: 1.2rem;
-}
-
-.ic-card {
-  border-radius: 18px !important;
-  overflow: hidden;
-  position: relative;
-  border: 1px solid rgba(25, 118, 210, 0.12);
-  background: rgba(255, 255, 255, 0.95);
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.ic-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 60px rgba(11, 46, 74, 0.12);
-}
-
-.ic-card-top {
-  height: 44px;
-  display: flex;
-  align-items: center;
-  padding: 0 14px;
-}
-
 .top-blue {
-  background: linear-gradient(90deg, #1976d2, #0b2e4a);
+  background: linear-gradient(135deg, #1976d2, #0b2e4a);
 }
 
 .top-blue-dark {
-  background: linear-gradient(90deg, #0b2e4a, #1976d2);
-}
-
-.ic-card-body {
-  padding: 14px;
-  padding-right: 56px;
-}
-
-.ic-card-title {
-  font-weight: 950;
-  color: #0b2e4a;
-  font-size: 1.02rem;
-  margin-bottom: 6px;
-}
-
-.ic-card-desc {
-  color: #607d8b;
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-
-.ic-arrow {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: rgba(25, 118, 210, 0.10);
-  border: 1px solid rgba(25, 118, 210, 0.14);
+  background: linear-gradient(135deg, #0b2e4a, #1976d2);
 }
 
 .ic-back {
   border-radius: 999px !important;
-  font-weight: 900;
+  font-weight: 700;
+}
+
+/* Carte d'outil fine : une ligne (pastille dégradée 32 px, texte, flèche)
+   au lieu d'un grand bandeau dégradé de 44 px au-dessus du texte. */
+.ic-card {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(25, 118, 210, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ic-card:hover {
+  border-color: rgba(25, 118, 210, 0.4);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.ic-card-top {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.ic-card-top :deep(.v-icon) {
+  font-size: 18px !important;
+}
+
+.ic-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 !important;
+}
+
+.ic-card-title {
+  font-weight: 800;
+  color: #0b2e4a;
+  font-size: 14px;
+  line-height: 1.3;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ic-card-desc {
+  display: flex;
+  align-items: center;
+  color: #607d8b;
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+.ic-arrow {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(25, 118, 210, 0.08);
+  border: 1px solid rgba(25, 118, 210, 0.14);
 }
 
 @media (max-width: 600px) {
+  /* Téléphone : l'en-tête n'est plus un cadre, juste un titre. */
   .ic-header {
-    padding: 12px;
-    border-radius: 14px;
-  }
-  .ic-card {
-    border-radius: 16px !important;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 8px;
   }
 }
 </style>

@@ -24,7 +24,7 @@
       </v-btn>
     </div>
 
-    <v-alert v-if="error" type="error" variant="tonal" class="mb-6" border="start" density="comfortable">
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-3" border="start" density="compact">
       {{ error }}
     </v-alert>
 
@@ -37,11 +37,11 @@
     <v-card
       v-else-if="!error && totaux.nombreEnfants === 0"
       class="empty-card"
-      elevation="10"
+      elevation="0"
     >
       <v-card-text class="empty-content">
         <div class="empty-icon">
-          <v-icon size="40">mdi-account-child-outline</v-icon>
+          <v-icon size="20">mdi-account-child-outline</v-icon>
         </div>
         <div class="empty-title">Aucun enfant rattaché à ce compte</div>
         <div class="empty-subtitle">
@@ -53,11 +53,11 @@
     <template v-else>
       <!-- KPI -->
       <v-row>
-        <v-col cols="12" sm="6" md="3" v-for="(kpi, i) in kpis" :key="i">
-          <v-card class="kpi-card" elevation="8">
+        <v-col cols="6" md="3" class="kpi-col" v-for="(kpi, i) in kpis" :key="i">
+          <v-card class="kpi-card" elevation="0">
             <div class="kpi-inner">
-              <v-avatar :color="kpi.color" variant="tonal" size="46" class="mr-3">
-                <v-icon :color="kpi.color">{{ kpi.icon }}</v-icon>
+              <v-avatar :color="kpi.color" variant="tonal" size="32" class="mr-2 kpi-avatar">
+                <v-icon :color="kpi.color" size="18">{{ kpi.icon }}</v-icon>
               </v-avatar>
               <div class="kpi-text">
                 <div class="kpi-label">{{ kpi.title }}</div>
@@ -74,15 +74,13 @@
         Mes enfants
       </div>
 
-      <v-row>
+      <v-row dense>
         <v-col cols="12" sm="6" md="4" v-for="enfant in enfants" :key="enfant.id">
-          <v-card class="child-card" elevation="8">
+          <v-card class="child-card" elevation="0">
             <div class="child-card-accent" aria-hidden="true"></div>
             <v-card-text class="child-card-body">
               <div class="child-card-head">
-                <div class="child-avatar">
-                  <v-icon color="primary">mdi-account</v-icon>
-                </div>
+                <EleveAvatar :photo="enfant.photo || ''" :prenom="enfant.prenom" :nom="enfant.nom" :size="48" />
                 <div class="child-name-wrap">
                   <div class="child-name">{{ enfant.prenom }} {{ enfant.nom }}</div>
                   <div class="child-classe">{{ enfant.classe || "Classe" }}</div>
@@ -122,7 +120,7 @@
                 </div>
                 <v-progress-linear
                   :model-value="enfant.scolarite.tauxRecouvrement"
-                  height="8"
+                  height="6"
                   rounded
                   :color="recouvrementColor(enfant.scolarite.tauxRecouvrement)"
                   bg-color="grey-lighten-3"
@@ -149,15 +147,15 @@
       </v-row>
 
       <!-- Charts row 1 -->
-      <v-row class="mt-2">
+      <v-row dense class="mt-1">
         <v-col cols="12" md="6">
-          <v-card class="chart-card" elevation="8">
+          <v-card class="chart-card" elevation="0">
             <div class="chart-title">Moyenne générale par enfant</div>
             <ClientOnly>
               <apexchart
                 v-if="hasNotes"
                 type="bar"
-                height="240"
+                height="210"
                 :options="moyenneChartOptions"
                 :series="moyenneChartSeries"
               />
@@ -167,13 +165,13 @@
         </v-col>
 
         <v-col cols="12" md="6">
-          <v-card class="chart-card" elevation="8">
+          <v-card class="chart-card" elevation="0">
             <div class="chart-title">Taux de présence par enfant</div>
             <ClientOnly>
               <apexchart
                 v-if="hasPresence"
                 type="bar"
-                height="240"
+                height="210"
                 :options="presenceChartOptions"
                 :series="presenceChartSeries"
               />
@@ -184,15 +182,15 @@
       </v-row>
 
       <!-- Charts row 2 -->
-      <v-row class="mt-2">
+      <v-row dense class="mt-1">
         <v-col cols="12" md="6">
-          <v-card class="chart-card" elevation="8">
+          <v-card class="chart-card" elevation="0">
             <div class="chart-title">Situation financière par enfant</div>
             <ClientOnly>
               <apexchart
                 v-if="hasFinance"
                 type="bar"
-                height="240"
+                height="210"
                 :options="financeChartOptions"
                 :series="financeChartSeries"
               />
@@ -202,12 +200,12 @@
         </v-col>
 
         <v-col cols="12" md="6">
-          <v-card class="chart-card" elevation="8">
+          <v-card class="chart-card" elevation="0">
             <div class="chart-title">Absences déclarées par mois</div>
             <ClientOnly>
               <apexchart
                 type="bar"
-                height="240"
+                height="210"
                 :options="absencesChartOptions"
                 :series="absencesChartSeries"
               />
@@ -217,14 +215,14 @@
       </v-row>
 
       <!-- Chart row 3 : moyennes par semestre -->
-      <v-row class="mt-2 mb-4" v-if="moyennesParSemestre.length > 1">
+      <v-row dense class="mt-1 mb-2" v-if="moyennesParSemestre.length > 1">
         <v-col cols="12">
-          <v-card class="chart-card" elevation="8">
+          <v-card class="chart-card" elevation="0">
             <div class="chart-title">Évolution de la moyenne par semestre</div>
             <ClientOnly>
               <apexchart
                 type="line"
-                height="260"
+                height="220"
                 :options="semestreChartOptions"
                 :series="semestreChartSeries"
               />
@@ -510,7 +508,7 @@ const semestreChartOptions = computed(() => ({
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .pdash-title {
@@ -522,9 +520,9 @@ const semestreChartOptions = computed(() => ({
 }
 
 .pdash-subtitle {
-  margin-top: 6px;
+  margin-top: 2px;
   color: #455a64;
-  font-size: 0.92rem;
+  font-size: 0.86rem;
 }
 
 .pill {
@@ -538,7 +536,7 @@ const semestreChartOptions = computed(() => ({
 
 /* Empty state */
 .empty-card {
-  border-radius: 20px !important;
+  border-radius: 10px!important;
   border: 1px solid rgba(25, 118, 210, 0.12);
   background: rgba(255, 255, 255, 0.9);
   max-width: 560px;
@@ -546,12 +544,12 @@ const semestreChartOptions = computed(() => ({
 }
 .empty-content {
   text-align: center;
-  padding: 26px 18px;
+  padding: 12px;
 }
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
@@ -562,7 +560,7 @@ const semestreChartOptions = computed(() => ({
 .empty-title {
   font-weight: 900;
   color: #0b2e4a;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
 }
 .empty-subtitle {
   margin-top: 4px;
@@ -572,10 +570,11 @@ const semestreChartOptions = computed(() => ({
 
 /* KPI */
 .kpi-card {
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   border: 1px solid rgba(25, 118, 210, 0.12);
   background: rgba(255, 255, 255, 0.92);
-  padding: 16px;
+  padding: 8px 10px;
+  height: 100%;
 }
 .kpi-inner {
   display: flex;
@@ -585,7 +584,8 @@ const semestreChartOptions = computed(() => ({
   min-width: 0;
 }
 .kpi-label {
-  font-size: 0.76rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
   font-weight: 800;
   color: #607d8b;
   text-transform: uppercase;
@@ -594,8 +594,9 @@ const semestreChartOptions = computed(() => ({
 .kpi-value {
   font-weight: 950;
   color: #0b2e4a;
-  font-size: 1.25rem;
-  margin-top: 2px;
+  font-size: 1.05rem;
+  margin-top: 1px;
+  overflow-wrap: anywhere;
 }
 
 /* Section title */
@@ -604,25 +605,25 @@ const semestreChartOptions = computed(() => ({
   align-items: center;
   font-weight: 900;
   color: #0b2e4a;
-  margin: 20px 4px 12px;
-  font-size: 1.02rem;
+  margin: 14px 2px 8px;
+  font-size: 0.98rem;
 }
 
 /* Child card */
 .child-card {
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   overflow: hidden;
   border: 1px solid rgba(25, 118, 210, 0.12);
   background: rgba(255, 255, 255, 0.92);
   height: 100%;
 }
 .child-card-accent {
-  height: 5px;
+  height: 3px;
   width: 100%;
   background: linear-gradient(90deg, #1976d2, rgba(25, 118, 210, 0.22), #1976d2);
 }
 .child-card-body {
-  padding: 16px !important;
+  padding: 10px 12px !important;
 }
 .child-card-head {
   display: flex;
@@ -630,9 +631,9 @@ const semestreChartOptions = computed(() => ({
   gap: 10px;
 }
 .child-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   background: rgba(25, 118, 210, 0.1);
@@ -657,15 +658,15 @@ const semestreChartOptions = computed(() => ({
 .child-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 14px 0 12px;
+  gap: 6px;
+  margin: 10px 0 8px;
 }
 .child-stat {
   text-align: center;
   background: rgba(25, 118, 210, 0.05);
   border: 1px solid rgba(25, 118, 210, 0.1);
-  border-radius: 12px;
-  padding: 8px 4px;
+  border-radius: 8px;
+  padding: 4px;
 }
 .stat-label {
   font-size: 0.7rem;
@@ -716,22 +717,22 @@ const semestreChartOptions = computed(() => ({
 
 /* Chart card */
 .chart-card {
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   border: 1px solid rgba(25, 118, 210, 0.12);
   background: rgba(255, 255, 255, 0.92);
-  padding: 18px;
+  padding: 10px 12px;
   height: 100%;
 }
 .chart-title {
   font-weight: 900;
   color: #0b2e4a;
-  margin-bottom: 12px;
-  font-size: 0.98rem;
+  margin-bottom: 6px;
+  font-size: 0.92rem;
 }
 .chart-empty {
   text-align: center;
   color: #607d8b;
-  padding: 40px 10px;
+  padding: 20px 10px;
   font-weight: 700;
 }
 
@@ -741,8 +742,9 @@ const semestreChartOptions = computed(() => ({
 }
 
 @media (max-width: 600px) {
-  .pdash { padding: 16px 12px; }
+  .pdash { padding: 10px 8px; }
   .child-stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  .chart-card { padding: 14px; }
+  .chart-card { padding: 8px 10px; }
+  .kpi-value { font-size: 0.98rem; }
 }
 </style>

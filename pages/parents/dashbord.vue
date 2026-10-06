@@ -93,6 +93,16 @@
               <v-list-item-title>Contacter l’administration</v-list-item-title>
             </v-list-item>
 
+            <v-list-item
+              :active="currentComponent === 'GuideUtilisateur'"
+              @click="showComponent('GuideUtilisateur')"
+              class="drawer-item"
+              rounded="lg"
+            >
+              <template #prepend><v-icon>mdi-help-circle-outline</v-icon></template>
+              <v-list-item-title>Guide d’utilisation</v-list-item-title>
+            </v-list-item>
+
             <v-divider class="my-3 drawer-divider" />
 
             <div class="drawer-section">Compte</div>
@@ -118,14 +128,19 @@
       <div class="page-shell">
         <div class="content-container">
           <client-only>
-            <component
-              :is="currentComponent"
-              v-if="currentComponent"
+            <!-- Fil d'Ariane et flèche de retour, en haut et en bas de chaque écran -->
+            <PageNav :crumbs="crumbs" position="top" />
+
+            <!-- Écran courant = route enfant (pages/parents/dashbord/...) -->
+            <NuxtPage
+              v-if="ready"
               :etablissementId="etablissementId"
               :anneeScolaireId="anneeScolaireId"
               :initialBadgeCount="initialBadgeCount"
               @showComponent="showComponent"
             />
+
+            <PageNav :crumbs="crumbs" position="bottom" />
           </client-only>
         </div>
       </div>
@@ -142,32 +157,81 @@ import axios from "axios";
 import { EventBus } from "@/event-bus";
 
 import ToolbarComponent from "@/components/parents/ToolbarComponent.vue";
-import ChildrenList from "@/components/parents/ChildrenList.vue";
-import Acceuil from "@/components/parents/Acceuil.vue";
-import DashboardHome from "@/components/parents/DashboardHome.vue";
 import LogoutDialog from "@/components/parents/LogoutDialog.vue";
-import NotificationsComponent from "@/components/parents/NotificationsComponent.vue";
-import MessagesComponent from "@/components/parents/MessagesComponent.vue";
+import PageNav from "@/components/PageNav.vue";
+import { providePageNav, buildCrumbs, slugToName } from "@/composables/usePageNav";
+
+// Chaque section du tableau de bord a sa propre route (pages/parents/dashbord/...).
+// Les composants émettent encore « showComponent » avec le nom de la section :
+// on le traduit en route.
+const BASE_PATH = "/parents/dashbord";
+
+// Libellés du fil d'Ariane de l'espace parents.
+const CRUMB_LABELS = {
+  accueil: "Accueil",
+  enfants: "Mes enfants",
+  notifications: "Notifications",
+  messages: "Messages",
+  contact: "Contacter l'administration",
+  guide: "Guide d'utilisation",
+  notes: "Notes",
+  bulletin: "Bulletin",
+  presence: "Présence",
+  conduite: "Conduite",
+  scolarite: "Scolarité",
+  programme: "Emploi du temps",
+  permission: "Demande de permission",
+  activite: "Activité",
+  devoirs: "Devoirs",
+  assistances: "Assistants IA",
+};
+
+function parentCrumbLabel(segment, previous) {
+  // /enfants/:enfant → prénom de l'enfant ; /assistances/:matiereId → conversation.
+  if (previous[previous.length - 1] === "enfants") return slugToName(segment);
+  if (previous[previous.length - 1] === "assistances") return "Conversation";
+  return CRUMB_LABELS[segment] || null;
+}
+const SECTION_PATHS = {
+  DashboardHome: BASE_PATH,
+  Acceuil: `${BASE_PATH}/accueil`,
+  ChildrenList: `${BASE_PATH}/enfants`,
+  NotificationsComponent: `${BASE_PATH}/notifications`,
+  MessagesComponent: `${BASE_PATH}/messages`,
+  ContactAdmin: `${BASE_PATH}/contact`,
+  GuideUtilisateur: `${BASE_PATH}/guide`,
+};
 
 export default {
   components: {
     ToolbarComponent,
-    ChildrenList,
-    Acceuil,
-    DashboardHome,
     LogoutDialog,
-    NotificationsComponent,
-    MessagesComponent,
+    PageNav,
   },
+
   setup() {
     const router = useRouter();
     const route = useRoute();
+    const pageNav = providePageNav();
+    const crumbs = computed(() =>
+      buildCrumbs(route.path, BASE_PATH, "Tableau de bord", parentCrumbLabel, { labels: pageNav.labels })
+    );
 
     const API_BASE = "";
 
     const drawer = ref(false);
     const logoutDialogVisible = ref(false);
-    const currentComponent = ref("DashboardHome");
+    // Section active du menu, déduite de la route courante.
+    const currentComponent = computed(() => {
+      const path = route.path.replace(/\/+$/, "");
+      const found = Object.entries(SECTION_PATHS)
+        .filter(([name]) => name !== "DashboardHome")
+        .find(([, p]) => path === p || path.startsWith(`${p}/`));
+      return found ? found[0] : "DashboardHome";
+    });
+    // Les écrans ont besoin de l'année scolaire : on attend qu'elle soit chargée
+    // (au rechargement, l'écran est affiché d'emblée, sans passer par un clic).
+    const ready = ref(false);
 
     const etablissementId = ref(null);
     const anneeScolaireId = ref(null);
@@ -191,14 +255,6 @@ export default {
     const getToken = () =>
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-    const decodeJwtPayload = (token) => {
-      try {
-        return JSON.parse(atob(token.split(".")[1]));
-      } catch {
-        return null;
-      }
-    };
-
     const getParentIdFromToken = () => {
       const token = getToken();
       if (!token) return null;
@@ -208,53 +264,29 @@ export default {
 
     const toBool = (v) => v === true || v === 1 || v === "1";
 
-    // ✅ IMPORTANT: on n'écrase JAMAIS le badge vers 0 automatiquement
+    // Badge de la cloche : nombre exact de notifications non lues (alertes
+    // et messages). Il ne baisse que quand le parent les a vraiment lues.
     const applyStickyBadge = (serverUnread) => {
-      const current = Number(initialBadgeCount.value || 0);
-      const n = Number(serverUnread || 0);
-
-      // on ne descend jamais automatiquement
-      const next = Math.max(current, n);
-      initialBadgeCount.value = next;
-
-      // push vers toolbar
-      EventBus.emit("badge:set", next);
+      initialBadgeCount.value = Number(serverUnread || 0);
+      EventBus.emit("badge:set", initialBadgeCount.value);
     };
 
     const fetchNotificationCount = async () => {
       const token = getToken();
-      const parentId = getParentIdFromToken();
-
-      if (!token || !parentId || !etablissementId.value || !anneeScolaireId.value) return;
-
+      if (!token) return;
       try {
-        const res = await axios.get(
-          `${API_BASE}/api/notificationed/${parentId}/${etablissementId.value}/${anneeScolaireId.value}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        const notifs = Array.isArray(res.data?.notifications) ? res.data.notifications : [];
-        const unread = notifs.filter((n) => !toBool(n.is_read)).length;
-
-        // ✅ sticky update (ne descend pas)
-        applyStickyBadge(unread);
-
+        const res = await axios.get(`${API_BASE}/api/parent/notifications/non-lues`, { headers: { Authorization: `Bearer ${token}` } });
+        applyStickyBadge(res.data?.nonLues);
       } catch (err) {
-        const status = err?.response?.status;
-        if (status === 401 || status === 403) {
-          if (typeof window !== "undefined") localStorage.removeItem("token");
-          router.push({ name: "parents-connexion" });
-          return;
-        }
+        // Session réellement invalide : plugins/axios-auth.client.ts renvoie déjà à la connexion.
         console.error("Erreur notifications :", err?.response?.data || err);
-        // ⚠️ on ne met PAS à 0 ici sinon ça ferait disparaître le badge
       }
     };
 
     const startPolling = () => {
       stopPolling();
       fetchNotificationCount();
-      pollingTimer.value = setInterval(fetchNotificationCount, 10000);
+      pollingTimer.value = setInterval(fetchNotificationCount, 30000);
     };
 
     const stopPolling = () => {
@@ -295,11 +327,16 @@ export default {
         return;
       }
 
-      etablissementId.value = Number(route.query.etablissement) || null;
+      // Adresse ouverte sans les paramètres du login : l'établissement est relu dans le token.
+      etablissementId.value =
+        Number(route.query.etablissement) ||
+        Number(decodeJwtPayload(token)?.etablissementId) ||
+        null;
 
       if (etablissementId.value) {
         await fetchAnneeScolaire();
       }
+      ready.value = true;
 
       drawer.value = !isMobile.value;
 
@@ -318,8 +355,12 @@ export default {
 
     const toggleDrawer = () => (drawer.value = !drawer.value);
 
+
     const showComponent = (comp) => {
-      currentComponent.value = comp;
+      const path = SECTION_PATHS[comp] || BASE_PATH;
+      if (route.path.replace(/\/+$/, "") !== path) {
+        router.push({ path });
+      }
       if (isMobile.value) drawer.value = false;
 
       if (comp === "NotificationsComponent") {
@@ -332,9 +373,9 @@ export default {
 
     // ✅ Quand l’utilisateur clique sur la cloche, la toolbar va demander d’effacer.
     // Ici on accepte : le badge tombe à 0 UNIQUEMENT sur action utilisateur.
+    // Le badge se met à jour quand le parent a lu (l'écran le signale).
     const onNotificationsOpened = () => {
-      initialBadgeCount.value = 0;
-      EventBus.emit("badge:set", 0);
+      fetchNotificationCount();
     };
 
     const logout = () => {
@@ -345,9 +386,11 @@ export default {
     };
 
     return {
+      crumbs,
       drawer,
       logoutDialogVisible,
       currentComponent,
+      ready,
       toggleDrawer,
       showComponent,
       openLogoutDialog,
@@ -392,7 +435,7 @@ export default {
 }
 
 .drawer-header {
-  padding: 18px 16px 12px;
+  padding: 12px 12px 10px;
 }
 
 .drawer-brand {
@@ -402,9 +445,9 @@ export default {
 }
 
 .drawer-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.14);
@@ -428,7 +471,7 @@ export default {
 }
 
 .drawer-meta {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .drawer-chip {
@@ -448,7 +491,7 @@ export default {
 }
 
 .drawer-list {
-  padding: 10px 12px 12px;
+  padding: 6px 8px 8px;
 }
 
 .drawer-section {
@@ -461,8 +504,8 @@ export default {
 }
 
 .drawer-item {
-  margin: 6px 4px;
-  border-radius: 14px !important;
+  margin: 2px 4px;
+  border-radius: 10px!important;
   transition: background-color 0.2s ease, transform 0.12s ease;
 }
 
@@ -483,7 +526,7 @@ export default {
 }
 
 .drawer-footer {
-  padding: 12px 16px 16px;
+  padding: 8px 12px 10px;
   opacity: 0.9;
 }
 .drawer-footer-text {
@@ -500,24 +543,24 @@ export default {
 }
 
 .page-shell {
-  padding: 26px 18px;
+  padding: 14px 12px;
 }
 
 .content-container {
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(25, 118, 210, 0.12);
-  border-radius: 22px;
-  padding: 28px;
+  border-radius: 10px;
+  padding: 12px;
   max-width: 1200px;
   margin: 0 auto;
-  box-shadow: 0 16px 60px rgba(11, 46, 74, 0.12);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(8px);
 }
 
 .white-toolbar {
   background-color: #ffffff !important;
   color: #0b2e4a !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 @media (max-width: 600px) {

@@ -45,7 +45,12 @@ state = move(state, TUTOR_EVENTS.EXPLANATION_SENT, TUTOR_STATES.UNDERSTANDING_CH
 state = move(state, TUTOR_EVENTS.UNDERSTOOD, TUTOR_STATES.APPLICATION_EXERCISE);
 state = move(state, TUTOR_EVENTS.ANSWER_INCORRECT, TUTOR_STATES.APPLICATION_RETRY);
 assert.equal(state.attempts, 1);
-state = move(state, TUTOR_EVENTS.ANSWER_CORRECT, TUTOR_STATES.BOOK_SELECTION);
+// Une bonne réponse fait progresser d'exercice en exercice ; le manuel
+// n'est demandé qu'ensuite, sur décision du backend.
+state = move(state, TUTOR_EVENTS.ANSWER_CORRECT, TUTOR_STATES.APPLICATION_EXERCISE);
+assert.equal(state.attempts, 0);
+assert.equal(state.completedExercises, 1);
+state = move(state, TUTOR_EVENTS.BOOK_SELECTION_REQUESTED, TUTOR_STATES.BOOK_SELECTION);
 state = move(state, TUTOR_EVENTS.BOOK_PROVIDED, TUTOR_STATES.BOOK_LOOKUP);
 state = move(state, TUTOR_EVENTS.REFERENCE_VERIFIED, TUTOR_STATES.BOOK_REFERENCE);
 state = move(state, TUTOR_EVENTS.FOLLOW_UP_REQUESTED, TUTOR_STATES.FOLLOW_UP);
@@ -83,10 +88,16 @@ assert.equal(sanitiseExercise({ prompt: 'incomplet' }), null);
 
 // L'analyse facultative de Claude doit référencer un critère existant ; elle
 // n'est jamais une transition libre envoyée par le modèle.
-const assessment = { verdict: 'correct', criterionIndex: 0, reason: 'La formule est bien appliquée.' };
+const assessment = {
+  verdict: 'correct',
+  reason: 'La formule est bien appliquée.',
+  questions: [{ id: 1, verdict: 'correct', reason: 'Périmètre juste.' }],
+};
 assert.equal(isValidAssessment(assessment, exercise), true);
-assert.equal(isValidAssessment({ ...assessment, criterionIndex: 9 }, exercise), false);
-const tagged = extractTaggedData('<exercise-assessment>{"verdict":"incorrect","criterionIndex":0,"reason":"Calcul incomplet."}</exercise-assessment>', 'exercise-assessment');
+// Une évaluation doit contenir exactement une entrée par question.
+assert.equal(isValidAssessment({ ...assessment, questions: [] }, exercise), false);
+assert.equal(isValidAssessment({ ...assessment, verdict: 'peut-être' }, exercise), false);
+const tagged = extractTaggedData('<exercise-assessment>{"verdict":"incorrect","reason":"Calcul incomplet.","questions":[{"id":1,"verdict":"incorrect","reason":"Oubli du x2."}]}</exercise-assessment>', 'exercise-assessment');
 assert.equal(tagged.data.verdict, 'incorrect');
 assert.equal(tagged.visibleText, '');
 
@@ -106,7 +117,7 @@ const afterThirdError = transitionTutorState(resumed, TUTOR_EVENTS.ANSWER_INCORR
 assert.equal(afterThirdError.attempts, 3);
 assert.equal(
   transitionTutorState(afterThirdError, TUTOR_EVENTS.EXERCISE_REEXPLAINED).state.phase,
-  TUTOR_STATES.UNDERSTANDING_CHECK
+  TUTOR_STATES.EXPLANATION
 );
 
 // Le normaliseur de promotions reste fondé sur les valeurs présentes, sans

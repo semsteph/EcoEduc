@@ -1,17 +1,7 @@
 <template>
-  <v-container fluid class="pa-2 pa-sm-4 bg-white">
+  <v-container fluid class="pa-2 pa-sm-3 bg-white">
     <v-row align="center" class="mb-4 mx-0" no-gutters>
       <v-col cols="auto">
-        <v-btn
-          icon
-          variant="flat"
-          color="indigo-darken-4"
-          @click="$emit('back')"
-          class="rounded-lg elevation-1"
-          :size="$vuetify.display.smAndDown ? 'small' : 'default'"
-        >
-          <v-icon color="white">mdi-arrow-left</v-icon>
-        </v-btn>
       </v-col>
 
       <v-col class="ml-4">
@@ -27,7 +17,7 @@
     <v-card
       variant="flat"
       border
-      class="rounded-xl overflow-hidden shadow-sm"
+      class="rounded-lg overflow-hidden shadow-sm"
       v-if="!selectedStudentId"
     >
       <v-toolbar color="indigo-darken-4" dark flat height="auto" class="pa-2">
@@ -69,7 +59,7 @@
         </div>
       </v-toolbar>
 
-      <v-card-text class="pa-2 pa-sm-4">
+      <v-card-text class="pa-2 pa-sm-3">
         <v-row dense>
           <v-col
             v-for="eleve in eleves"
@@ -86,8 +76,8 @@
               @click="selectStudent(eleve.id)"
             >
               <v-card-text class="pa-3 d-flex align-center">
-                <v-avatar color="indigo-lighten-5" rounded="lg" size="40" class="mr-3">
-                  <v-icon color="indigo-darken-4">mdi-account-circle</v-icon>
+                <v-avatar color="indigo-lighten-5" rounded="lg" size="32" class="mr-3">
+                  <v-icon size="18" color="indigo-darken-4">mdi-account-circle</v-icon>
                 </v-avatar>
 
                 <div class="flex-grow-1 overflow-hidden">
@@ -116,7 +106,7 @@
 
       <v-divider></v-divider>
 
-      <v-card-actions class="bg-grey-lighten-5 pa-4 sticky-footer">
+      <v-card-actions class="bg-grey-lighten-5 pa-3 sticky-footer">
         <div class="text-caption font-weight-bold text-indigo-darken-4">
           {{ selectedIds.length }} élève(s) sélectionné(s)
         </div>
@@ -126,8 +116,8 @@
         <div class="d-flex flex-wrap align-center ga-2 action-buttons-wrap">
           <v-btn
             v-if="!afficherPartis"
-            class="px-2 px-sm-6 rounded-lg migrate-btn"
-            elevation="3"
+            class="px-2 px-sm-3 rounded-lg migrate-btn"
+            elevation="0"
             :disabled="selectedIds.length === 0"
             @click="ouvrirDialogMigration"
           >
@@ -137,8 +127,8 @@
 
           <v-btn
             v-if="!afficherPartis"
-            class="px-2 px-sm-6 rounded-lg reinscription-btn"
-            elevation="3"
+            class="px-2 px-sm-3 rounded-lg reinscription-btn"
+            elevation="0"
             :disabled="selectedIds.length === 0"
             @click="reinscrireEleves"
           >
@@ -148,8 +138,8 @@
 
           <v-btn
             v-if="!afficherPartis"
-            class="px-2 px-sm-6 rounded-lg parti-btn"
-            elevation="3"
+            class="px-2 px-sm-3 rounded-lg parti-btn"
+            elevation="0"
             :disabled="selectedIds.length === 0"
             :loading="isMarquantParti"
             @click="marquerPartis"
@@ -160,10 +150,10 @@
 
           <v-btn
             v-if="afficherPartis"
-            class="px-2 px-sm-6 rounded-lg"
+            class="px-2 px-sm-3 rounded-lg"
             color="grey-darken-1"
             variant="elevated"
-            elevation="3"
+            elevation="0"
             :disabled="selectedIds.length === 0"
             :loading="isMarquantParti"
             @click="annulerDeparts"
@@ -177,8 +167,8 @@
 
     <!-- Dialog succès réinscription -->
     <v-dialog v-model="dialog" max-width="400" transition="dialog-bottom-transition">
-      <v-card class="rounded-xl overflow-hidden">
-        <v-sheet class="pa-2 pa-sm-6 text-center" color="white">
+      <v-card class="rounded-lg overflow-hidden">
+        <v-sheet class="pa-2 pa-sm-3 text-center" color="white">
           <v-icon size="64" color="green-darken-1" class="mb-4">mdi-check-circle</v-icon>
           <h3 class="text-h6 font-weight-black text-indigo-darken-4 mb-2">
             Réinscription réussie
@@ -189,7 +179,7 @@
           <v-btn
             block
             color="indigo-darken-4"
-            class="mt-6 rounded-lg dialog-btn-white-text"
+            class="mt-3 rounded-lg dialog-btn-white-text"
             variant="flat"
             @click="dialog = false"
           >
@@ -201,13 +191,13 @@
 
     <!-- Dialog migration -->
     <v-dialog v-model="migrationDialog" max-width="520" transition="dialog-bottom-transition">
-      <v-card class="rounded-xl overflow-hidden">
-        <v-toolbar color="deep-purple-darken-2" dark flat>
+      <v-card class="rounded-lg overflow-hidden">
+        <v-toolbar height="40" color="deep-purple-darken-2" dark flat>
           <v-icon start class="ml-4">mdi-swap-horizontal-bold</v-icon>
           <span class="font-weight-bold">Migration des élèves</span>
         </v-toolbar>
 
-        <v-card-text class="pa-2 pa-sm-5">
+        <v-card-text class="pa-2 pa-sm-3">
           <v-alert
             type="info"
             variant="tonal"
@@ -241,7 +231,7 @@
             label="Classe de destination"
             placeholder="Choisir une classe"
             variant="outlined"
-            density="comfortable"
+            density="compact"
             class="migration-select"
             :loading="loadingClassesEtablissement"
             :disabled="loadingClassesEtablissement || isMigrating"
@@ -262,7 +252,7 @@
 
         <v-divider></v-divider>
 
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer></v-spacer>
 
           <v-btn
@@ -287,8 +277,8 @@
 
     <!-- Dialog succès migration -->
     <v-dialog v-model="migrationSuccessDialog" max-width="420" transition="dialog-bottom-transition">
-      <v-card class="rounded-xl overflow-hidden">
-        <v-sheet class="pa-2 pa-sm-6 text-center" color="white">
+      <v-card class="rounded-lg overflow-hidden">
+        <v-sheet class="pa-2 pa-sm-3 text-center" color="white">
           <v-icon size="64" color="deep-purple-darken-2" class="mb-4">
             mdi-swap-horizontal-circle
           </v-icon>
@@ -301,7 +291,7 @@
           <v-btn
             block
             color="deep-purple-darken-2"
-            class="mt-6 rounded-lg dialog-btn-white-text"
+            class="mt-3 rounded-lg dialog-btn-white-text"
             variant="flat"
             @click="migrationSuccessDialog = false"
           >
@@ -340,9 +330,13 @@ export default {
       isMigrating: false,
       migrationError: '',
 
-      afficherPartis: false,
       isMarquantParti: false,
     };
+  },
+  setup() {
+    // Filtre « élèves partis », gardé dans l'adresse (?partis=1).
+    const afficherPartis = useUrlState('partis', false);
+    return { afficherPartis };
   },
   computed: {
     allSelected() {
@@ -567,7 +561,7 @@ export default {
 
 <style scoped>
 .shadow-sm {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08)!important;
 }
 
 .student-card {

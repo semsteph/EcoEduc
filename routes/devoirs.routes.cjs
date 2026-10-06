@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 
 const { authenticateJWT, getEleveDuParentOr403 } = require('../server-lib/auth.cjs');
+const evenements = require('../server-lib/alertes-evenements.cjs');
 
 // ---------------------------------------------------------------------
 // POST /devoirs — un enseignant donne un devoir à une classe/matière.
@@ -45,6 +46,7 @@ router.post('/devoirs', authenticateJWT, async (req, res) => {
     );
 
     const [rows] = await req.db.query('SELECT * FROM devoirs WHERE id = ?', [result.insertId]);
+    evenements.plusTard(evenements.devoirDonne, result.insertId);
     res.status(201).json(rows[0]);
   } catch (error) {
     console.error("Erreur lors de la création du devoir :", error);

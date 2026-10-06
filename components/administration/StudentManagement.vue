@@ -1,25 +1,24 @@
 <template>
-  <v-container class="scrollable-container px-4 py-6" fluid>
-    <v-row justify="center">
+  <v-container class="scrollable-container px-1 px-sm-3 py-2" fluid>
+    <v-row dense>
       <v-col
         v-for="(label, index) in visibleLabels"
         :key="index"
-        cols="12"
-        sm="6"
-        md="4"
+        cols="6"
+        sm="4"
         lg="3"
       >
         <v-card
           class="menu-card"
-          :style="{ background: label.gradient }"
+          :style="{ '--tile-bg': label.gradient }"
           @click="navigateTo(label.route)"
         >
           <div class="card-overlay">
-            <v-icon size="48" class="mb-3">
+            <v-icon size="22" class="mb-1">
               {{ label.icon }}
             </v-icon>
 
-            <div class="text-h6 font-weight-bold text-center">
+            <div class="menu-card__label font-weight-bold text-center">
               {{ label.name }}
             </div>
           </div>
@@ -27,19 +26,8 @@
       </v-col>
     </v-row>
 
-    <v-row justify="center" class="mt-8">
+    <v-row justify="center" dense class="mt-2">
       <v-col cols="12" sm="6" md="4">
-        <v-btn
-          block
-          color="primary"
-          size="large"
-          rounded="pill"
-          variant="elevated"
-          @click="$emit('back')"
-        >
-          <v-icon start>mdi-arrow-left</v-icon>
-          Retour
-        </v-btn>
       </v-col>
     </v-row>
   </v-container>
@@ -112,12 +100,26 @@ const labels = [
     route: 'Scolarite',
     icon: 'mdi-cash-multiple',
     gradient: 'linear-gradient(135deg, #4CAF50, #1B5E20)'
+  },
+  {
+    name: 'Orientation en 2nde',
+    route: 'Orientation',
+    icon: 'mdi-sign-direction',
+    gradient: 'linear-gradient(135deg, #FF7043, #D84315)'
+  },
+  {
+    name: 'EducMaster',
+    route: 'EducMaster',
+    icon: 'mdi-transfer-up',
+    gradient: 'linear-gradient(135deg, #00897B, #004D40)'
   }
 ];
 
 // Le dashboard remappe la route 'Scolarite' vers le composant 'ScolariteManager' :
 // on filtre sur la même clé pour que les droits accordés correspondent aux tuiles affichées.
-const permissionKeyForRoute = (route) => (route === 'Scolarite' ? 'ScolariteManager' : route);
+// EducMaster : accessible à qui peut consulter les notes.
+// Orientation en 2nde : avec la réinscription.
+const permissionKeyForRoute = (route) => (route === 'Scolarite' ? 'ScolariteManager' : route === 'EducMaster' ? 'NoteConsultation' : route === 'Orientation' ? 'Reinscription' : route);
 
 const visibleLabels = computed(() => {
   if (!props.modulesAutorises) return labels;
@@ -137,13 +139,20 @@ const navigateTo = (route) => {
 
 /* Carte moderne */
 .menu-card {
-  height: 150px;
-  border-radius: 20px;
+  height: 72px;
+  border-radius: 8px;
   cursor: pointer;
   overflow: hidden;
   position: relative;
   transition: all 0.35s ease;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* Fond dégradé posé par variable : reste visible sur téléphone (la règle
+   globale rend transparents les conteneurs « card » qui en contiennent). */
+.menu-card.menu-card.menu-card {
+  background: var(--tile-bg) !important;
+  border: none !important;
 }
 
 /* Contenu */
@@ -154,13 +163,18 @@ const navigateTo = (route) => {
   justify-content: center;
   align-items: center;
   color: white;
-  padding: 20px;
+  padding: 8px;
+}
+
+.menu-card__label {
+  font-size: 14px;
+  line-height: 1.25;
 }
 
 /* Hover */
 .menu-card:hover {
-  transform: translateY(-8px) scale(1.03);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .menu-card:active {
@@ -184,11 +198,7 @@ const navigateTo = (route) => {
 /* Mobile */
 @media (max-width: 600px) {
   .menu-card {
-    height: 130px;
-  }
-
-  .text-h6 {
-    font-size: 1rem !important;
+    height: 64px;
   }
 }
 </style>

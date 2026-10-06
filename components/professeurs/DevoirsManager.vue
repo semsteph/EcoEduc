@@ -2,10 +2,6 @@
   <v-container class="dv-page">
     <!-- TOP BAR -->
     <div class="dv-topbar">
-      <v-btn class="dv-back" variant="tonal" color="black" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        <span class="dv-hide-xs">Retour</span>
-      </v-btn>
 
       <div class="dv-title">
         <div class="dv-h1">
@@ -26,7 +22,7 @@
     </div>
 
     <!-- DESKTOP TABLE -->
-    <v-card class="dv-card dv-hide-xs" elevation="10">
+    <v-card class="dv-card dv-hide-xs" elevation="0">
       <div class="dv-card-head">
         <div class="dv-card-head-title">
           <v-icon class="mr-2" color="white">mdi-format-list-bulleted</v-icon>
@@ -43,7 +39,7 @@
         :items="devoirs"
         item-key="id"
         class="dv-table"
-        density="comfortable"
+        density="compact"
         :items-per-page="8"
         :loading="loading"
       >
@@ -87,7 +83,7 @@
     </v-card>
 
     <!-- MOBILE CARDS -->
-    <v-card class="dv-card dv-show-xs" elevation="10">
+    <v-card class="dv-card dv-show-xs" elevation="0">
       <div class="dv-card-head dv-card-head--alt">
         <div class="dv-card-head-title">
           <v-icon class="mr-2" color="white">mdi-format-list-bulleted</v-icon>
@@ -136,10 +132,6 @@
 
     <!-- BOTTOM BAR (mobile) -->
     <div class="dv-bottom-bar dv-show-xs">
-      <v-btn variant="tonal" color="black" class="dv-bottom-btn" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
       <div class="dv-spacer" />
       <v-btn color="primary" class="dv-bottom-btn" @click="openAddDialog">
         <v-icon start>mdi-plus</v-icon>
@@ -169,7 +161,7 @@
                   label="Titre"
                   placeholder="Ex: Exercices chapitre 3"
                   variant="outlined"
-                  density="comfortable"
+                  density="compact"
                   color="primary"
                   hide-details="auto"
                   :rules="[v => !!v || 'Titre obligatoire']"
@@ -182,7 +174,7 @@
                   label="Description (optionnel)"
                   placeholder="Détaillez ce qu'il y a à faire..."
                   variant="outlined"
-                  density="comfortable"
+                  density="compact"
                   color="primary"
                   auto-grow
                   rows="3"
@@ -196,7 +188,7 @@
                   type="date"
                   label="À rendre pour le (optionnel)"
                   variant="outlined"
-                  density="comfortable"
+                  density="compact"
                   color="primary"
                   hide-details="auto"
                 />
@@ -254,7 +246,7 @@
                 <v-checkbox
                   v-model="el.nonFait"
                   color="error"
-                  density="comfortable"
+                  density="compact"
                   hide-details
                 />
               </template>
@@ -334,7 +326,13 @@ export default {
   },
   computed: {
     teacherId() {
-      return this.$route.query.id;
+      // Adresse ouverte sans « ?id= » : l'identifiant de l'enseignant est relu dans le token.
+      if (this.$route.query.id) return this.$route.query.id;
+      try {
+        return decodeJwtPayload(localStorage.getItem("token"))?.id ?? null;
+      } catch {
+        return null;
+      }
     },
   },
   methods: {
@@ -474,7 +472,7 @@ export default {
   background: radial-gradient(900px 500px at 20% 10%, rgba(25,118,210,.14), transparent 55%),
               radial-gradient(800px 500px at 85% 0%, rgba(11,46,74,.10), transparent 55%),
               linear-gradient(180deg, #eef6ff 0%, #f7fbff 45%, #ffffff 100%);
-  border-radius: 18px;
+  border-radius: 10px;
 }
 
 .dv-topbar {
@@ -482,9 +480,9 @@ export default {
   gap: 12px;
   align-items: center;
   padding: 14px;
-  border-radius: 18px;
+  border-radius: 10px;
   background: linear-gradient(90deg, #1976d2 0%, #0b2e4a 100%);
-  box-shadow: 0 16px 50px rgba(11, 46, 74, 0.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   border: 1px solid rgba(255,255,255,.12);
   margin-bottom: 14px;
   flex-wrap: wrap;
@@ -523,11 +521,11 @@ export default {
 .dv-add {
   border-radius: 999px !important;
   font-weight: 950;
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .dv-card {
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   overflow: hidden;
   border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.90);
@@ -586,7 +584,7 @@ export default {
 .dv-mobile-list { padding: 12px; }
 
 .dv-mobile-card {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
   border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.94);
   padding: 12px;
@@ -663,7 +661,7 @@ export default {
 }
 
 .dv-dialog {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
   overflow: hidden;
 }
 
@@ -714,11 +712,170 @@ export default {
 .dv-hide-sm { display: inline-flex; }
 
 @media (max-width: 600px) {
-  .dv-page { padding: 10px; border-radius: 14px; padding-bottom: 86px; }
-  .dv-topbar { padding: 12px; border-radius: 14px; gap: 10px; }
+  .dv-page { padding: 10px; border-radius: 10px; padding-bottom: 86px; }
+  .dv-topbar { padding: 12px; border-radius: 10px; gap: 10px; }
   .dv-h1 { font-size: 1.02rem; }
   .dv-hide-sm { display: none !important; }
   .dv-hide-xs { display: none !important; }
   .dv-show-xs { display: block !important; }
+}
+
+/* =====================================================================
+   Interface fine : en-têtes dégradés bas (≤ 40 px), cartes et marges
+   réduites, polices raisonnables. Placé en fin de fichier pour
+   l'emporter sur les règles plus haut.
+   ===================================================================== */
+.dv-page {
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0;
+}
+
+.dv-topbar {
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.dv-back,
+.dv-add {
+  height: 30px !important;
+  font-weight: 700;
+}
+
+.dv-back {
+  border-radius: 8px !important;
+}
+
+.dv-h1 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.dv-sub {
+  margin-top: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dv-card {
+  border-radius: 8px !important;
+  backdrop-filter: none;
+  margin-bottom: 10px;
+}
+
+.dv-card-head {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.dv-card-head-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dv-chip-year {
+  font-weight: 700;
+}
+
+.dv-mobile-date,
+.dv-mobile-title,
+.dv-date {
+  font-weight: 700;
+}
+
+.dv-empty,
+.dv-empty-mobile {
+  padding: 10px 8px;
+  font-weight: 700;
+}
+
+.dv-mobile-list {
+  padding: 8px 0 !important;
+}
+
+.dv-mobile-card {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.dv-mobile-head {
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dv-dialog-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dv-bottom-bar {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.dv-bottom-btn {
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  /* Barre de boutons fixe en bas : place réservée sous le contenu. */
+  .dv-page {
+    padding: 0 0 52px !important;
+  }
+
+  .dv-topbar {
+    min-height: 36px;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .dv-h1 {
+    font-size: 15px;
+  }
+
+  /* Pas de grand cadre autour des blocs : contenu posé sur la page. */
+  .dv-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible;
+    margin-bottom: 8px;
+  }
+
+  .dv-card-head {
+    height: 32px;
+    min-height: 32px;
+    border-radius: 8px;
+  }
+}
+
+.dv-dialog-head {
+  min-height: 40px;
+  padding: 4px 4px 4px 12px;
+}
+
+.dv-dialog-title {
+  font-size: 15px;
+}
+
+.dv-dialog-body {
+  padding-top: 10px !important;
+}
+
+.dv-dialog-actions {
+  padding: 6px 12px 10px !important;
+}
+
+.dv-mobile-desc {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.dv-roster-item {
+  border-radius: 8px;
 }
 </style>

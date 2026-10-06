@@ -1,20 +1,11 @@
 <template>
-  <v-container fluid class="pa-4 bg-grey-lighten-4">
+  <v-container fluid class="pa-3 bg-grey-lighten-4">
     
-    <v-row align="center" class="mb-6">
+    <v-row align="center" class="mb-3">
       <v-col cols="auto">
-        <v-btn
-          icon
-          variant="elevated"
-          color="white"
-          elevation="2"
-          @click="selectedClassId ? clearSelection() : $emit('back')"
-        >
-          <v-icon color="teal-darken-3">mdi-arrow-left</v-icon>
-        </v-btn>
       </v-col>
       <v-col>
-        <h1 class="text-h5 font-weight-bold text-teal-darken-4 d-flex align-center">
+        <h1 class="text-h6 font-weight-bold text-teal-darken-4 d-flex align-center">
           <v-icon start size="32" color="teal-darken-2">mdi-account-convert</v-icon>
           {{ selectedClassId ? 'Réinscription : Liste des élèves' : 'Gestion des Réinscriptions' }}
         </h1>
@@ -29,15 +20,15 @@
         <v-window v-model="activeView" disabled>
           
           <v-window-item value="list">
-            <v-card border flat class="rounded-xl overflow-hidden elevation-1 w-100">
-              <v-toolbar color="teal-lighten-5" flat px-4>
+            <v-card border flat class="rounded-lg overflow-hidden elevation-1 w-100">
+              <v-toolbar height="40" color="teal-lighten-5" flat px-3>
                 <v-icon start color="teal-darken-3" class="ml-4">mdi-filter-variant</v-icon>
                 <span class="text-subtitle-1 font-weight-bold text-teal-darken-3">
                   Sélectionnez une classe pour réinscrire les élèves
                 </span>
               </v-toolbar>
 
-              <v-card-text class="pa-4 pa-md-6">
+              <v-card-text class="pa-3 pa-md-3">
                 <v-row v-if="loading" justify="center" class="py-12">
                   <v-progress-circular indeterminate color="teal-darken-2" size="48"></v-progress-circular>
                 </v-row>
@@ -58,9 +49,9 @@
                         @click="goToClass(classe.id)"
                         ripple
                       >
-                        <v-card-text class="d-flex align-center pa-4">
-                          <v-avatar color="teal-lighten-4" rounded="lg" size="52" class="me-4">
-                            <v-icon color="teal-darken-3">mdi-google-classroom</v-icon>
+                        <v-card-text class="d-flex align-center pa-3">
+                          <v-avatar color="teal-lighten-4" rounded="lg" size="32" class="me-2">
+                            <v-icon size="18" color="teal-darken-3">mdi-google-classroom</v-icon>
                           </v-avatar>
                           
                           <div class="overflow-hidden">
@@ -130,14 +121,31 @@ export default {
     etablissementId: { type: Number, required: true },
     etablissementNom: { type: String, required: true },
     anneeScolaire: { type: String, required: true },
-    anneeScolaireId: { type: Number, required: true }
+    anneeScolaireId: { type: Number, required: true },
+    classeId: { type: Number, default: null }
   },
+  emits: ['back', 'ouvrir-classe'],
   data: () => ({
     classes: [],
-    selectedClassId: null,
     loading: false,
     activeView: 'list'
   }),
+  computed: {
+    // Classe ouverte : donnée par la route (…/<classeId>). La changer émet
+    // « ouvrir-classe » et la page va vers la nouvelle adresse.
+    selectedClassId: {
+      get() { return this.classeId },
+      set(id) { this.$emit('ouvrir-classe', id) }
+    }
+  },
+  watch: {
+    classeId: {
+      handler(id) {
+        this.activeView = id ? 'detail' : 'list'
+      },
+      immediate: true
+    }
+  },
   methods: {
     async fetchClasses() {
       this.loading = true
@@ -147,6 +155,10 @@ export default {
           headers: { Authorization: `Bearer ${token}` },
         })
         this.classes = response.data
+        // Classe inconnue dans l'adresse : retour à la liste des classes.
+        if (this.classeId && !this.classes.some((c) => Number(c.id) === this.classeId)) {
+          this.selectedClassId = null
+        }
       } catch (error) {
         console.error('Erreur API réinscription:', error)
       } finally {
@@ -155,11 +167,9 @@ export default {
     },
     goToClass(classId) {
       this.selectedClassId = classId
-      this.activeView = 'detail'
     },
     clearSelection() {
       this.selectedClassId = null
-      this.activeView = 'list'
     }
   },
   created() {
@@ -184,7 +194,7 @@ export default {
   border-color: #00796B !important;
   background-color: #F0F9F8 !important;
   transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 121, 107, 0.1) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08)!important;
 }
 
 .transition-swing {

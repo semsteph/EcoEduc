@@ -2,16 +2,6 @@
   <v-container class="pm-page">
     <!-- TOP BAR -->
     <div class="pm-topbar">
-      <v-btn
-        class="pm-back-btn"
-        variant="flat"
-        color="black"
-        @click="$emit('back')"
-        aria-label="Retour"
-      >
-        <v-icon start>mdi-arrow-left</v-icon>
-        <span class="hide-xs">Retour</span>
-      </v-btn>
 
       <div class="pm-topbar-title">
         <div class="pm-topbar-h1">
@@ -19,28 +9,13 @@
           Gestion des absences
         </div>
         <div class="pm-topbar-sub hide-sm">
-          Renseignez la date et le statut, puis sauvegardez.
+          Choisissez la date, marquez les absents, puis « Enregistrer l'appel ».
         </div>
       </div>
-
-      <v-spacer />
-
-      <!-- Desktop save button -->
-      <v-btn
-        class="pm-save-btn hide-sm"
-        color="primary"
-        size="large"
-        :loading="saving"
-        :disabled="saving"
-        @click="save"
-      >
-        <v-icon start>mdi-content-save</v-icon>
-        Sauvegarder
-      </v-btn>
     </div>
 
     <!-- SEMESTERS CARD -->
-    <v-card class="pm-card pm-card--semester" elevation="8">
+    <v-card class="pm-card pm-card--semester" elevation="0">
       <div class="pm-card-header">
         <div class="pm-card-title">
           <v-icon class="mr-2" color="white">mdi-timeline-clock-outline</v-icon>
@@ -55,7 +30,7 @@
             :key="semester.id"
             class="pm-chip"
             :class="{ 'pm-chip--active': currentSemester === semester.nom }"
-            :color="currentSemester === semester.nom ? 'primary' : 'blue-lighten-5'"
+            :color="'primary'"
             :variant="currentSemester === semester.nom ? 'flat' : 'tonal'"
             @click="changeSemester(semester.nom)"
           >
@@ -71,12 +46,12 @@
     </v-card>
 
     <!-- SEARCH + INFO BAR -->
-    <v-card class="pm-card pm-card--tools" elevation="8">
+    <v-card class="pm-card pm-card--tools" elevation="0">
       <div class="pm-tools">
         <v-text-field
           v-model="search"
           variant="outlined"
-          density="comfortable"
+          density="compact"
           color="primary"
           prepend-inner-icon="mdi-magnify"
           label="Rechercher un élève"
@@ -97,158 +72,61 @@
       </div>
     </v-card>
 
-    <!-- TABLE CARD -->
-    <v-card class="pm-card pm-card--table" elevation="10">
-      <div class="pm-card-header pm-card-header--table">
-        <div class="pm-card-title">
-          <v-icon class="mr-2" color="white">mdi-table</v-icon>
-          Liste des élèves
+    <!-- APPEL : une date, tout le monde présent, un toucher par absent -->
+    <v-card class="pm-card pm-card--table" elevation="0">
+      <div class="appel-head">
+        <v-text-field
+          v-model="dateAppel"
+          type="date"
+          label="Date de l'appel"
+          :max="aujourdhui"
+          variant="outlined"
+          density="compact"
+          hide-details
+          class="appel-date"
+        />
+        <div class="appel-compteur">
+          <span class="text-success">{{ students.length - nbAbsents }} présent(s)</span>
+          · <span class="text-error">{{ nbAbsents }} absent(s)</span>
         </div>
+        <!-- Un seul bouton, à côté de la date et du compteur ; la barre reste
+             en haut quand on fait défiler la liste. -->
+        <v-btn
+          color="primary"
+          class="appel-enregistrer"
+          :loading="saving"
+          :disabled="saving || !students.length"
+          prepend-icon="mdi-content-save"
+          @click="save"
+        >Enregistrer l'appel</v-btn>
       </div>
+      <p class="appel-aide">Touchez le bouton d'un élève pour le marquer absent (puis permissionnaire).</p>
+      <p v-if="nbPermissions" class="appel-permissions">
+        <v-icon size="16" color="orange-darken-2">mdi-account-arrow-right</v-icon>
+        {{ nbPermissions }} élève(s) ont une permission d'absence ce jour : marqué(s) « Permissionnaire ». Touchez pour changer s'il est là.
+      </p>
 
-      <!-- Desktop / Tablet table -->
-      <div class="hide-xs">
-        <v-data-table
-          :headers="headers"
-          :items="students"
-          item-key="id"
-          :search="search"
-          :items-per-page="itemsPerPage"
-          class="pm-table"
-          density="comfortable"
-        >
-          <template #item.name="{ item }">
-            <div class="pm-student">
-              <div class="pm-student-name">{{ item.name }}</div>
-            </div>
-          </template>
-
-          <template #item.date="{ item }">
-            <v-text-field
-              v-model="item.date"
-              type="date"
-              variant="outlined"
-              density="compact"
-              color="primary"
-              hide-details
-              class="pm-field"
-            />
-          </template>
-
-          <template #item.status="{ item }">
-            <v-select
-              v-model="item.status"
-              :items="statuses"
-              variant="outlined"
-              density="compact"
-              color="primary"
-              hide-details
-              class="pm-field"
-            />
-          </template>
-
-          <template #no-data>
-            <div class="pm-empty">
-              <v-icon size="22" color="primary" class="mr-2">mdi-information-outline</v-icon>
-              Aucun élève trouvé.
-            </div>
-          </template>
-        </v-data-table>
+      <div v-if="filteredStudents.length === 0" class="pm-empty-mobile">
+        <v-icon size="22" color="primary" class="mr-2">mdi-information-outline</v-icon>
+        Aucun élève trouvé.
       </div>
-
-      <!-- Mobile cards (true responsive) -->
-      <div class="pm-mobile-list show-xs">
-        <div v-if="filteredStudents.length === 0" class="pm-empty-mobile">
-          <v-icon size="22" color="primary" class="mr-2">mdi-information-outline</v-icon>
-          Aucun élève trouvé.
-        </div>
-
-        <v-card
-          v-for="st in pagedMobileStudents"
-          :key="st.id"
-          class="pm-mobile-card"
-          elevation="0"
-        >
-          <div class="pm-mobile-head">
-            <div class="pm-mobile-name">{{ st.name }}</div>
-          </div>
-
-          <div class="pm-mobile-fields">
-            <v-text-field
-              v-model="st.date"
-              type="date"
-              variant="outlined"
-              density="compact"
-              color="primary"
-              hide-details
-              class="pm-mobile-field"
-              label="Date"
-            />
-            <v-select
-              v-model="st.status"
-              :items="statuses"
-              variant="outlined"
-              density="compact"
-              color="primary"
-              hide-details
-              class="pm-mobile-field"
-              label="Statut"
-            />
-          </div>
-        </v-card>
-
-        <!-- Simple mobile pagination -->
-        <div v-if="mobileTotalPages > 1" class="pm-mobile-pager">
-          <v-btn
-            variant="tonal"
-            color="primary"
-            :disabled="mobilePage === 1"
-            @click="mobilePage--"
-          >
-            <v-icon start>mdi-chevron-left</v-icon>
-            Préc.
-          </v-btn>
-
-          <div class="pm-mobile-page-indicator">
-            Page {{ mobilePage }} / {{ mobileTotalPages }}
-          </div>
-
-          <v-btn
-            variant="tonal"
-            color="primary"
-            :disabled="mobilePage === mobileTotalPages"
-            @click="mobilePage++"
-          >
-            Suiv.
-            <v-icon end>mdi-chevron-right</v-icon>
-          </v-btn>
-        </div>
+      <div v-for="st in filteredStudents" :key="st.id" class="appel-ligne">
+        <span class="appel-nom">
+          {{ st.name }}
+          <span v-if="st.permission" class="appel-badge-perm">{{ st.permission.sousReserve ? 'permission sous réserve' : 'permission' }}<template v-if="st.permission.duree"> · {{ st.permission.duree }}</template></span>
+        </span>
+        <button
+          type="button"
+          class="appel-statut"
+          :class="statutClasse(st.status)"
+          @click="basculer(st)"
+        >{{ st.status || 'Présent' }}</button>
       </div>
     </v-card>
 
-    <!-- BOTTOM BAR (mobile) -->
-    <div class="pm-bottom-bar show-xs">
-      <v-btn variant="tonal" color="black" class="pm-bottom-btn" @click="$emit('back')">
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
-
-      <v-spacer />
-
-      <v-btn
-        color="primary"
-        class="pm-bottom-btn"
-        :loading="saving"
-        :disabled="saving"
-        @click="save"
-      >
-        <v-icon start>mdi-content-save</v-icon>
-        Sauvegarder
-      </v-btn>
-    </div>
 
     <!-- Snackbars -->
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3200">
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3200" location="top">
       {{ snackbar.message }}
     </v-snackbar>
 
@@ -295,16 +173,23 @@ export default {
     anneeScolaire: String,
     anneeScolaireId: Number,
   },
+  setup() {
+    // Période (semestre) affichée : conservée dans l'URL (?periode=).
+    const currentSemester = useUrlState("periode", "");
+    return { currentSemester };
+  },
   data() {
     return {
-      currentSemester: "",
       semesters: [],
       headers: [
         { title: "Nom / Prénom", value: "name", sortable: true },
         { title: "Date", value: "date", sortable: false },
         { title: "Statut", value: "status", sortable: false },
       ],
-      statuses: ["Absent", "Permissionaire"],
+      statuses: ["Absent", "Permissionnaire"],
+      // Date locale (et non UTC) : juste après minuit, l'appel restait sur la veille.
+      dateAppel: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
+      aujourdhui: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
       students: [],
       successDialog: false,
       errorDialog: false,
@@ -322,6 +207,12 @@ export default {
     };
   },
   computed: {
+    nbPermissions() {
+      return this.students.filter((s) => s.permission).length;
+    },
+    nbAbsents() {
+      return this.students.filter((s) => s.status).length;
+    },
     filteredStudents() {
       const q = (this.search || "").trim().toLowerCase();
       if (!q) return this.students;
@@ -342,6 +233,9 @@ export default {
     },
   },
   watch: {
+    dateAppel() {
+      this.appliquerPermissions();
+    },
     // Quand on recherche, on revient à la page 1 mobile
     search() {
       this.mobilePage = 1;
@@ -354,12 +248,44 @@ export default {
     },
   },
   methods: {
+    // Présent → Absent → Permissionnaire → Présent
+    basculer(st) {
+      st.autoPermission = false;
+      st.status = st.status === "" ? "Absent" : st.status === "Absent" ? "Permissionnaire" : "";
+    },
+    statutClasse(status) {
+      return status === "Absent" ? "is-absent" : status === "Permissionnaire" ? "is-permission" : "is-present";
+    },
     setSnack(message, color = "info") {
       this.snackbar = { show: true, color, message };
     },
 
     changeSemester(semesterNom) {
       this.currentSemester = semesterNom;
+    },
+
+    // Élèves ayant une permission d'absence accordée ce jour-là : marqués
+    // « Permissionnaire » d'office (l'enseignant peut toujours changer).
+    async appliquerPermissions() {
+      const date = this.dateAppel;
+      this.students.forEach((s) => {
+        if (s.permission && s.status === "Permissionnaire" && s.autoPermission) s.status = "";
+        s.permission = null;
+        s.autoPermission = false;
+      });
+      if (!date || !this.students.length) return;
+      try {
+        const { data } = await axios.get(`${this.API_BASE}/api/enseignant/permissions`, { params: { classeId: this.classeId, matiereId: this.subjectId, date } });
+        if (date !== this.dateAppel) return;
+        (Array.isArray(data) ? data : []).forEach((p) => {
+          const st = this.students.find((s) => s.id === p.eleveId);
+          if (!st) return;
+          st.permission = p;
+          if (!st.status) { st.status = "Permissionnaire"; st.autoPermission = true; }
+        });
+      } catch (error) {
+        // Sans cette information, l'appel reste utilisable normalement.
+      }
     },
 
     async getStudents() {
@@ -375,7 +301,10 @@ export default {
           name: `${student.nom} ${student.prenom}`,
           date: "",
           status: "",
+          permission: null,
+          autoPermission: false,
         }));
+        await this.appliquerPermissions();
       } catch (error) {
         console.error("Erreur élèves:", error);
         this.setSnack("Impossible de charger la liste des élèves.", "error");
@@ -389,7 +318,7 @@ export default {
         );
 
         this.semesters = response.data || [];
-        if (this.semesters.length > 0 && !this.currentSemester) {
+        if (this.semesters.length > 0 && !this.semesters.some((s) => s.nom === this.currentSemester)) {
           this.currentSemester = this.semesters[0].nom;
         }
       } catch (error) {
@@ -398,41 +327,29 @@ export default {
       }
     },
 
+    // Tout l'appel est envoyé : un élève remis « Présent » efface une absence
+    // notée par erreur ce jour-là.
     async save() {
+      if (!this.dateAppel) {
+        this.setSnack("Choisissez la date de l'appel.", "warning");
+        return;
+      }
+      this.saving = true;
       try {
-        this.saving = true;
-
-        const dataToSave = this.students
-          .filter((s) => s.date && s.status)
-          .map((s) => ({
-            eleveId: s.id,
-            date: s.date,
-            status: s.status,
-            subjectId: this.subjectId,
-            classeId: this.classeId,
-            semesterName: this.currentSemester,
-            etablissementId: this.etablissementId,
-            anneeScolaireId: this.anneeScolaireId,
-          }));
-
-        if (dataToSave.length === 0) {
-          this.setSnack(
-            "Renseignez la date et le statut pour au moins un élève.",
-            "warning"
-          );
-          return;
-        }
-
-        const saveToken = localStorage.getItem("token");
-        await axios.post(`${this.API_BASE}/api/presence`, dataToSave, {
-          headers: { Authorization: `Bearer ${saveToken}` },
-        });
-
-        this.students = this.students.map((s) => ({ ...s, date: "", status: "" }));
-        this.successDialog = true;
+        const dataToSave = this.students.map((s) => ({
+          eleveId: s.id,
+          date: this.dateAppel,
+          status: s.status || "Présent",
+          subjectId: this.subjectId,
+          classeId: this.classeId,
+          semesterName: this.currentSemester,
+          etablissementId: this.etablissementId,
+          anneeScolaireId: this.anneeScolaireId,
+        }));
+        const { data } = await axios.post(`${this.API_BASE}/api/presence`, dataToSave);
+        this.setSnack(data.message || "Appel enregistré.", "success");
       } catch (error) {
-        console.error("Erreur sauvegarde:", error);
-        this.errorDialog = true;
+        this.setSnack(error?.response?.data?.error || "L'appel n'a pas pu être enregistré.", "error");
       } finally {
         this.saving = false;
       }
@@ -456,6 +373,22 @@ export default {
 </script>
 
 <style scoped>
+.appel-permissions { margin: 0 10px 6px; font-size: 0.8rem; color: #8a4b00; background: #fff3e0; border-radius: 8px; padding: 5px 8px; }
+.appel-badge-perm { display: inline-block; margin-left: 6px; font-size: 0.7rem; font-weight: 700; color: #e65100; background: #fff3e0; border-radius: 6px; padding: 0 6px; }
+.appel-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px; position: sticky; top: -16px; z-index: 5; background: #fff; border-bottom: 1px solid #e3e9f1; }
+/* La barre d'appel reste visible en haut : la carte ne doit pas couper le défilement. */
+.pm-card--table { overflow: visible !important; }
+.appel-enregistrer { margin-left: auto; text-transform: none; font-weight: 700; }
+@media (max-width: 600px) { .appel-enregistrer { width: 100%; margin-left: 0; } }
+.appel-date { max-width: 190px; }
+.appel-compteur { font-size: 0.85rem; font-weight: 700; }
+.appel-aide { font-size: 0.75rem; color: #5f6b7a; margin: 6px 10px; }
+.appel-ligne { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border-top: 1px solid #edf1f6; }
+.appel-nom { font-size: 0.9rem; font-weight: 600; }
+.appel-statut { min-width: 118px; padding: 6px 10px; border-radius: 16px; font-size: 0.8rem; font-weight: 700; border: 1px solid; cursor: pointer; }
+.appel-statut.is-present { color: #2e7d32; border-color: #a5d6a7; background: #f1f8e9; }
+.appel-statut.is-absent { color: #fff; border-color: #c62828; background: #d32f2f; }
+.appel-statut.is-permission { color: #e65100; border-color: #ffb74d; background: #fff3e0; }
 /* Base */
 .pm-page {
   max-width: 1200px;
@@ -464,7 +397,7 @@ export default {
   background: radial-gradient(900px 500px at 20% 10%, rgba(25,118,210,.14), transparent 55%),
               radial-gradient(800px 500px at 85% 0%, rgba(11,46,74,.10), transparent 55%),
               linear-gradient(180deg, #eef6ff 0%, #f7fbff 45%, #ffffff 100%);
-  border-radius: 18px;
+  border-radius: 10px;
 }
 
 /* Topbar */
@@ -473,9 +406,9 @@ export default {
   gap: 12px;
   align-items: center;
   padding: 14px;
-  border-radius: 18px;
+  border-radius: 10px;
   background: linear-gradient(90deg, #1976d2 0%, #0b2e4a 100%);
-  box-shadow: 0 16px 50px rgba(11, 46, 74, 0.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   border: 1px solid rgba(255,255,255,.12);
   margin-bottom: 14px;
 }
@@ -513,12 +446,12 @@ export default {
 .pm-save-btn {
   border-radius: 999px !important;
   font-weight: 950;
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 /* Cards */
 .pm-card {
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   overflow: hidden;
   border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.88);
@@ -562,7 +495,7 @@ export default {
 }
 
 .pm-chip--active {
-  box-shadow: 0 10px 22px rgba(25,118,210,.25);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 /* Tools */
@@ -627,7 +560,7 @@ export default {
 }
 
 .pm-mobile-card {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
   border: 1px solid rgba(25,118,210,.16);
   background: rgba(255,255,255,.92);
   padding: 12px;
@@ -705,7 +638,7 @@ export default {
 
 /* Dialog */
 .pm-dialog {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
 }
 
 /* Visibility helpers */
@@ -716,13 +649,13 @@ export default {
 @media (max-width: 600px) {
   .pm-page {
     padding-top: 10px;
-    border-radius: 14px;
+    border-radius: 10px;
     padding-bottom: 92px;
   }
 
   .pm-topbar {
     padding: 12px;
-    border-radius: 14px;
+    border-radius: 10px;
     gap: 10px;
   }
 
@@ -757,6 +690,163 @@ export default {
   }
   .pm-bottom-btn {
     padding-inline: 12px;
+  }
+}
+
+/* =====================================================================
+   Interface fine : en-têtes dégradés bas (≤ 40 px), cartes et marges
+   réduites, polices raisonnables. Placé en fin de fichier pour
+   l'emporter sur les règles plus haut.
+   ===================================================================== */
+.pm-page {
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0;
+}
+
+.pm-topbar {
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.pm-back-btn,
+.pm-save-btn {
+  height: 30px !important;
+  font-weight: 700;
+}
+
+.pm-back-btn {
+  border-radius: 8px !important;
+}
+
+.pm-topbar-h1 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.pm-topbar-sub {
+  margin-top: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pm-card {
+  border-radius: 8px !important;
+  backdrop-filter: none;
+  margin-bottom: 10px;
+}
+
+.pm-card-header {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.pm-card-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pm-card-body,
+.pm-tools {
+  padding: 8px 10px !important;
+  gap: 8px;
+}
+
+.pm-chip,
+.pm-info-chip {
+  font-weight: 700;
+}
+
+.pm-student-name,
+.pm-mobile-name {
+  font-weight: 700;
+}
+
+.pm-empty,
+.pm-empty-mobile {
+  padding: 10px 8px;
+  font-weight: 700;
+}
+
+.pm-mobile-list {
+  padding: 8px 0 !important;
+}
+
+.pm-mobile-card {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.pm-mobile-head {
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pm-mobile-page-indicator {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pm-bottom-bar {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.pm-bottom-btn {
+  font-weight: 700;
+}
+
+.pm-mobile-fields {
+  gap: 8px;
+}
+
+.pm-mobile-field :deep(.v-field) {
+  border-radius: 8px;
+}
+
+@media (max-width: 600px) {
+  /* Barre de boutons fixe en bas : place réservée sous le contenu. */
+  .pm-page {
+    padding: 0 0 52px !important;
+  }
+
+  .pm-topbar {
+    min-height: 36px;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .pm-topbar-h1 {
+    font-size: 15px;
+  }
+
+  /* Pas de grand cadre autour des blocs : contenu posé sur la page. */
+  .pm-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible;
+    margin-bottom: 8px;
+  }
+
+  .pm-card-header {
+    height: 32px;
+    min-height: 32px;
+    border-radius: 8px;
+  }
+
+  .pm-card-body,
+.pm-tools {
+    padding: 6px 0 !important;
+  }
+
+  /* Champs deux par ligne ; la zone de texte garde toute la ligne. */
+  .pm-mobile-fields {
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>

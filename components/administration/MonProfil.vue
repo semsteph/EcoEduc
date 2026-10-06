@@ -1,14 +1,14 @@
 <template>
-  <v-container class="pa-2 pa-sm-4 pa-md-8 page-bg" fluid>
+  <v-container class="pa-2 pa-sm-3 pa-md-3 page-bg" fluid>
     <v-row justify="center">
       <v-col cols="12" sm="8" md="6" lg="5">
-        <v-card class="rounded-xl elevation-4 overflow-hidden">
-          <v-toolbar flat color="primary" dark>
+        <v-card class="rounded-lg elevation-4 overflow-hidden">
+          <v-toolbar height="40" flat color="primary" dark>
             <v-icon dark class="mr-3">mdi-account-cog-outline</v-icon>
-            <v-toolbar-title class="font-weight-bold">Mon profil</v-toolbar-title>
+            <v-toolbar-title class="font-weight-bold text-subtitle-1">Mon profil</v-toolbar-title>
           </v-toolbar>
 
-          <v-card-text class="pa-2 pa-sm-6">
+          <v-card-text class="pa-2 pa-sm-3">
             <div class="mb-4">
               <div class="text-caption grey--text">Connecté en tant que</div>
               <div class="text-h6 font-weight-bold">{{ nom }}</div>
@@ -50,8 +50,7 @@
               <v-btn
                 color="primary"
                 block
-                large
-                class="rounded-xl text-none font-weight-bold"
+                class="rounded-lg text-none font-weight-bold"
                 :loading="isSaving"
                 @click="submit"
               >

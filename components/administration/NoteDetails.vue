@@ -1,13 +1,10 @@
 <template>
-  <v-container class="notes-container pa-4 pa-sm-6">
-    <v-row align="center" class="mb-6">
+  <v-container class="notes-container pa-3 pa-sm-3">
+    <v-row align="center" class="mb-3">
       <v-col cols="auto">
-        <v-btn icon variant="tonal" color="primary" @click="$emit('back')">
-          <v-icon>mdi-arrow-left</v-icon>
-        </v-btn>
       </v-col>
       <v-col>
-        <h1 class="text-h5 font-weight-bold text-primary d-flex align-center">
+        <h1 class="text-h6 font-weight-bold text-primary d-flex align-center">
           <v-icon start color="primary">mdi-book-open-variant</v-icon>
           Cahier de Notes
         </h1>
@@ -23,7 +20,7 @@
       variant="tonal"
       rounded="lg"
       icon="mdi-information"
-      class="mt-6"
+      class="mt-3"
     >
       Aucune donnée n'est disponible pour cette classe actuellement.
     </v-alert>
@@ -32,21 +29,21 @@
       <v-card
         v-for="matiere in matieres"
         :key="matiere.id"
-        class="mb-6 rounded-xl elevation-2 overflow-hidden border"
+        class="mb-3 rounded-lg elevation-2 overflow-hidden border"
       >
         <div
-          class="matiere-header d-flex align-center justify-space-between pa-4 cursor-pointer"
+          class="matiere-header d-flex align-center justify-space-between pa-3 cursor-pointer"
           :class="activeMatiere === matiere.id ? 'bg-primary' : 'bg-grey-lighten-4'"
           @click="toggleMatiere(matiere.id)"
         >
           <div class="d-flex align-center">
             <v-avatar
-              size="40"
+              size="32"
               :color="activeMatiere === matiere.id ? 'white' : 'primary'"
               variant="flat"
-              class="mr-4"
+              class="mr-2"
             >
-              <v-icon :color="activeMatiere === matiere.id ? 'primary' : 'white'">mdi-book-open</v-icon>
+              <v-icon size="18" :color="activeMatiere === matiere.id ? 'primary' : 'white'">mdi-book-open</v-icon>
             </v-avatar>
             <span :class="['text-h6', activeMatiere === matiere.id ? 'text-white' : 'text-grey-darken-3']">
               {{ matiere.nom }}
@@ -58,8 +55,8 @@
         </div>
 
         <v-expand-transition>
-          <div v-if="activeMatiere === matiere.id" class="pa-4 pa-sm-6 bg-white">
-            <div class="semestres-container mb-6">
+          <div v-if="activeMatiere === matiere.id" class="pa-3 pa-sm-3 bg-white">
+            <div class="semestres-container mb-3">
               <span class="text-caption font-weight-bold text-uppercase text-grey mb-3 d-block">
                 Choisir un Semestre
               </span>
@@ -84,7 +81,7 @@
             </div>
 
             <v-responsive v-if="getUniqueElevesForMatiere(matiere.id).length" class="border rounded-lg">
-              <v-table density="comfortable" hover striped class="custom-table">
+              <v-table density="compact" hover striped class="custom-table">
                 <thead class="bg-grey-lighten-4">
                   <tr>
                     <th class="text-left font-weight-bold">Nom & Prénoms</th>
@@ -125,7 +122,7 @@
               </v-table>
             </v-responsive>
 
-            <div v-else class="text-center pa-2 pa-sm-8 border-dashed rounded-lg grey--text">
+            <div v-else class="text-center pa-2 pa-sm-3 border-dashed rounded-lg grey--text">
               <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-database-off</v-icon>
               <p>Aucune note enregistrée pour cette période.</p>
             </div>
@@ -145,14 +142,18 @@ export default {
     anneeScolaire: String,
     anneeScolaireId: Number
   },
+  setup() {
+    // Période et matière dépliée, conservées dans l'adresse (?periode=&matiere=).
+    const selectedSemestre = useUrlState('periode', null, { type: 'number' });
+    const activeMatiere = useUrlState('matiere', null, { type: 'number' });
+    return { selectedSemestre, activeMatiere };
+  },
   data() {
     return {
       semestres: [],
       matieres: [],
       allNotes: {},
       filteredNotes: [],
-      selectedSemestre: null,
-      activeMatiere: null,
     };
   },
   methods: {
@@ -171,7 +172,9 @@ export default {
         this.allNotes = response.data.notes || {};
           
         if (this.semestres.length) {
-          this.selectedSemestre = this.semestres[0].id;
+          if (!this.semestres.some(s => s.id === this.selectedSemestre)) {
+            this.selectedSemestre = this.semestres[0].id;
+          }
           this.filterNotes();
         }
       } catch (error) {

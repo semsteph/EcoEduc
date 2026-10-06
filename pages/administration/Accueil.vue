@@ -28,11 +28,11 @@
     <v-app-bar 
       fixed
       app
-      elevation="4"
+      elevation="0"
       color="primary"
       class="custom-navbar"
     >
-      <v-container class="d-flex align-center py-0 px-4" fluid>
+      <v-container class="d-flex align-center py-0 px-3" fluid>
         <img
           src="@/assets/administration/logooff.png"
           alt="Logo EchoEducation"
@@ -62,7 +62,10 @@
         <div class="darker-overlay"></div>
       </div>
 
-      <v-container class="content-wrapper px-4" fluid>
+      <v-container class="content-wrapper px-3" fluid>
+        <div class="landing-nav">
+          <PageNav :crumbs="crumbs" position="top" />
+        </div>
         <div class="welcome-banner">
           <div class="moving-text">
             Bienvenue sur EchoEducation — Plateforme de gestion moderne • Centralisez vos données • Suivez vos élèves • Simplifiez votre administration
@@ -73,8 +76,8 @@
           <v-col cols="12" md="10" lg="9">
             <v-row class="no-margin-row">
               <v-col cols="12" md="4" v-for="(item, i) in features" :key="i" class="pa-2">
-                <v-card class="info-card" elevation="10">
-                  <v-card-text class="pa-2 pa-sm-6 text-center">
+                <v-card class="info-card" elevation="0">
+                  <v-card-text class="pa-2 pa-sm-3 text-center">
                     <v-icon color="primary" size="48" class="mb-4">{{ item.icon }}</v-icon>
                     <h3 class="headline-modern">{{ item.title }}</h3>
                     <p class="body-text">{{ item.text }}</p>
@@ -83,19 +86,23 @@
               </v-col>
             </v-row>
             
-            <v-card class="cta-card mt-10" elevation="12">
+            <v-card class="cta-card mt-4" elevation="0">
               <v-row no-gutters align="center">
-                <v-col cols="12" md="8" class="pa-2 pa-sm-8">
-                  <h2 class="text-h4 font-weight-bold mb-2">Prêt à commencer ?</h2>
+                <v-col cols="12" md="8" class="pa-2 pa-sm-3">
+                  <h2 class="text-h6 font-weight-bold mb-2">Prêt à commencer ?</h2>
                   <p class="text-subtitle-1">Rejoignez l'avenir de l'éducation numérique dès aujourd'hui.</p>
                 </v-col>
-                <v-col cols="12" md="4" class="text-center pa-2 pa-sm-8">
-                  <v-btn size="x-large" color="white" variant="elevated" class="text-primary font-weight-black" rounded @click="navigateTo('/administration/inscription')">
+                <v-col cols="12" md="4" class="text-center pa-2 pa-sm-3">
+                  <v-btn color="white" variant="elevated" class="text-primary font-weight-black" rounded @click="navigateTo('/administration/inscription')">
                     S'inscrire
                   </v-btn>
                 </v-col>
               </v-row>
             </v-card>
+
+            <div class="landing-nav">
+              <PageNav :crumbs="crumbs" position="bottom" />
+            </div>
 
             <div style="height: 100px;"></div>
           </v-col>
@@ -106,6 +113,11 @@
 </template>
 
 <script setup>
+// Fil d'Ariane : Accueil › Espace administration.
+const crumbs = [
+  { label: "Accueil", to: "/Accueil/Accueil" },
+  { label: "Espace administration", to: "/administration/Accueil" },
+];
 import { ref } from 'vue'
 
 const router = useRouter();
@@ -202,7 +214,7 @@ const features = [
 
 /* DESIGN DES CARTES */
 .info-card {
-  border-radius: 16px;
+  border-radius: 10px;
   background-color: rgba(255, 255, 255, 0.95);
   transition: transform 0.3s ease;
   border-top: 4px solid #007BFF;
@@ -216,7 +228,7 @@ const features = [
 .cta-card {
   background: linear-gradient(45deg, #0056b3, #007BFF) !important;
   color: white;
-  border-radius: 20px;
+  border-radius: 10px;
   overflow: hidden; /* Important pour mobile */
 }
 
@@ -277,5 +289,20 @@ const features = [
   .pa-2 pa-sm-8 {
     padding: 20px !important; /* Réduit le padding sur mobile pour éviter le débordement */
   }
+}
+
+/* Fil d'Ariane et flèches retour, posés sur une bande claire (fond sombre). */
+.landing-nav {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 8px 0;
+  padding: 2px 8px 2px 4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.landing-nav :deep(.page-nav) {
+  margin: 0;
+  min-width: 0;
 }
 </style>

@@ -19,6 +19,7 @@ router.get("/parent/children", authenticateJWT, async (req, res) => {
         e.id, 
         e.prenom, 
         e.nom, 
+        e.photo_url AS photo,
         c.nom AS class
        FROM eleve e
        JOIN classes c ON e.Classe_id = c.id
@@ -30,6 +31,46 @@ router.get("/parent/children", authenticateJWT, async (req, res) => {
   } catch (error) {
     console.error("❌ Erreur lors de la récupération des enfants:", error);
     return res.status(500).json({ message: "Erreur interne du serveur" });
+  }
+});
+
+// Messagerie : messages automatiques de l'école (notes, emploi du temps).
+const messagesParents = require('../server-lib/messages-parents.cjs');
+const parentDuJeton = (req, res) => {
+  if (req.user?.role !== 'parent' || !req.user.id) { res.status(403).json({ message: 'Réservé aux parents.' }); return null; }
+  return Number(req.user.id);
+};
+router.get('/parent/messages', authenticateJWT, async (req, res) => {
+  const parentId = parentDuJeton(req, res);
+  if (!parentId) return;
+  try {
+    const messages = await messagesParents.messagesDuParent(db, parentId);
+    res.json({ messages, nonLus: messages.filter((m) => !m.lu).length });
+  } catch (error) {
+    console.error('Erreur messagerie parent :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+router.get('/parent/messages/non-lus', authenticateJWT, async (req, res) => {
+  const parentId = parentDuJeton(req, res);
+  if (!parentId) return;
+  try {
+    const [[r]] = await db.query('SELECT COUNT(*) AS n FROM message_parent WHERE parent_id = ? AND lu = 0', [parentId]);
+    res.json({ nonLus: Number(r.n) });
+  } catch (error) {
+    console.error('Erreur compteur messagerie parent :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+router.put('/parent/messages/lus', authenticateJWT, async (req, res) => {
+  const parentId = parentDuJeton(req, res);
+  if (!parentId) return;
+  try {
+    await db.query('UPDATE message_parent SET lu = 1, updated_at = updated_at WHERE parent_id = ? AND lu = 0', [parentId]);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Erreur marquage messagerie parent :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
   }
 });
 
@@ -58,7 +99,7 @@ router.get("/parent/dashboard/:anneeScolaireId", authenticateJWT, async (req, re
 
   try {
     const [children] = await db.query(
-      `SELECT e.id, e.prenom, e.nom, c.nom AS classe
+      `SELECT e.id, e.prenom, e.nom, e.photo_url AS photo, c.nom AS classe
        FROM eleve e
        JOIN classes c ON e.Classe_id = c.id
        WHERE e.Parents_id = ?`,
@@ -104,13 +145,14 @@ router.get("/parent/dashboard/:anneeScolaireId", authenticateJWT, async (req, re
 
       db
         .query(
-          `SELECT eleve_id AS childId,
-                  SUM(CASE WHEN statut = 'Absent' THEN 1 ELSE 0 END) AS absences,
-                  COUNT(*) AS total
-           FROM presence
-           WHERE eleve_id IN (?) AND Annee_scolaire_id = ?
-           GROUP BY eleve_id`,
-          [childIds, anneeScolaireId]
+          // Séances = appels faits dans la classe de l'enfant ; absences =
+          // absences non justifiées (les permissions ne comptent pas).
+          `SELECT e.id AS childId,
+                  (SELECT COUNT(*) FROM presence p WHERE p.eleve_id = e.id AND p.Annee_scolaire_id = ? AND p.statut = 'Absent') AS absences,
+                  (SELECT COUNT(*) FROM appel a WHERE a.classe_id = e.classe_id AND a.Annee_scolaire_id = ?) AS total
+           FROM eleve e
+           WHERE e.id IN (?)`,
+          [anneeScolaireId, anneeScolaireId, childIds]
         )
         .then(([r]) => r),
 
@@ -192,6 +234,7 @@ router.get("/parent/dashboard/:anneeScolaireId", authenticateJWT, async (req, re
         nom: c.nom,
         prenom: c.prenom,
         classe: c.classe,
+        photo: c.photo || null,
         moyenneGenerale: moy ? Number(moy.moyenne) : null,
         nbNotes: Number(moy?.nbNotes || 0),
         totalSeances,

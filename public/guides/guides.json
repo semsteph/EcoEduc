@@ -1,0 +1,479 @@
+{
+ "genereLe": "2026-10-05T05:32:29.234Z",
+ "espaces": {
+  "administration": [
+   {
+    "id": "inscrire-classe",
+    "titre": "Inscrire toute une classe d’un coup",
+    "categorie": "Élèves",
+    "icone": "mdi-account-group",
+    "resume": "À partir d’un fichier Excel, Word ou d’une liste copiée.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Dans **Élèves → Inscription**, choisissez **Toute une classe**.",
+      "images": {
+       "ordinateur": "/guides/img/administration-inscrire-classe-1-ordinateur.jpg",
+       "mobile": "/guides/img/administration-inscrire-classe-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Choisissez la classe, puis **importez votre fichier** (Excel ou Word) ou **collez la liste**. Le parent est facultatif : il pourra être rattaché plus tard.",
+      "images": {
+       "ordinateur": "/guides/img/administration-inscrire-classe-2-ordinateur.jpg",
+       "mobile": "/guides/img/administration-inscrire-classe-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Collez une ligne par élève : nom, prénom, date de naissance, sexe (et le téléphone du parent si vous l’avez).",
+      "images": {
+       "ordinateur": "/guides/img/administration-inscrire-classe-3-ordinateur.jpg",
+       "mobile": "/guides/img/administration-inscrire-classe-3-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Cliquez sur **Lire la liste**, vérifiez le tableau, puis **Inscrire**. Vous pourrez ensuite ajouter les photos de toute la classe.",
+      "images": {
+       "ordinateur": "/guides/img/administration-inscrire-classe-4-ordinateur.jpg",
+       "mobile": "/guides/img/administration-inscrire-classe-4-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "rattacher-parent",
+    "titre": "Rattacher un parent à un élève",
+    "categorie": "Élèves",
+    "icone": "mdi-account-supervisor",
+    "resume": "Pour les élèves inscrits sans parent, ou pour corriger un parent.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Ouvrez **Élèves → Nos élèves**. Le filtre **Sans parent** regroupe les élèves qui n’en ont pas.",
+      "images": {
+       "ordinateur": "/guides/img/administration-rattacher-parent-1-ordinateur.jpg",
+       "mobile": "/guides/img/administration-rattacher-parent-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Touchez l’icône **parent** sur la carte de l’élève.",
+      "images": {
+       "ordinateur": "/guides/img/administration-rattacher-parent-2-ordinateur.jpg",
+       "mobile": "/guides/img/administration-rattacher-parent-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Choisissez un parent **déjà inscrit** (nom, téléphone ou e-mail) ou créez un **nouveau parent**. Les frères et sœurs sans parent sont proposés en même temps.",
+      "images": {
+       "ordinateur": "/guides/img/administration-rattacher-parent-3-ordinateur.jpg",
+       "mobile": "/guides/img/administration-rattacher-parent-3-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "cartes-scolaires",
+    "titre": "Photos et cartes scolaires",
+    "categorie": "Élèves",
+    "icone": "mdi-card-account-details",
+    "resume": "Ajouter les photos d’une classe et imprimer les cartes.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Ouvrez **Élèves → Carte Scolaire**. Chaque classe indique combien d’élèves ont une photo.",
+      "images": {
+       "ordinateur": "/guides/img/administration-cartes-scolaires-1-ordinateur.jpg",
+       "mobile": "/guides/img/administration-cartes-scolaires-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Ouvrez une classe : les cartes s’affichent (initiales tant qu’il n’y a pas de photo).",
+      "images": {
+       "ordinateur": "/guides/img/administration-cartes-scolaires-2-ordinateur.jpg",
+       "mobile": "/guides/img/administration-cartes-scolaires-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Ajoutez les photos de la classe d’un coup (dossier nommé par élève ou rangé dans l’ordre de la liste), puis imprimez les cartes.",
+      "images": {
+       "ordinateur": "/guides/img/administration-cartes-scolaires-3-ordinateur.jpg",
+       "mobile": "/guides/img/administration-cartes-scolaires-3-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "enseignants",
+    "titre": "Ajouter un enseignant et lui donner ses classes",
+    "categorie": "Enseignants",
+    "icone": "mdi-human-male-board",
+    "resume": "Inscription, identifiants et répartition des classes et matières.",
+    "astuce": "Si le professeur enseigne déjà dans une autre école qui utilise l’application (même téléphone ou e-mail), il est simplement ajouté à la vôtre et garde ses identifiants.",
+    "etapes": [
+     {
+      "texte": "Ouvrez **Enseignants** puis **Inscrire Enseignant**.",
+      "images": {
+       "ordinateur": "/guides/img/administration-enseignants-1-ordinateur.jpg",
+       "mobile": "/guides/img/administration-enseignants-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Saisissez le nom, le prénom, l’e-mail et le téléphone. À la validation, un identifiant et un mot de passe provisoire s’affichent : remettez-les au professeur.",
+      "images": {
+       "ordinateur": "/guides/img/administration-enseignants-2-ordinateur.jpg",
+       "mobile": "/guides/img/administration-enseignants-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Avec **Affecter Enseignant**, choisissez ses classes, sa matière et le coefficient.",
+      "images": {
+       "ordinateur": "/guides/img/administration-enseignants-3-ordinateur.jpg",
+       "mobile": "/guides/img/administration-enseignants-3-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "bulletins",
+    "titre": "Enregistrer et imprimer les bulletins",
+    "categorie": "Notes et bulletins",
+    "icone": "mdi-file-document-outline",
+    "resume": "Les moyennes, rangs et décisions sont calculés par le logiciel.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Ouvrez **Élèves → Gestion Bulletin** et choisissez la classe.",
+      "images": {
+       "ordinateur": "/guides/img/administration-bulletins-1-ordinateur.jpg",
+       "mobile": "/guides/img/administration-bulletins-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Cliquez sur **Enregistrer les bulletins**. S’il manque des notes, le message indique quel enseignant doit terminer quoi.",
+      "images": {
+       "ordinateur": "/guides/img/administration-bulletins-2-ordinateur.jpg",
+       "mobile": "/guides/img/administration-bulletins-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Chaque élève a son bulletin : ouvrez-le pour le consulter ou le télécharger en PDF. Les parents le voient dans leur espace.",
+      "images": {
+       "ordinateur": "/guides/img/administration-bulletins-3-ordinateur.jpg",
+       "mobile": "/guides/img/administration-bulletins-3-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "educmaster",
+    "titre": "Transférer les notes vers EducMaster",
+    "categorie": "Notes et bulletins",
+    "icone": "mdi-transfer-up",
+    "resume": "Remplir automatiquement le fichier d’importation d’EducMaster.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Téléchargez sur EducMaster le fichier d’importation de la classe, puis ouvrez **Élèves → EducMaster**.",
+      "images": {
+       "ordinateur": "/guides/img/administration-educmaster-1-ordinateur.jpg",
+       "mobile": "/guides/img/administration-educmaster-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Déposez le fichier, cochez les matières et les notes voulues, puis téléchargez : le fichier garde exactement le nom attendu par EducMaster.",
+      "images": {
+       "ordinateur": "/guides/img/administration-educmaster-2-ordinateur.jpg",
+       "mobile": "/guides/img/administration-educmaster-2-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "orientation",
+    "titre": "Orienter les admis de 3ème en 2nde",
+    "categorie": "Fin d’année",
+    "icone": "mdi-sign-direction",
+    "resume": "Choisir la série de chaque élève selon son vœu.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Après la clôture, ouvrez **Élèves → Orientation en 2nde** (un rappel s’affiche aussi sur le tableau de bord).",
+      "images": {
+       "ordinateur": "/guides/img/administration-orientation-1-ordinateur.jpg",
+       "mobile": "/guides/img/administration-orientation-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Cochez les élèves, choisissez la **série**, puis **Orienter** : ils sont répartis dans les classes de cette série les moins remplies.",
+      "images": {
+       "ordinateur": "/guides/img/administration-orientation-2-ordinateur.jpg",
+       "mobile": "/guides/img/administration-orientation-2-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "cloture",
+    "titre": "Clôturer l’année scolaire",
+    "categorie": "Fin d’année",
+    "icone": "mdi-lock-check-outline",
+    "resume": "Passage des élèves, sortants, nouvelle année : tout est vérifié avant.",
+    "astuce": "Une clôture faite par erreur peut être annulée tant que rien n’a été fait dans la nouvelle année.",
+    "etapes": [
+     {
+      "texte": "Ouvrez **Paramètres → Clôture**. Vérifiez l’effectif maximum par classe et la création automatique des classes.",
+      "images": {
+       "ordinateur": "/guides/img/administration-cloture-1-ordinateur.jpg",
+       "mobile": "/guides/img/administration-cloture-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Cliquez sur **Clôturer l’année** : un rapport s’affiche, rien n’est encore appliqué.",
+      "images": {
+       "ordinateur": "/guides/img/administration-cloture-2-ordinateur.jpg",
+       "mobile": "/guides/img/administration-cloture-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Lisez le rapport : ce qui bloque (avec un bouton pour corriger), la répartition des admis, les redoublants avec leur moyenne, les fins de cycle.",
+      "images": {
+       "ordinateur": "/guides/img/administration-cloture-3-ordinateur.jpg",
+       "mobile": "/guides/img/administration-cloture-3-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Si tout est prêt, **Valider définitivement**, puis tapez le nom de l’année pour confirmer.",
+      "images": {
+       "ordinateur": "/guides/img/administration-cloture-4-ordinateur.jpg",
+       "mobile": "/guides/img/administration-cloture-4-mobile.jpg"
+      }
+     }
+    ]
+   }
+  ],
+  "enseignant": [
+   {
+    "id": "notes",
+    "titre": "Saisir les notes et valider les moyennes",
+    "categorie": "Notes",
+    "icone": "mdi-book-open-page-variant",
+    "resume": "Saisie à l’écran, enregistrement, puis validation.",
+    "astuce": "Tous les élèves doivent avoir une note dans chaque colonne utilisée : donnez 00 à un absent. Une case vide bloque la validation.",
+    "etapes": [
+     {
+      "texte": "Dans le menu, choisissez votre **matière**, puis la **classe**, puis **Notes**.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-notes-1-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-notes-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Choisissez la **période**, tapez les notes (0 à 20) et passez à la ligne suivante avec Entrée. Sur téléphone, choisissez une colonne à la fois.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-notes-2-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-notes-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Cliquez sur **Enregistrer les notes**.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-notes-3-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-notes-3-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Quand toute la classe a ses notes, **Valider les moyennes** : elles partent dans les bulletins. Une note validée ne se modifie plus que sur demande à l’administration.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-notes-4-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-notes-4-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "import-excel",
+    "titre": "Importer des notes depuis Excel",
+    "categorie": "Notes",
+    "icone": "mdi-file-excel",
+    "resume": "Télécharger le modèle, le remplir, l’importer.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Dans l’écran des notes, ouvrez le menu **⋮** puis **Télécharger le modèle Excel** et remplissez la colonne Note.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-import-excel-1-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-import-excel-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Choisissez **Importer un fichier Excel**, le type de note (Inter 1, Devoir 1…) et le fichier. Une note déjà présente n’est jamais remplacée ; le bilan liste les élèves restés sans note.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-import-excel-2-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-import-excel-2-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "appel",
+    "titre": "Faire l’appel",
+    "categorie": "Présences",
+    "icone": "mdi-calendar-check-outline",
+    "resume": "Tout le monde est présent par défaut : un toucher par absent.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Dans la classe, ouvrez **Présences**. Vérifiez la date de l’appel.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-appel-1-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-appel-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Touchez le bouton d’un élève pour le marquer **Absent** (un second toucher : Permissionnaire). Un élève qui a une permission accordée est marqué d’office.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-appel-2-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-appel-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Cliquez sur **Enregistrer l’appel**. Les parents des absents sont prévenus.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-appel-3-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-appel-3-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "demande-modification",
+    "titre": "Modifier une note déjà validée",
+    "categorie": "Notes",
+    "icone": "mdi-shield-alert-outline",
+    "resume": "La demande est envoyée à l’administration.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Dans l’écran des notes, une note validée porte un **cadenas**. Cliquez dessus.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-demande-modification-1-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-demande-modification-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Indiquez la nouvelle note (ou laissez vide pour la supprimer) et le motif, puis **Envoyer la demande**. La réponse arrive dans vos notifications.",
+      "images": {
+       "ordinateur": "/guides/img/enseignant-demande-modification-2-ordinateur.jpg",
+       "mobile": "/guides/img/enseignant-demande-modification-2-mobile.jpg"
+      }
+     }
+    ]
+   }
+  ],
+  "parent": [
+   {
+    "id": "connexion",
+    "titre": "Se connecter ou activer mon compte",
+    "categorie": "Démarrer",
+    "icone": "mdi-login",
+    "resume": "Première connexion et connexions suivantes.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Sur la page **Espace parents**, choisissez l’établissement, tapez votre identifiant (ou votre e-mail) et votre mot de passe.",
+      "images": {
+       "ordinateur": "/guides/img/parent-connexion-1-ordinateur.jpg",
+       "mobile": "/guides/img/parent-connexion-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Première fois ? Si votre compte n’est pas encore activé, cliquez sur **Activer mon compte** : un code est envoyé à votre e-mail. Sans e-mail, l’école vous remet un identifiant et un mot de passe.",
+      "images": {
+       "ordinateur": "/guides/img/parent-connexion-2-ordinateur.jpg",
+       "mobile": "/guides/img/parent-connexion-2-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "alertes-telephone",
+    "titre": "Recevoir les alertes sur mon téléphone",
+    "categorie": "Notifications",
+    "icone": "mdi-cellphone-message",
+    "resume": "Être prévenu d’une absence ou d’un bulletin, même application fermée.",
+    "astuce": "Sur iPhone : dans Safari, touchez Partager puis « Sur l’écran d’accueil », ouvrez l’application depuis l’icône, puis activez. Sur Android, utilisez Chrome.",
+    "etapes": [
+     {
+      "texte": "Ouvrez **Notifications** (la cloche en haut).",
+      "images": {
+       "ordinateur": "/guides/img/parent-alertes-telephone-1-ordinateur.jpg",
+       "mobile": "/guides/img/parent-alertes-telephone-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Dans **Notifications sur ce téléphone**, touchez **Activer** et acceptez. Une notification d’essai arrive.",
+      "images": {
+       "ordinateur": "/guides/img/parent-alertes-telephone-2-ordinateur.jpg",
+       "mobile": "/guides/img/parent-alertes-telephone-2-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Si l’école envoie des SMS, vous pouvez les couper ou les remettre avec l’interrupteur **SMS de l’école**.",
+      "images": {
+       "ordinateur": "/guides/img/parent-alertes-telephone-3-ordinateur.jpg",
+       "mobile": "/guides/img/parent-alertes-telephone-3-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "absence",
+    "titre": "Justifier une absence",
+    "categorie": "Notifications",
+    "icone": "mdi-account-off-outline",
+    "resume": "Indiquer à l’école la raison d’une absence.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Une absence de votre enfant apparaît dans **Notifications** (et sur votre téléphone si vous avez activé les alertes).",
+      "images": {
+       "ordinateur": "/guides/img/parent-absence-1-ordinateur.jpg",
+       "mobile": "/guides/img/parent-absence-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Touchez **Justifier l’absence**, écrivez la raison (maladie, rendez-vous…) et **Envoyer** : l’école la reçoit.",
+      "images": {
+       "ordinateur": "/guides/img/parent-absence-2-ordinateur.jpg",
+       "mobile": "/guides/img/parent-absence-2-mobile.jpg"
+      }
+     }
+    ]
+   },
+   {
+    "id": "permission",
+    "titre": "Demander une permission d’absence",
+    "categorie": "Scolarité",
+    "icone": "mdi-calendar-check-outline",
+    "resume": "Une journée, plusieurs jours ou quelques heures.",
+    "astuce": null,
+    "etapes": [
+     {
+      "texte": "Dans la page de l’enfant, ouvrez **Permission** puis **Ajouter une permission**.",
+      "images": {
+       "ordinateur": "/guides/img/parent-permission-1-ordinateur.jpg",
+       "mobile": "/guides/img/parent-permission-1-mobile.jpg"
+      }
+     },
+     {
+      "texte": "Choisissez **une journée**, **plusieurs jours** ou **quelques heures**, la date, le motif et votre téléphone, puis **Envoyer la demande**. La réponse de l’école vous est notifiée.",
+      "images": {
+       "ordinateur": "/guides/img/parent-permission-2-ordinateur.jpg",
+       "mobile": "/guides/img/parent-permission-2-mobile.jpg"
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

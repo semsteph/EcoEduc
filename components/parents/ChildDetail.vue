@@ -27,7 +27,7 @@
           >
             <v-card
               class="label-card"
-              elevation="10"
+              elevation="0"
               @click="selectDetail(detail.label)"
               :class="{ active: selectedDetail === detail.label }"
             >
@@ -55,10 +55,6 @@
 
     <!-- Bouton "Retour" (si un détail est sélectionné) -->
     <div class="text-center mt-4" v-if="selectedDetail">
-      <v-btn class="pill" color="primary" variant="tonal" @click="goBack">
-        <v-icon start>mdi-arrow-left</v-icon>
-        Retour
-      </v-btn>
     </div>
   </div>
 </template>
@@ -139,7 +135,7 @@ export default {
 /* Card */
 .label-card {
   width: 100%;
-  border-radius: 18px !important;
+  border-radius: 10px!important;
   overflow: hidden;
   border: 1px solid rgba(25, 118, 210, 0.12);
   background: rgba(255, 255, 255, 0.9);
@@ -166,7 +162,7 @@ export default {
 .card-icon {
   width: 40px;
   height: 40px;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: rgba(25, 118, 210, 0.08);
@@ -193,12 +189,12 @@ export default {
 /* hover + active */
 .label-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 18px 55px rgba(11, 46, 74, 0.16) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08)!important;
   border-color: rgba(25, 118, 210, 0.22);
 }
 .label-card.active {
   border-color: rgba(25, 118, 210, 0.45);
-  box-shadow: 0 18px 60px rgba(25, 118, 210, 0.18) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08)!important;
 }
 
 /* Bouton */

@@ -1,85 +1,102 @@
 <template>
   <div class="assist-page">
-    <template v-if="!selectedAssistant">
-      <!-- Topbar -->
+    <!-- 1. Un assistant par matière -->
+    <template v-if="matiereId == null">
       <div class="topbar">
-        <v-btn icon class="back-btn" @click="$emit('back')" aria-label="Retour">
-          <v-icon>mdi-arrow-left</v-icon>
-        </v-btn>
-
         <div class="topbar-title">
           <div class="title">Assistants IA</div>
           <div class="subtitle">
-            Pose tes questions sur ce que vous avez fait en classe, <span class="sub-strong">{{ childName }}</span>
+            Un assistant par matière, au courant de tout ce qui a été fait en classe, <span class="sub-strong">{{ childName }}</span>
           </div>
         </div>
-
-        <v-btn icon class="refresh-btn" @click="fetchSubjects" :loading="loading" aria-label="Rafraîchir">
+        <v-btn icon class="refresh-btn" @click="charger" :loading="loading" aria-label="Rafraîchir">
           <v-icon>mdi-refresh</v-icon>
         </v-btn>
       </div>
 
       <v-container fluid class="content">
-        <!-- Error -->
-        <v-alert v-if="error" type="error" variant="tonal" class="mb-3" density="compact" border="start">
-          {{ error }}
-        </v-alert>
-
-        <!-- Loading -->
+        <v-alert v-if="error" type="error" variant="tonal" class="mb-3" density="compact" border="start">{{ error }}</v-alert>
         <div v-if="loading" class="skeleton-wrap">
           <v-skeleton-loader type="list-item-two-line, list-item-two-line, list-item-two-line" />
         </div>
-
-        <!-- Empty -->
-        <v-card v-else-if="!error && subjects.length === 0" class="empty-card" variant="outlined">
+        <v-card v-else-if="!error && matieres.length === 0" class="empty-card" variant="outlined">
           <v-card-text class="empty-content">
-            <div class="empty-icon">
-              <v-icon size="42">mdi-account-question-outline</v-icon>
-            </div>
+            <div class="empty-icon"><v-icon size="24">mdi-account-question-outline</v-icon></div>
             <div class="empty-title">Aucun assistant disponible</div>
-            <div class="empty-subtitle">
-              Ton professeur n'a pas encore renseigné d'activité de cours cette année.
-            </div>
-
-            <v-btn class="btn-primary mt-4" @click="fetchSubjects">
-              <v-icon left>mdi-refresh</v-icon>
-              Rafraîchir
-            </v-btn>
+            <div class="empty-subtitle">Les assistants apparaissent dès que les professeurs remplissent leur cahier de texte.</div>
+            <v-btn class="btn-primary mt-4" @click="charger"><v-icon left>mdi-refresh</v-icon>Rafraîchir</v-btn>
           </v-card-text>
         </v-card>
-
-        <!-- Subject cards -->
         <div v-else class="subjects-wrap">
-          <div v-for="subject in subjects" :key="subject.matiereId" class="subject-card" @click="selectSubject(subject)">
-            <div class="assistant-avatar">
-              <v-icon size="22">mdi-account</v-icon>
-            </div>
-
+          <div v-for="m in matieres" :key="m.matiereId" class="subject-card" @click="$emit('selectMatiere', m.matiereId)">
+            <div class="assistant-avatar"><v-icon size="22">mdi-account</v-icon></div>
             <div class="subject-info">
-              <div class="subject-name">Assistant {{ subject.matiereNom }}</div>
+              <div class="subject-name">Assistant {{ m.nom }}</div>
               <div class="subject-sub">
                 <v-icon size="14" class="mr-1">mdi-calendar</v-icon>
-                {{ formatDate(subject.date) }}
+                {{ formatDate(m.derniereDate) }}
                 <span class="dot">•</span>
-                <span class="subject-activity">{{ subject.activite }}</span>
+                <span class="subject-activity">{{ resumeMatiere(m) }}</span>
               </div>
             </div>
-
             <v-icon class="chev">mdi-chevron-right</v-icon>
           </div>
         </div>
       </v-container>
     </template>
 
+    <!-- 2. Une matière : parties vues en classe (une discussion chacune) -->
+    <template v-else-if="!filChoisi">
+      <div class="topbar">
+        <div class="topbar-title">
+          <div class="title">Assistant {{ matiere?.nom || "" }}</div>
+          <div class="subtitle">Choisis la partie du cours sur laquelle tu veux poser tes questions.</div>
+        </div>
+      </div>
+      <v-container fluid class="content">
+        <div v-if="loading" class="skeleton-wrap"><v-skeleton-loader type="list-item-two-line, list-item-two-line" /></div>
+        <template v-else-if="matiere">
+          <div v-for="g in groupesSA" :key="g.sa" class="sa-groupe">
+            <div class="sa-titre">{{ g.sa }}</div>
+            <div v-for="p in g.parties" :key="p.elementId" class="partie-card" @click="ouvrir({ partie: p.elementId })">
+              <div class="partie-info">
+                <div v-if="p.parents && p.parents !== g.sa" class="partie-parents">{{ p.parents.replace(g.sa + ' › ', '') }}</div>
+                <div class="partie-titre">{{ p.titre }}</div>
+                <div class="partie-sub">
+                  <v-chip size="x-small" :color="p.termine ? 'success' : 'primary'" variant="flat" class="mr-2">
+                    {{ p.termine ? "Terminée en classe" : "En cours en classe" }}
+                  </v-chip>
+                  {{ p.seances }} séance(s) · {{ formatDate(p.derniereDate) }}
+                </div>
+              </div>
+              <v-icon class="chev">mdi-chevron-right</v-icon>
+            </div>
+          </div>
+          <div v-if="matiere.horsProgramme.length" class="sa-groupe">
+            <div class="sa-titre">{{ matiere.parties.length ? "Autres séances" : "Séances" }}</div>
+            <div v-for="h in matiere.horsProgramme" :key="h.testId" class="partie-card" @click="ouvrir({ seance: h.testId })">
+              <div class="partie-info">
+                <div class="partie-titre">{{ h.activite }}</div>
+                <div class="partie-sub"><v-icon size="14" class="mr-1">mdi-calendar</v-icon>{{ formatDate(h.date) }}</div>
+              </div>
+              <v-icon class="chev">mdi-chevron-right</v-icon>
+            </div>
+          </div>
+        </template>
+      </v-container>
+    </template>
+
+    <!-- 3. Discussion d'une partie -->
     <ChatWithAssistant
       v-else
+      :key="filChoisi.cle"
       :eleveId="childId"
-      :testId="selectedAssistant.testId"
-      :subjectName="selectedAssistant.matiereNom"
-      :activity="selectedAssistant.activite"
-      :date="selectedAssistant.date"
+      :testId="filChoisi.testId"
+      :subjectName="matiere.nom"
+      :activity="filChoisi.titre"
+      :date="filChoisi.date"
       :childName="childName"
-      @back="selectedAssistant = null"
+      @back="fermerFil"
     />
   </div>
 </template>
@@ -88,6 +105,7 @@
 import axios from "axios";
 import dayjs from "dayjs";
 import ChatWithAssistant from "./ChatWithAssistant.vue";
+import { useCrumbLabel } from "@/composables/usePageNav";
 
 const API = "/api/parent/assistant";
 
@@ -97,59 +115,92 @@ export default {
     childId: { type: Number, required: true },
     childName: { type: String, required: true },
     childClass: { type: String, required: false, default: "" },
+    // Matière ouverte, fournie par la route
+    // /parents/dashbord/enfants/:enfant/assistances/:matiereId ; la partie
+    // ouverte est dans l'adresse (?partie= ou ?seance=).
+    matiereId: { type: Number, default: null },
+  },
+  emits: ["back", "selectMatiere"],
+  setup() {
+    return { setCrumbLabel: useCrumbLabel() };
   },
   data() {
     return {
-      subjects: [],
-      selectedAssistant: null,
+      matieres: [],
       loading: false,
       error: null,
     };
   },
+  computed: {
+    matiere() {
+      if (this.matiereId == null) return null;
+      return this.matieres.find((m) => Number(m.matiereId) === this.matiereId) || null;
+    },
+    // Parties regroupées par SA, dans l'ordre du programme.
+    groupesSA() {
+      const groupes = [];
+      (this.matiere?.parties || []).forEach((p) => {
+        let g = groupes.find((x) => x.sa === p.sa);
+        if (!g) groupes.push((g = { sa: p.sa, parties: [] }));
+        g.parties.push(p);
+      });
+      return groupes;
+    },
+    filChoisi() {
+      if (!this.matiere) return null;
+      const { partie, seance } = this.$route.query;
+      if (partie) {
+        const p = this.matiere.parties.find((x) => String(x.elementId) === String(partie));
+        return p ? { cle: `p${p.elementId}`, testId: p.testId, titre: p.titre, date: p.derniereDate } : null;
+      }
+      if (seance) {
+        const h = this.matiere.horsProgramme.find((x) => String(x.testId) === String(seance));
+        return h ? { cle: `s${h.testId}`, testId: h.testId, titre: h.activite, date: h.date } : null;
+      }
+      return null;
+    },
+  },
+  watch: {
+    matiere(m) {
+      if (m) this.setCrumbLabel(this.$route.path, m.nom);
+    },
+  },
   created() {
-    this.fetchSubjects();
+    this.charger();
   },
   methods: {
-    getToken() {
-      return typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    },
-
-    async fetchSubjects() {
-      const token = this.getToken();
+    async charger() {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
       if (!token) {
         this.error = "Session expirée. Veuillez vous reconnecter.";
         return;
       }
-
       this.loading = true;
       this.error = null;
       try {
-        const response = await axios.get(`${API}/subjects/${this.childId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const rows = Array.isArray(response.data?.assistants) ? response.data.assistants : [];
-
-        // Une carte par matière : on garde l'entrée la plus récente (les lignes
-        // arrivent déjà triées par date décroissante côté serveur).
-        const recentByMatiere = new Map();
-        rows.forEach((row) => {
-          if (!recentByMatiere.has(row.matiereId)) recentByMatiere.set(row.matiereId, row);
-        });
-        this.subjects = Array.from(recentByMatiere.values());
+        const { data } = await axios.get(`${API}/matieres/${this.childId}`, { headers: { Authorization: `Bearer ${token}` } });
+        this.matieres = Array.isArray(data?.matieres) ? data.matieres : [];
+        // Matière de l'adresse introuvable : retour à la liste des assistants.
+        if (this.matiereId != null && !this.matiere) this.$emit("selectMatiere", null);
       } catch (err) {
         console.error("Erreur lors de la récupération des assistants :", err);
-        this.error =
-          err.response?.data?.message || "Erreur lors du chargement des assistants.";
+        this.error = err.response?.data?.message || "Erreur lors du chargement des assistants.";
       } finally {
         this.loading = false;
       }
     },
-
-    selectSubject(subject) {
-      this.selectedAssistant = subject;
+    resumeMatiere(m) {
+      const enCours = [...m.parties].reverse().find((p) => !p.termine) || m.parties[m.parties.length - 1];
+      if (enCours) return enCours.titre;
+      return m.horsProgramme[0]?.activite || "";
     },
-
+    ouvrir(choix) {
+      this.$router.push({ path: this.$route.path, query: { ...this.$route.query, partie: undefined, seance: undefined, ...choix } });
+    },
+    fermerFil() {
+      const { partie, seance, ...reste } = this.$route.query;
+      this.$router.push({ path: this.$route.path, query: reste });
+    },
     formatDate(value) {
       const d = dayjs(value);
       return d.isValid() ? d.format("DD/MM/YYYY") : "—";
@@ -159,6 +210,16 @@ export default {
 </script>
 
 <style scoped>
+/* Page d'une matière : parties vues en classe */
+.sa-groupe { margin-bottom: 18px; }
+.sa-titre { font-weight: 800; color: #1d4ed8; margin: 4px 2px 8px; }
+.partie-card { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid rgba(15, 23, 42, 0.1); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06); }
+.partie-card:hover { border-color: #93c5fd; }
+.partie-info { flex: 1; min-width: 0; }
+.partie-parents { font-size: 0.78rem; color: #64748b; }
+.partie-titre { font-weight: 800; color: #0f172a; }
+.partie-sub { display: flex; align-items: center; flex-wrap: wrap; font-size: 0.82rem; color: #64748b; margin-top: 4px; }
+
 /* ===== Page (charte bleue, cohérente avec Presence.vue / Scolarite.vue) ===== */
 .assist-page {
   --primary: #2563eb;
@@ -184,7 +245,7 @@ export default {
   background: rgba(246, 248, 252, 0.82);
   border-bottom: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: minmax(0, 1fr) 44px; /* la flèche retour est dans le cadre (PageNav) */
   gap: 10px;
   align-items: center;
   padding: 12px 14px;
@@ -232,18 +293,18 @@ export default {
 .empty-card {
   max-width: 640px;
   margin: 18px auto 0;
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
 }
 .empty-content {
-  padding: 22px 18px;
+  padding: 14px 12px;
   text-align: center;
 }
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   margin: 0 auto 10px;
   display: grid;
   place-items: center;
@@ -252,17 +313,17 @@ export default {
   border: 1px solid rgba(37, 99, 235, 0.22);
 }
 .empty-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 900;
   color: var(--text);
 }
 .empty-subtitle {
   margin-top: 4px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: var(--muted);
 }
 .btn-primary {
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--primary);
   color: #fff;
   font-weight: 900;
@@ -286,15 +347,15 @@ export default {
   gap: 14px;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 18px;
-  box-shadow: 0 10px 40px rgba(11, 46, 74, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   padding: 14px 14px;
   cursor: pointer;
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 .subject-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 18px 55px rgba(11, 46, 74, 0.14);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 /* Silhouette de personne : chaque assistant représente un tuteur, pas un robot. */
 .assistant-avatar {
@@ -305,7 +366,7 @@ export default {
   place-items: center;
   background: linear-gradient(135deg, var(--primary), var(--primary-600));
   color: #fff;
-  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   flex: 0 0 auto;
 }
 .subject-info {

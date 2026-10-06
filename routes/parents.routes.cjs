@@ -5,10 +5,11 @@
 const express = require('express');
 const router = express.Router();
 
-const { authenticateJWT } = require('../server-lib/auth.cjs');
+const { authenticateJWT, requireAdminStaff } = require('../server-lib/auth.cjs');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 
-router.post('/Parents', async (req, res) => {
+router.post('/Parents', authenticateJWT, async (req, res) => {
   const {
     name,
     firstName,
@@ -34,7 +35,25 @@ router.post('/Parents', async (req, res) => {
     return res.status(400).json({ error: 'Tous les champs sont requis (y compris anneeScolaireId).' });
   }
 
+  if (Number(etablissementId) !== Number(req.user.etablissementId)) {
+    return res.status(403).json({ error: "Vous n'avez pas accès à cet établissement." });
+  }
+  if (String(password).length < 6) {
+    return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 6 caractères.' });
+  }
+
   try {
+    // La connexion parent cherche par e-mail OU nom d'utilisateur dans
+    // l'école : un doublon empêchait l'un des deux parents de se connecter.
+    const [doublon] = await req.db.query(
+      `SELECT id FROM parents WHERE etablissement_id = ?
+         AND (LOWER(email) IN (LOWER(?), LOWER(?)) OR LOWER(nom_utilisateur) IN (LOWER(?), LOWER(?)))`,
+      [etablissementId, email, username, email, username]
+    );
+    if (doublon.length > 0) {
+      return res.status(409).json({ error: "Un parent utilise déjà cet e-mail ou ce nom d'utilisateur." });
+    }
+
     // Hash du mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -135,6 +154,47 @@ router.put('/Parents/:id', authenticateJWT, async (req, res) => {
     res.json(updatedParent);
   } catch (error) {
     console.error('Erreur lors de la modification du parent:', error);
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+// Accès d'un parent sans e-mail (inscrit par téléphone) : il ne peut pas
+// activer son compte lui-même ; l'école lui remet un identifiant (son
+// numéro) et un mot de passe provisoire, affiché une seule fois. Sert aussi
+// à réinitialiser un mot de passe oublié.
+router.post('/Parents/:id/acces', authenticateJWT, requireAdminStaff, async (req, res) => {
+  const etablissementId = Number(req.user.etablissementId);
+  try {
+    const [[p]] = await req.db.query(
+      'SELECT id, nom, prenom, contact, email, nom_utilisateur FROM parents WHERE id = ? AND etablissement_id = ?',
+      [req.params.id, etablissementId]
+    );
+    if (!p) return res.status(404).json({ error: 'Parent non trouvé' });
+
+    let identifiant = p.nom_utilisateur;
+    if (!identifiant) {
+      const sansAccents = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const base = String(p.contact || '').replace(/\D/g, '') || `${sansAccents(p.prenom)}.${sansAccents(p.nom)}`.replace(/^\.|\.$/g, '') || `parent${p.id}`;
+      identifiant = base;
+      for (let n = 2; ; n += 1) {
+        const [pris] = await req.db.query(
+          'SELECT id FROM parents WHERE etablissement_id = ? AND id <> ? AND (LOWER(nom_utilisateur) = ? OR LOWER(email) = ?)',
+          [etablissementId, p.id, identifiant, identifiant]
+        );
+        if (!pris.length) break;
+        identifiant = `${base}${n}`;
+      }
+    }
+    // Sans caractères ambigus (0/O, 1/l/I) : il sera recopié à la main.
+    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+    const motDePasse = Array.from(crypto.randomBytes(8), (b) => alphabet[b % alphabet.length]).join('');
+    await req.db.query(
+      'UPDATE parents SET nom_utilisateur = ?, mot_de_passe = ? WHERE id = ?',
+      [identifiant, await bcrypt.hash(motDePasse, 10), p.id]
+    );
+    res.json({ identifiant, motDePasse, parent: `${p.prenom || ''} ${p.nom || ''}`.trim() });
+  } catch (error) {
+    console.error("Erreur création de l'accès parent :", error);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });

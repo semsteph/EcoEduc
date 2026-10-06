@@ -1,12 +1,8 @@
 <template>
   <div class="requests-wrapper">
-    <v-card :elevation="4" class="pa-4 card-style">
+    <v-card :elevation="0" class="pa-3 card-style">
       <!-- Bouton Retour -->
       <div class="d-flex justify-center mb-2">
-        <v-btn color="primary" @click="$emit('back')" rounded size="small">
-          <v-icon start size="small">mdi-arrow-left</v-icon>
-          Retour
-        </v-btn>
       </div>
 
       <v-card-title class="d-flex align-center justify-space-between flex-wrap">
@@ -40,11 +36,11 @@
       <v-divider class="my-2"></v-divider>
 
       <v-card-text>
-        <div v-if="loading" class="text-center py-6">
+        <div v-if="loading" class="text-center py-3">
           <v-progress-circular indeterminate color="primary" size="40" />
         </div>
 
-        <div v-else-if="demandes.length === 0" class="text-caption text-center py-8 text-grey">
+        <div v-else-if="demandes.length === 0" class="text-caption text-center py-3 text-grey">
           <v-icon class="mb-2" size="32">mdi-check-circle-outline</v-icon>
           <div>Aucune demande{{ filtreStatut === 'en_attente' ? ' en attente' : '' }} pour le moment</div>
         </div>
@@ -53,7 +49,7 @@
           <v-col v-for="demande in demandes" :key="demande.id" cols="12" md="10" lg="8">
             <v-alert
               :type="alertType(demande.statut)"
-              class="pa-4 alert-card"
+              class="pa-3 alert-card"
               border="start"
               :border-color="alertColor(demande.statut)"
               colored-border
@@ -156,11 +152,17 @@ export default {
     etablissementId: { type: Number, required: true },
     anneeScolaireId: { type: Number, required: true },
   },
+  setup() {
+    // Filtre de statut affiché, gardé dans l'adresse (?statut=...).
+    const filtreStatut = useUrlState("statut", "en_attente", {
+      allowed: ["en_attente", "approuvee", "rejetee", "toutes"],
+    });
+    return { filtreStatut };
+  },
   data() {
     return {
       demandes: [],
       loading: true,
-      filtreStatut: "en_attente",
       countEnAttente: 0,
       commentaires: {},
       processing: {},
@@ -294,7 +296,7 @@ export default {
 .card-style {
   width: 100%;
   max-width: 1100px;
-  border-radius: 16px;
+  border-radius: 10px;
   background-color: #f9fbff;
 }
 

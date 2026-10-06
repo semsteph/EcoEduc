@@ -13,6 +13,7 @@ const express = require('express');
 const router = express.Router();
 
 const { authenticateJWT, requireAdminStaff } = require('../server-lib/auth.cjs');
+const notesService = require('../server-lib/notes-service.cjs');
 
 // Liste blanche des colonnes de `note` qu'une demande peut viser : le nom de
 // colonne vient du client et ne doit jamais être interpolé tel quel dans le SQL.
@@ -42,8 +43,14 @@ router.post('/notes/modification-requests', authenticateJWT, async (req, res) =>
 
   const nouvelleValeurNum = toNullableFloat(nouvelleValeur);
   const typeDemande = nouvelleValeurNum === null ? 'suppression' : 'modification';
+  if (nouvelleValeurNum !== null && (nouvelleValeurNum < 0 || nouvelleValeurNum > 20)) {
+    return res.status(400).json({ message: 'La nouvelle note doit être entre 0 et 20.' });
+  }
 
   try {
+    if (!(await notesService.canWriteNotes(req.db, req.user, { classeId, matiereId, anneeScolaireId }))) {
+      return res.status(403).json({ message: "Vous n'enseignez pas cette matière dans cette classe." });
+    }
     // Une seule demande en attente à la fois pour une même note : évite les doublons.
     const [existing] = await req.db.query(
       `SELECT id FROM note_modification_requests
@@ -252,13 +259,12 @@ router.put('/notes/modification-requests/:id/approve', authenticateJWT, requireA
 
     const nouvelleValeur = demande.type_demande === 'suppression' ? null : demande.nouvelle_valeur;
 
-    await connection.query(
-      `UPDATE note SET ${demande.note_type} = ?
-       WHERE Eleves_id = ? AND matieres_id = ? AND Semestre_id = ?
-         AND classe_id = ? AND etablissement_id = ? AND Annee_scolaire_id = ?`,
-      [nouvelleValeur, demande.eleve_id, demande.matieres_id, demande.semestre_id,
-       demande.classe_id, demande.etablissement_id, demande.annee_scolaire_id]
-    );
+    // Note changée puis moyenne recalculée (avant : la moyenne du bulletin
+    // restait l'ancienne).
+    await notesService.setNote(connection, {
+      eleveId: demande.eleve_id, matiereId: demande.matieres_id, semestreId: demande.semestre_id,
+      classeId: demande.classe_id, etablissementId: demande.etablissement_id, anneeScolaireId: demande.annee_scolaire_id,
+    }, notesService.noteField(demande.note_type) || demande.note_type, nouvelleValeur);
 
     await connection.query(
       `UPDATE note_modification_requests
@@ -272,6 +278,7 @@ router.put('/notes/modification-requests/:id/approve', authenticateJWT, requireA
     res.json({ message: 'Demande approuvée : la note a été mise à jour.' });
   } catch (error) {
     if (connection) await connection.rollback();
+    if (error.code === 'ANNEE_CLOTUREE') return res.status(409).json({ message: error.message });
     console.error('Erreur lors de l\'approbation de la demande de modification de note:', error);
     res.status(500).json({ message: 'Erreur serveur.' });
   } finally {

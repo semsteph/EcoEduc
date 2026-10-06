@@ -32,7 +32,7 @@
       <v-card v-else-if="!filteredPermissions.length" class="empty-card" outlined>
         <v-card-text class="empty-content">
           <div class="empty-icon">
-            <v-icon size="42">mdi-inbox-outline</v-icon>
+            <v-icon size="24">mdi-inbox-outline</v-icon>
           </div>
           <div class="empty-title">Aucune demande</div>
           <div class="empty-subtitle">
@@ -128,7 +128,7 @@
 
     <!-- Dialog détails permission -->
     <v-dialog v-model="dialog" max-width="920" scrollable>
-      <v-card class="dialog-card" rounded="xl">
+      <v-card class="dialog-card" rounded="lg">
         <!-- Header sticky -->
         <div class="dialog-header">
           <div class="dialog-header-left">
@@ -227,7 +227,7 @@
 
     <!-- Dialog mise à jour statut -->
     <v-dialog v-model="statusDialog" max-width="520">
-      <v-card class="status-card" rounded="xl">
+      <v-card class="status-card" rounded="lg">
         <div class="dialog-header">
           <div class="dialog-title">
             <v-icon class="mr-2" color="primary">mdi-check-decagram</v-icon>
@@ -246,7 +246,7 @@
             v-model="selectedStatus"
             :items="statusItems"
             label="Sélectionnez le statut"
-            density="comfortable"
+            density="compact"
             variant="outlined"
           />
         </v-card-text>
@@ -590,7 +590,7 @@ export default {
 }
 
 .btn-primary {
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--primary);
   color: #fff;
   font-weight: 900;
@@ -645,7 +645,7 @@ export default {
 
 /* Card */
 .perm-card {
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
   overflow: hidden;
@@ -667,7 +667,7 @@ export default {
 .perm-avatar {
   width: 48px;
   height: 48px;
-  border-radius: 16px;
+  border-radius: 10px;
   background: #f1f5f9;
   border: 1px solid rgba(15, 23, 42, 0.08);
   color: #64748b;
@@ -790,20 +790,20 @@ export default {
 .empty-card {
   max-width: 560px;
   margin: 18px auto 0;
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
 }
 
 .empty-content {
-  padding: 20px 18px;
+  padding: 14px 12px;
   text-align: center;
 }
 
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   margin: 0 auto 10px;
   display: flex;
   align-items: center;
@@ -815,14 +815,14 @@ export default {
 }
 
 .empty-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 900;
   color: var(--text);
 }
 
 .empty-subtitle {
   margin-top: 4px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: var(--muted);
 }
 
@@ -882,7 +882,7 @@ export default {
 /* Info blocks */
 .info-block {
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 12px 12px;
   background: #fff;
 }
@@ -913,7 +913,7 @@ export default {
   .perm-avatar {
     width: 44px;
     height: 44px;
-    border-radius: 14px;
+    border-radius: 10px;
   }
   .btn-view {
     width: 100%;

@@ -46,31 +46,60 @@ export default defineNuxtPlugin((app) => {
     // pour une apparence cohérente (coins arrondis, ombres douces)
     // sans avoir à répéter les mêmes props partout.
     defaults: {
+      // Interface fine (voir assets/css/interface-fine.css) : densité
+      // compacte et aucune ombre épaisse par défaut.
       VCard: {
         rounded: 'lg',
-        elevation: 1,
+        elevation: 0,
       },
       VBtn: {
         rounded: 'lg',
+        density: 'compact',
+        elevation: 0,
         style: 'text-transform: none; letter-spacing: normal; font-weight: 600;',
       },
       VTextField: {
         rounded: 'lg',
         variant: 'outlined',
-        density: 'comfortable',
+        density: 'compact',
       },
       VTextarea: {
         rounded: 'lg',
         variant: 'outlined',
-        density: 'comfortable',
+        density: 'compact',
       },
       VSelect: {
         rounded: 'lg',
         variant: 'outlined',
-        density: 'comfortable',
+        density: 'compact',
+      },
+      VAutocomplete: {
+        variant: 'outlined',
+        density: 'compact',
+      },
+      VCombobox: {
+        variant: 'outlined',
+        density: 'compact',
+      },
+      VFileInput: {
+        variant: 'outlined',
+        density: 'compact',
+      },
+      VList: {
+        density: 'compact',
+      },
+      VTable: {
+        density: 'compact',
+      },
+      VDataTable: {
+        density: 'compact',
+      },
+      VTabs: {
+        density: 'compact',
       },
       VChip: {
         rounded: 'lg',
+        size: 'small',
       },
       VAlert: {
         rounded: 'lg',
@@ -80,6 +109,11 @@ export default defineNuxtPlugin((app) => {
       },
       VAppBar: {
         elevation: 0,
+      },
+      // Un message temporaire affiché ne doit pas « avaler » le bouton
+      // Précédent du navigateur : sinon l'utilisateur reste sur l'écran.
+      VSnackbar: {
+        closeOnBack: false,
       },
     },
   });

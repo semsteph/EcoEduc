@@ -2,9 +2,6 @@
   <div class="page">
     <!-- ✅ Topbar pro + responsive -->
     <div class="topbar">
-      <v-btn icon class="icon-btn" @click="$emit('back')" aria-label="Retour">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
 
       <div class="topbar-title">
         <div class="t1">Enseignants / Classes</div>
@@ -38,7 +35,7 @@
       <v-card v-else-if="!classes.length" class="empty-card" outlined>
         <v-card-text class="empty-content">
           <div class="empty-icon">
-            <v-icon size="42">mdi-school-outline</v-icon>
+            <v-icon size="24">mdi-school-outline</v-icon>
           </div>
           <div class="empty-title">Aucune classe disponible</div>
           <div class="empty-subtitle">
@@ -66,7 +63,7 @@
           <v-text-field
             v-model="search"
             class="search"
-            density="comfortable"
+            density="compact"
             variant="outlined"
             hide-details
             placeholder="Rechercher une classe..."
@@ -85,10 +82,10 @@
             <v-card
               class="class-card"
               outlined
-              @click="goToClass(classe.id, classe.nom)"
+              @click="goToClass(classe.id)"
               role="button"
               tabindex="0"
-              @keydown.enter.prevent="goToClass(classe.id, classe.nom)"
+              @keydown.enter.prevent="goToClass(classe.id)"
             >
               <div class="class-card-inner">
                 <div class="class-avatar">
@@ -147,12 +144,12 @@ export default {
     etablissementNom: { type: String, required: true },
     anneeScolaire: { type: String, required: true },
     anneeScolaireId: { type: Number, required: true },
+    classeId: { type: Number, default: null },
   },
+  emits: ["back", "ouvrir-classe"],
   data() {
     return {
       classes: [],
-      selectedClassId: null,
-      selectedClassName: "",
 
       loading: false,
       search: "",
@@ -160,6 +157,16 @@ export default {
     };
   },
   computed: {
+    // Classe ouverte : donnée par la route (…/<classeId>). La changer émet
+    // « ouvrir-classe » et la page va vers la nouvelle adresse.
+    selectedClassId: {
+      get() { return this.classeId; },
+      set(id) { this.$emit("ouvrir-classe", id); },
+    },
+    selectedClassName() {
+      const classe = this.classes.find((c) => Number(c.id) === Number(this.classeId));
+      return classe ? classe.nom : "";
+    },
     filteredClasses() {
       const q = String(this.search || "").trim().toLowerCase();
       if (!q) return this.classes;
@@ -175,6 +182,8 @@ export default {
           headers: { Authorization: `Bearer ${token}` },
         });
         this.classes = Array.isArray(res.data) ? res.data : [];
+        // Classe inconnue dans l'adresse : retour à la liste des classes.
+        if (this.classeId && !this.selectedClassName) this.selectedClassId = null;
         if (showToast) this.snackbar = { show: true, text: "Classes mises à jour." };
       } catch (error) {
         console.error("Erreur lors de la récupération des classes:", error);
@@ -184,13 +193,11 @@ export default {
         this.loading = false;
       }
     },
-    goToClass(classId, className) {
+    goToClass(classId) {
       this.selectedClassId = classId;
-      this.selectedClassName = className;
     },
     clearSelection() {
       this.selectedClassId = null;
-      this.selectedClassName = "";
     },
   },
   created() {
@@ -316,7 +323,7 @@ export default {
 
 /* Cards */
 .class-card {
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
   overflow: hidden;
@@ -334,7 +341,7 @@ export default {
 .class-avatar {
   width: 46px;
   height: 46px;
-  border-radius: 16px;
+  border-radius: 10px;
   background: rgba(37, 99, 235, 0.10);
   border: 1px solid rgba(37, 99, 235, 0.22);
   color: var(--primary-600);
@@ -373,7 +380,7 @@ export default {
   .class-card:hover {
     transform: translateY(-1px);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    box-shadow: 0 10px 28px rgba(37, 99, 235, 0.10);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   }
 }
 
@@ -381,20 +388,20 @@ export default {
 .empty-card {
   max-width: 560px;
   margin: 18px auto 0;
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--card);
 }
 
 .empty-content {
-  padding: 20px 18px;
+  padding: 14px 12px;
   text-align: center;
 }
 
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   margin: 0 auto 10px;
   display: flex;
   align-items: center;
@@ -406,20 +413,20 @@ export default {
 }
 
 .empty-title {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 900;
   color: var(--text);
 }
 
 .empty-subtitle {
   margin-top: 4px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   color: var(--muted);
 }
 
 /* Buttons */
 .btn-primary {
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--primary);
   color: #fff;
   font-weight: 900;
@@ -451,7 +458,7 @@ export default {
   .class-avatar {
     width: 44px;
     height: 44px;
-    border-radius: 14px;
+    border-radius: 10px;
   }
   .search {
     min-width: 100%;

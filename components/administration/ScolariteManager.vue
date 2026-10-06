@@ -1,21 +1,12 @@
 <template>
-  <v-container fluid class="pa-4 bg-grey-lighten-4">
+  <v-container fluid class="pa-3 bg-grey-lighten-4">
 
-    <v-row align="center" class="mb-6">
+    <v-row align="center" class="mb-3">
       <v-col cols="auto">
-        <v-btn
-          icon
-          variant="elevated"
-          color="white"
-          @click="selectedClassId ? clearSelection() : $emit('back')"
-          elevation="2"
-        >
-          <v-icon color="success">mdi-arrow-left</v-icon>
-        </v-btn>
       </v-col>
 
       <v-col>
-        <h1 class="text-h5 font-weight-bold text-success d-flex align-center">
+        <h1 class="text-h6 font-weight-bold text-success d-flex align-center">
           <v-icon start size="32">mdi-cash-multiple</v-icon>
 
           {{
@@ -52,7 +43,7 @@
 
     <!-- Dialogue : paiements déclarés par les parents, en attente de validation -->
     <v-dialog v-model="pendingDialog" max-width="720">
-      <v-card class="rounded-xl">
+      <v-card class="rounded-lg">
         <v-card-title class="d-flex align-center justify-space-between">
           <span>Paiements déclarés par les parents</span>
           <v-btn icon variant="text" @click="pendingDialog = false">
@@ -61,7 +52,7 @@
         </v-card-title>
 
         <v-card-text>
-          <v-row v-if="pendingLoading" justify="center" class="py-6">
+          <v-row v-if="pendingLoading" justify="center" class="py-3">
             <v-progress-circular indeterminate color="warning" />
           </v-row>
 
@@ -136,9 +127,9 @@
             <v-card
               border
               flat
-              class="rounded-xl pa-2 pa-md-6 w-100"
+              class="rounded-lg pa-2 pa-md-3 w-100"
             >
-              <v-card-title class="px-4 pt-4">
+              <v-card-title class="px-3 pt-4">
                 <span class="text-subtitle-1 font-weight-medium text-grey-darken-2">
                   Sélectionnez une classe pour gérer les frais scolaires
                 </span>
@@ -168,13 +159,13 @@
                       lg="3"
                     >
                       <v-card
-                        class="class-card rounded-xl text-center"
-                        @click="goToClass(classe.id, classe.nom)"
+                        class="class-card rounded-lg text-center"
+                        @click="goToClass(classe.id)"
                         ripple
                       >
                         <v-card-text>
-                          <v-avatar color="success" size="65" class="mb-4">
-                            <v-icon color="white" size="34">mdi-cash-register</v-icon>
+                          <v-avatar color="success" size="32" class="mb-2">
+                            <v-icon size="18" color="white">mdi-cash-register</v-icon>
                           </v-avatar>
 
                           <div class="text-h6 font-weight-bold">
@@ -274,14 +265,18 @@ export default {
     anneeScolaireId: {
       type: Number,
       required: true
+    },
+    classeId: {
+      type: Number,
+      default: null
     }
   },
+
+  emits: ['back', 'ouvrir-classe'],
 
   data() {
     return {
       classes: [],
-      selectedClassId: null,
-      selectedClassName: '',
       loading: false,
       viewTransition: 'list',
 
@@ -289,6 +284,28 @@ export default {
       pendingDialog: false,
       pendingLoading: false,
       processingId: null
+    }
+  },
+
+  computed: {
+    // Classe ouverte : donnée par la route (…/<classeId>). La changer émet
+    // « ouvrir-classe » et la page va vers la nouvelle adresse.
+    selectedClassId: {
+      get() { return this.classeId },
+      set(id) { this.$emit('ouvrir-classe', id) }
+    },
+    selectedClassName() {
+      const classe = this.classes.find((c) => Number(c.id) === Number(this.classeId))
+      return classe ? classe.nom : ''
+    }
+  },
+
+  watch: {
+    classeId: {
+      handler(id) {
+        this.viewTransition = id ? 'detail' : 'list'
+      },
+      immediate: true
     }
   },
 
@@ -364,6 +381,8 @@ export default {
           this.authHeaders()
         )
         this.classes = response.data
+        // Classe inconnue dans l'adresse : retour à la liste des classes.
+        if (this.classeId && !this.selectedClassName) this.selectedClassId = null
       } catch (error) {
         console.error('Erreur lors du chargement des classes :', error)
       } finally {
@@ -371,16 +390,12 @@ export default {
       }
     },
 
-    goToClass(classId, className) {
+    goToClass(classId) {
       this.selectedClassId = classId
-      this.selectedClassName = className
-      this.viewTransition = 'detail'
     },
 
     clearSelection() {
       this.selectedClassId = null
-      this.selectedClassName = ''
-      this.viewTransition = 'list'
     }
 
   },
@@ -405,7 +420,7 @@ export default {
 
 .class-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   border-color: rgb(var(--v-theme-success));
 }
 

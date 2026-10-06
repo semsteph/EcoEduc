@@ -39,6 +39,10 @@ function buildConfigFromEnv() {
 const db = mysql.createPool({
   ...buildConfigFromEnv(),
   charset: 'utf8mb4',
+  // Colonnes DATE renvoyées telles quelles (« 2026-10-03 ») : converties en
+  // objets Date, elles arrivaient décalées d'un jour (« 2026-10-02T23:00Z »)
+  // dans les absences, dates de naissance, échéances...
+  dateStrings: ['DATE'],
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,

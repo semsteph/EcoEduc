@@ -1,274 +1,166 @@
 <template>
-  <v-container fluid class="login-container">
-    <!-- Bouton retour -->
-    <v-btn
-      class="back-button"
-      icon
-      variant="flat"
-      @click="$router.push('/Accueil/Accueil')"
-      aria-label="Retour"
-    >
-      <v-icon>mdi-arrow-left</v-icon>
-    </v-btn>
+  <AuthLayout
+    role="enseignants"
+    :before-back="backFromReset"
+    :title="showReset ? 'Mot de passe oublié' : 'Connexion'"
+    :subtitle="showReset
+      ? 'Récupérez votre compte en 3 étapes : e-mail, code, nouveau mot de passe.'
+      : 'Un seul compte pour tous les établissements où vous enseignez.'"
+  >
+    <!-- CHOIX DE L'ÉTABLISSEMENT (enseignant dans plusieurs écoles) -->
+    <div v-if="!showReset && choix.length" class="choix-ecole">
+      <p class="choix-texte">Vous enseignez dans {{ choix.length }} établissements. Lequel ouvrir ?</p>
+      <v-alert v-if="error" type="error" variant="tonal" density="comfortable" class="auth-alert">{{ error }}</v-alert>
+      <v-btn
+        v-for="c in choix"
+        :key="c.etablissementId"
+        block
+        variant="outlined"
+        color="primary"
+        class="choix-btn"
+        prepend-icon="mdi-school-outline"
+        :loading="loginLoading && choixEnCours === c.etablissementId"
+        @click="choisir(c.etablissementId)"
+      >{{ c.nom }}</v-btn>
+      <p class="choix-aide">Vous pourrez passer d'un établissement à l'autre depuis le menu, sans retaper votre mot de passe.</p>
+      <button type="button" class="auth-link" @click="choix = []">Revenir</button>
+    </div>
 
-    <v-row justify="center" align="center" class="fill-height ma-0">
-      <v-col cols="12" sm="10" md="6" lg="4" class="pa-0">
-        <!-- Header -->
-        <div class="text-center mb-5 px-2 px-sm-5">
-          <div class="brand-badge mx-auto mb-3">
-            <v-icon size="22">mdi-school-outline</v-icon>
-          </div>
+    <!-- CONNEXION -->
+    <v-form v-else-if="!showReset" @submit.prevent="login">
+      <v-alert
+        v-if="error"
+        type="error"
+        variant="tonal"
+        density="comfortable"
+        class="auth-alert"
+      >
+        {{ error }}
+      </v-alert>
 
-          <div class="welcome-title">Bienvenue</div>
-          <div class="welcome-subtitle">
-            Connectez-vous pour accéder à votre espace personnel.
-          </div>
-        </div>
+      <v-text-field
+        v-model="usernameOrEmail"
+        label="Identifiant, e-mail ou téléphone"
+        prepend-inner-icon="mdi-account-outline"
+        autocomplete="username"
+        hide-details="auto"
+        class="auth-field"
+      />
 
-        <!-- Card -->
-        <v-card class="login-card" elevation="10">
-          <!-- LOGIN -->
-          <v-form v-if="!showReset" @submit.prevent="login">
-            <v-text-field
-              v-model="usernameOrEmail"
-              label="Nom d'utilisateur ou Email"
-              required
-              variant="outlined"
-              density="comfortable"
-              color="primary"
-              prepend-inner-icon="mdi-account"
-              class="rounded-field"
-              hide-details="auto"
-            />
+      <v-text-field
+        v-model="password"
+        :type="showPassword ? 'text' : 'password'"
+        label="Mot de passe"
+        prepend-inner-icon="mdi-lock-outline"
+        :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+        autocomplete="current-password"
+        hide-details="auto"
+        class="auth-field"
+        @click:append-inner="togglePasswordVisibility"
+      />
 
-            <v-text-field
-              v-model="password"
-              :type="showPassword ? 'text' : 'password'"
-              label="Mot de passe"
-              required
-              variant="outlined"
-              density="comfortable"
-              color="primary"
-              prepend-inner-icon="mdi-lock"
-              :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
-              @click:append-inner="togglePasswordVisibility"
-              class="rounded-field"
-              hide-details="auto"
-            />
+      <div class="d-flex justify-end mb-3">
+        <button type="button" class="auth-link" @click="openReset">
+          Mot de passe oublié ?
+        </button>
+      </div>
 
-            <v-select
-              v-model="etablissement"
-              :items="etablissements"
-              item-title="nom"
-              item-value="id"
-              label="Établissement"
-              required
-              variant="outlined"
-              density="comfortable"
-              color="primary"
-              prepend-inner-icon="mdi-school"
-              class="rounded-field"
-              hide-details="auto"
-            />
+      <v-btn
+        type="submit"
+        color="primary"
+        class="auth-submit"
+        :loading="loginLoading"
+        :disabled="loginLoading || !canLogin"
+      >
+        Se connecter
+      </v-btn>
+    </v-form>
 
-            <v-btn
-              type="submit"
-              color="primary"
-              block
-              size="large"
-              class="mt-4 login-button"
-              :loading="loginLoading"
-              :disabled="loginLoading"
-            >
-              Se connecter
-            </v-btn>
+    <!-- MOT DE PASSE OUBLIÉ -->
+    <v-form v-else @submit.prevent="handleReset">
+      <div class="auth-steps" role="list" aria-label="Étapes">
+        <span class="auth-step" :class="{ 'is-active': !resetCodeSent }" role="listitem">E-mail</span>
+        <span class="auth-step-line" aria-hidden="true"></span>
+        <span class="auth-step" :class="{ 'is-active': resetCodeSent && !validCode }" role="listitem">Code</span>
+        <span class="auth-step-line" aria-hidden="true"></span>
+        <span class="auth-step" :class="{ 'is-active': validCode }" role="listitem">Nouveau</span>
+      </div>
 
-            <v-alert
-              v-if="error"
-              type="error"
-              class="mt-4"
-              variant="tonal"
-              border="start"
-              density="comfortable"
-            >
-              {{ error }}
-            </v-alert>
+      <v-alert v-if="resetError" type="error" variant="tonal" density="comfortable" class="auth-alert">
+        {{ resetError }}
+      </v-alert>
+      <v-alert v-if="resetSuccess" type="success" variant="tonal" density="comfortable" class="auth-alert">
+        {{ resetSuccess }}
+      </v-alert>
 
-            <div class="text-center mt-3">
-              <v-btn
-                variant="text"
-                class="forgot-btn"
-                color="primary"
-                @click="openReset"
-              >
-                Mot de passe oublié ?
-              </v-btn>
-            </div>
-          </v-form>
+      <template v-if="!resetCodeSent">
+        <v-text-field
+          v-model="email"
+          label="E-mail"
+          prepend-inner-icon="mdi-email-outline"
+          autocomplete="email"
+          hide-details="auto"
+          class="auth-field"
+        />
 
-          <!-- RESET -->
-          <v-form v-else @submit.prevent="handleReset">
-            <div class="reset-head mb-4">
-              <div class="reset-title">
-                <v-icon class="mr-2" size="20">mdi-lock-reset</v-icon>
-                Réinitialisation
-              </div>
-              <div class="reset-subtitle">
-                Suivez les étapes pour récupérer votre compte.
-              </div>
-            </div>
 
-            <!-- Stepper mini (visuel) -->
-            <div class="mini-steps mb-4">
-              <div class="step" :class="{ active: !resetCodeSent }">
-                <span class="dot"></span>
-                <span>Email</span>
-              </div>
-              <div class="line"></div>
-              <div class="step" :class="{ active: resetCodeSent && !validCode }">
-                <span class="dot"></span>
-                <span>Code</span>
-              </div>
-              <div class="line"></div>
-              <div class="step" :class="{ active: validCode }">
-                <span class="dot"></span>
-                <span>Nouveau</span>
-              </div>
-            </div>
+      </template>
 
-            <div v-if="!resetCodeSent">
-              <v-text-field
-                v-model="email"
-                label="Entrez votre e-mail"
-                required
-                variant="outlined"
-                density="comfortable"
-                color="primary"
-                prepend-inner-icon="mdi-email-outline"
-                class="rounded-field"
-                hide-details="auto"
-              />
+      <v-text-field
+        v-if="resetCodeSent && !validCode"
+        v-model="code"
+        label="Code de vérification"
+        prepend-inner-icon="mdi-shield-key-outline"
+        inputmode="numeric"
+        hide-details="auto"
+        class="auth-field"
+      />
 
-              <v-select
-                v-model="resetEtablissement"
-                :items="etablissements"
-                item-title="nom"
-                item-value="id"
-                label="Établissement"
-                required
-                variant="outlined"
-                density="comfortable"
-                color="primary"
-                prepend-inner-icon="mdi-school"
-                class="rounded-field"
-                hide-details="auto"
-              />
-            </div>
+      <template v-if="validCode">
+        <v-text-field
+          v-model="newPassword"
+          :type="showNewPassword ? 'text' : 'password'"
+          label="Nouveau mot de passe"
+          hint="6 caractères minimum"
+          prepend-inner-icon="mdi-lock-outline"
+          :append-inner-icon="showNewPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          autocomplete="new-password"
+          hide-details="auto"
+          class="auth-field"
+          @click:append-inner="showNewPassword = !showNewPassword"
+        />
 
-            <v-text-field
-              v-if="resetCodeSent && !validCode"
-              v-model="code"
-              label="Code de vérification"
-              required
-              variant="outlined"
-              density="comfortable"
-              color="primary"
-              prepend-inner-icon="mdi-shield-key-outline"
-              class="rounded-field"
-              hide-details="auto"
-            />
+        <v-text-field
+          v-model="confirmPassword"
+          :type="showConfirmPassword ? 'text' : 'password'"
+          label="Confirmer le mot de passe"
+          prepend-inner-icon="mdi-lock-check-outline"
+          :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          autocomplete="new-password"
+          hide-details="auto"
+          class="auth-field"
+          @click:append-inner="showConfirmPassword = !showConfirmPassword"
+        />
+      </template>
 
-            <div v-if="validCode">
-              <v-text-field
-                v-model="newPassword"
-                :type="showNewPassword ? 'text' : 'password'"
-                label="Nouveau mot de passe"
-                required
-                variant="outlined"
-                density="comfortable"
-                color="primary"
-                prepend-inner-icon="mdi-lock-outline"
-                :append-inner-icon="showNewPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                @click:append-inner="toggleNewPasswordVisibility"
-                class="rounded-field"
-                hide-details="auto"
-              />
+      <v-btn
+        type="submit"
+        color="primary"
+        class="auth-submit"
+        :loading="resetLoading"
+        :disabled="resetLoading || !canResetSubmit"
+      >
+        {{
+          !resetCodeSent
+            ? "Envoyer le code"
+            : !validCode
+              ? "Valider le code"
+              : "Modifier le mot de passe"
+        }}
+      </v-btn>
 
-              <v-text-field
-                v-model="confirmPassword"
-                :type="showConfirmPassword ? 'text' : 'password'"
-                label="Confirmez le mot de passe"
-                required
-                variant="outlined"
-                density="comfortable"
-                color="primary"
-                prepend-inner-icon="mdi-lock-check-outline"
-                :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                @click:append-inner="toggleConfirmPasswordVisibility"
-                class="rounded-field"
-                hide-details="auto"
-              />
-            </div>
-
-            <v-btn
-              type="submit"
-              color="primary"
-              block
-              size="large"
-              class="mt-3 login-button"
-              :loading="resetLoading"
-              :disabled="resetLoading"
-            >
-              {{
-                resetCodeSent
-                  ? validCode
-                    ? 'Modifier le mot de passe'
-                    : 'Valider le code'
-                  : 'Envoyer le code'
-              }}
-            </v-btn>
-
-            <v-btn
-              variant="tonal"
-              color="black"
-              block
-              class="mt-2 cancel-btn"
-              @click="cancelReset"
-            >
-              Annuler
-            </v-btn>
-
-            <v-alert
-              v-if="resetError"
-              type="error"
-              class="mt-4"
-              variant="tonal"
-              border="start"
-              density="comfortable"
-            >
-              {{ resetError }}
-            </v-alert>
-
-            <v-alert
-              v-if="resetSuccess"
-              type="success"
-              class="mt-4"
-              variant="tonal"
-              border="start"
-              density="comfortable"
-            >
-              {{ resetSuccess }}
-            </v-alert>
-          </v-form>
-        </v-card>
-
-        <!-- Footer -->
-        <div class="text-center mt-4 footer-note px-2 px-sm-6">
-          © {{ new Date().getFullYear() }} — Plateforme scolaire
-        </div>
-      </v-col>
-    </v-row>
-  </v-container>
+    </v-form>
+  </AuthLayout>
 </template>
 
 <script>
@@ -283,7 +175,6 @@ export default {
       // Connexion
       usernameOrEmail: "",
       password: "",
-      etablissement: "",
       error: "",
       showPassword: false,
       loginLoading: false,
@@ -297,21 +188,44 @@ export default {
       resetCodeSent: false,
       validCode: false,
       resetToken: null,
-      resetEtablissement: "",
       resetError: "",
       resetSuccess: "",
       showNewPassword: false,
       showConfirmPassword: false,
       resetLoading: false,
 
-      // Etablissements
-      etablissements: [],
+      // Plusieurs établissements : choix après le mot de passe.
+      choix: [],
+      jetonChoix: "",
+      choixEnCours: null,
+
     };
   },
 
-  mounted() {
-    this.fetchEtablissements();
+  computed: {
+    canLogin() {
+      return (
+        String(this.usernameOrEmail || "").trim().length > 0 &&
+        String(this.password || "").length > 0
+      );
+    },
+    canResetSubmit() {
+      if (!this.resetCodeSent) {
+        return String(this.email || "").trim().length > 0;
+      }
+      if (!this.validCode) {
+        return String(this.code || "").trim().length > 0;
+      }
+      return String(this.newPassword || "").length >= 6 && this.newPassword === this.confirmPassword;
+    },
   },
+
+  watch: {
+    // Le message d'erreur disparaît dès que l'utilisateur corrige sa saisie.
+    usernameOrEmail() { this.error = ""; },
+    password() { this.error = ""; },
+  },
+
 
   methods: {
     togglePasswordVisibility() {
@@ -326,16 +240,9 @@ export default {
 
     openReset() {
       this.error = "";
+      this.resetError = "";
+      this.resetSuccess = "";
       this.showReset = true;
-    },
-
-    async fetchEtablissements() {
-      try {
-        const res = await axios.get(`${API_BASE}/api/etablissements`);
-        this.etablissements = res.data || [];
-      } catch (error) {
-        console.error("Erreur lors du chargement des établissements.", error);
-      }
     },
 
     async login() {
@@ -343,39 +250,68 @@ export default {
       this.loginLoading = true;
 
       try {
-        const response = await axios.post(`${API_BASE}/api/loginEns`, {
-          username: this.usernameOrEmail, // ✅
+        const { data } = await axios.post(`${API_BASE}/api/loginEns`, {
+          username: this.usernameOrEmail,
           password: this.password,
-          etablissement: this.etablissement,
         });
-
-        const token = response.data.token;
-        localStorage.setItem("token", token);
-
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const {
-          id: enseignantId,
-          etablissement: etablissementId,
-          enseignant_nom,
-          enseignant_prenom,
-          etablissement_nom,
-        } = payload;
-
-        this.$router.push({
-          path: "/professeurs/dashbord",
-          query: {
-            id: enseignantId,
-            etablissement: etablissementId,
-            enseignantNom: enseignant_nom,
-            enseignantPrenom: enseignant_prenom,
-            etablissementNom: etablissement_nom,
-          },
-        });
+        this.retenirMotDePasseProvisoire(data.motDePasseProvisoire);
+        if (data.choix) {
+          this.choix = data.choix;
+          this.jetonChoix = data.jetonChoix;
+          return;
+        }
+        this.entrer(data.token);
       } catch (error) {
         this.error = error.response?.data?.message || "Erreur de connexion au serveur.";
       } finally {
         this.loginLoading = false;
       }
+    },
+
+    async choisir(etablissementId) {
+      this.error = "";
+      this.loginLoading = true;
+      this.choixEnCours = etablissementId;
+      try {
+        const { data } = await axios.post(`${API_BASE}/api/loginEns/choisir`, { jetonChoix: this.jetonChoix, etablissementId });
+        this.entrer(data.token);
+      } catch (error) {
+        this.error = error.response?.data?.message || "Erreur de connexion au serveur.";
+        if (error.response?.status === 401) this.choix = [];
+      } finally {
+        this.loginLoading = false;
+        this.choixEnCours = null;
+      }
+    },
+
+    // Mot de passe donné par l'école : à remplacer dès l'arrivée.
+    retenirMotDePasseProvisoire(provisoire) {
+      try {
+        if (provisoire) sessionStorage.setItem("ens-mdp-provisoire", "1");
+        else sessionStorage.removeItem("ens-mdp-provisoire");
+      } catch (e) { /* stockage indisponible */ }
+    },
+
+    entrer(token) {
+      localStorage.setItem("token", token);
+      const { id, etablissement, enseignant_nom, enseignant_prenom, etablissement_nom } = decodeJwtPayload(token);
+      this.$router.push({
+        path: "/professeurs/dashbord",
+        query: {
+          id,
+          etablissement,
+          enseignantNom: enseignant_nom,
+          enseignantPrenom: enseignant_prenom,
+          etablissementNom: etablissement_nom,
+        },
+      });
+    },
+
+    // Flèche retour pendant « Mot de passe oublié » : retour à la connexion.
+    backFromReset() {
+      if (!this.showReset) return false;
+      if (!this.resetLoading) this.cancelReset();
+      return true;
     },
 
     cancelReset() {
@@ -387,7 +323,6 @@ export default {
       this.resetCodeSent = false;
       this.validCode = false;
       this.resetToken = null;
-      this.resetEtablissement = "";
       this.resetError = "";
       this.resetSuccess = "";
       this.resetLoading = false;
@@ -400,19 +335,14 @@ export default {
 
       try {
         if (!this.resetCodeSent) {
-          await axios.post(`${API_BASE}/api/send-reset-code`, {
-            email: this.email,
-            etablissement: this.resetEtablissement,
-          });
+          await axios.post(`${API_BASE}/api/send-reset-code`, { email: this.email });
           this.resetCodeSent = true;
+          this.resetSuccess = "Code envoyé. Vérifiez votre boîte mail.";
         } else if (!this.validCode) {
-          const res = await axios.post(`${API_BASE}/api/verify-reset-code`, {
-            email: this.email,
-            code: this.code,
-            etablissement: this.resetEtablissement,
-          });
+          const res = await axios.post(`${API_BASE}/api/verify-reset-code`, { email: this.email, code: this.code });
           this.resetToken = res.data.resetToken;
           this.validCode = true;
+          this.resetSuccess = "Code validé. Choisissez un nouveau mot de passe.";
         } else {
           if (this.newPassword !== this.confirmPassword) {
             this.resetError = "Les mots de passe ne correspondent pas.";
@@ -426,12 +356,13 @@ export default {
 
           this.resetSuccess =
             "Mot de passe modifié avec succès. Vous pouvez maintenant vous connecter.";
-          // On revient au login proprement
-          this.cancelReset();
+          // Retour au formulaire de connexion après lecture du message
+          // (auparavant effacé immédiatement : l'utilisateur ne le voyait pas).
+          setTimeout(() => this.cancelReset(), 1800);
         }
       } catch (error) {
         if (error.response?.status === 404) {
-          this.resetError = "Aucun compte n’est associé à cet e-mail et établissement.";
+          this.resetError = "Aucun compte enseignant n’est associé à cet e-mail.";
         } else {
           this.resetError = error.response?.data?.message || "Erreur lors du processus.";
         }
@@ -444,163 +375,8 @@ export default {
 </script>
 
 <style scoped>
-/* CHARTE : BLEU / BLANC + touche de noir */
-.login-container {
-  min-height: 100vh;
-  padding: 14px;
-  background:
-    radial-gradient(900px 500px at 20% 15%, rgba(25, 118, 210, 0.22), transparent 60%),
-    radial-gradient(700px 500px at 80% 10%, rgba(25, 118, 210, 0.14), transparent 55%),
-    linear-gradient(180deg, #eaf2ff 0%, #ffffff 45%, #f6f9ff 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Bouton retour flottant */
-.back-button {
-  position: fixed;
-  top: 14px;
-  left: 14px;
-  z-index: 10;
-  background: rgba(0, 0, 0, 0.55) !important;
-  color: #fff !important;
-  border-radius: 12px !important;
-  backdrop-filter: blur(8px);
-}
-
-/* Badge logo */
-.brand-badge {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: rgba(25, 118, 210, 0.12);
-  border: 1px solid rgba(25, 118, 210, 0.18);
-  color: #1976d2;
-}
-
-.welcome-title {
-  font-size: 1.55rem;
-  font-weight: 900;
-  color: #0b2e4a; /* bleu foncé */
-  letter-spacing: 0.2px;
-}
-
-.welcome-subtitle {
-  margin-top: 6px;
-  font-size: 0.98rem;
-  color: #455a64;
-  line-height: 1.35rem;
-}
-
-/* Carte principale */
-.login-card {
-  border-radius: 18px !important;
-  background: rgba(255, 255, 255, 0.92) !important;
-  border: 1px solid rgba(25, 118, 210, 0.14);
-  box-shadow: 0 18px 60px rgba(11, 46, 74, 0.12);
-  padding: 18px;
-}
-
-/* Champs arrondis */
-.rounded-field :deep(.v-field) {
-  border-radius: 14px !important;
-}
-
-/* Bouton principal */
-.login-button {
-  border-radius: 999px !important;
-  font-weight: 900;
-  letter-spacing: 0.3px;
-}
-
-/* Bouton annuler (touche de noir) */
-.cancel-btn {
-  border-radius: 999px !important;
-  font-weight: 800;
-}
-
-/* Mot de passe oublié */
-.forgot-btn {
-  text-transform: none;
-  font-weight: 800;
-}
-
-/* Reset header */
-.reset-title {
-  font-weight: 900;
-  color: #0b2e4a;
-  display: flex;
-  align-items: center;
-  font-size: 1.05rem;
-}
-
-.reset-subtitle {
-  color: #607d8b;
-  font-size: 0.9rem;
-  margin-top: 4px;
-}
-
-/* Mini stepper */
-.mini-steps {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #90a4ae;
-  font-weight: 800;
-  font-size: 0.85rem;
-}
-
-.step .dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: #cfd8dc;
-  display: inline-block;
-}
-
-.step.active {
-  color: #1976d2;
-}
-
-.step.active .dot {
-  background: #1976d2;
-}
-
-.line {
-  flex: 1;
-  height: 2px;
-  background: #e3f2fd;
-  border-radius: 999px;
-}
-
-/* Footer */
-.footer-note {
-  color: #78909c;
-  font-size: 0.85rem;
-}
-
-/* Mobile adjustments */
-@media (max-width: 420px) {
-  .login-container {
-    padding: 10px;
-  }
-  .login-card {
-    padding: 14px;
-    border-radius: 16px !important;
-  }
-  .welcome-title {
-    font-size: 1.35rem;
-  }
-  .welcome-subtitle {
-    font-size: 0.92rem;
-  }
-}
+.choix-ecole { display: flex; flex-direction: column; gap: 8px; }
+.choix-texte { margin: 0 0 4px; font-weight: 600; }
+.choix-btn { justify-content: flex-start; text-transform: none; }
+.choix-aide { font-size: 0.8rem; color: #5f6b7a; margin: 4px 0; }
 </style>

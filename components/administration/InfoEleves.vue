@@ -7,7 +7,6 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-btn block color="primary" @click="$emit('back')">Retour</v-btn>
   </v-container>
 </template>
 

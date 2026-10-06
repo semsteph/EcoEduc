@@ -2,9 +2,6 @@
   <div class="container">
     <!-- Top bar -->
     <div class="topbar">
-      <v-btn icon class="back-btn" @click="$emit('back')" aria-label="Retour">
-        <v-icon>mdi-arrow-left</v-icon>
-      </v-btn>
 
       <div class="topbar-title">
         <div class="title">Ce qui a été fait ce mois-ci</div>
@@ -134,7 +131,7 @@ export default {
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: minmax(0, 1fr) 44px; /* la flèche retour est dans le cadre (PageNav) */
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -181,7 +178,7 @@ export default {
   background-color: white;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .header-cell {

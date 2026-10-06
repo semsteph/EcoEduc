@@ -1,15 +1,15 @@
 <template>
   <v-container
     fluid
-    class="pa-4 bg-lighten-4"
+    class="pa-3 bg-lighten-4"
     style="background-color: #f5f7fa; min-height: 100vh;"
   >
-    <v-card class="mb-5 rounded-lg border-bottom-blue" elevation="2">
-      <v-card-text class="d-flex align-center flex-wrap py-4">
+    <v-card class="mb-5 rounded-lg border-bottom-blue" elevation="0">
+      <v-card-text class="d-flex align-center flex-wrap py-3">
         <div class="d-flex align-center">
           <v-icon color="#1A237E" size="32" class="mr-3">mdi-calendar-clock</v-icon>
           <div>
-            <h1 class="text-h5 font-weight-black mb-0" style="color:#1A237E;">
+            <h1 class="text-h6 font-weight-black mb-0" style="color:#1A237E;">
               Programme Hebdomadaire
             </h1>
             <span class="text-subtitle-2 grey--text">
@@ -21,17 +21,17 @@
         <v-spacer></v-spacer>
 
         <div class="mt-3 mt-sm-0">
-          <v-btn color="#1A237E" dark depressed class="rounded-pill mr-2 px-2 px-sm-6" @click="dialog = true">
+          <v-btn color="#1A237E" dark depressed class="rounded-pill mr-2 px-2 px-sm-3" @click="dialog = true">
             <v-icon left>mdi-plus</v-icon> Ajouter
           </v-btn>
-          <v-btn color="success" dark depressed class="rounded-pill px-2 px-sm-6" @click="telechargerProgrammePDF">
+          <v-btn color="success" dark depressed class="rounded-pill px-2 px-sm-3" @click="telechargerProgrammePDF">
             <v-icon left>mdi-file-pdf-box</v-icon> PDF
           </v-btn>
         </div>
       </v-card-text>
     </v-card>
 
-    <v-card elevation="2" class="rounded-lg overflow-hidden">
+    <v-card elevation="0" class="rounded-lg overflow-hidden">
       <v-simple-table class="modern-table">
         <template v-slot:default>
           <thead>
@@ -79,11 +79,11 @@
 
     <v-dialog v-model="dialog" max-width="450">
       <v-card class="rounded-lg">
-        <v-toolbar color="#1A237E" dark flat>
-          <v-toolbar-title>Nouveau créneau</v-toolbar-title>
+        <v-toolbar height="40" color="#1A237E" dark flat>
+          <v-toolbar-title class="text-subtitle-1">Nouveau créneau</v-toolbar-title>
         </v-toolbar>
 
-        <v-card-text class="pa-2 pa-sm-6">
+        <v-card-text class="pa-2 pa-sm-3">
           <v-select
             label="Jour"
             v-model="nouveauProgramme.jour"
@@ -114,10 +114,10 @@
 
         <v-divider />
 
-        <v-card-actions class="pa-4">
+        <v-card-actions class="pa-3">
           <v-spacer />
-          <v-btn text @click="fermerDialog" class="px-2 px-sm-6">Annuler</v-btn>
-          <v-btn color="#1A237E" dark depressed @click="ajouterProgramme" class="px-2 px-sm-6">
+          <v-btn text @click="fermerDialog" class="px-2 px-sm-3">Annuler</v-btn>
+          <v-btn color="#1A237E" dark depressed @click="ajouterProgramme" class="px-2 px-sm-3">
             Valider
           </v-btn>
         </v-card-actions>
@@ -388,7 +388,7 @@ export default {
 
 .programme-chip:hover {
   background: white;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .time-text {

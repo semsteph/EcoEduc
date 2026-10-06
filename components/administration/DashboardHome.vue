@@ -1,8 +1,8 @@
 <template>
   <div class="dashboard-home">
-    <div class="d-flex align-center justify-space-between mb-6 flex-wrap ga-2">
+    <div class="d-flex align-center justify-space-between mb-3 flex-wrap ga-2">
       <div>
-        <h2 class="text-h5 font-weight-bold text-primary mb-1">Tableau de bord</h2>
+        <h2 class="dash-title font-weight-bold text-primary">Tableau de bord</h2>
         <div class="text-body-2 text-medium-emphasis">
           {{ etablissementNom }} · Année scolaire en cours
         </div>
@@ -18,23 +18,51 @@
       </v-btn>
     </div>
 
-    <v-alert v-if="error" type="error" variant="tonal" class="mb-6" density="comfortable">
+    <!-- Admis de 3ème en attente de leur série de 2nde -->
+    <v-alert v-if="aOrienter > 0" type="warning" variant="tonal" class="mb-3" prepend-icon="mdi-sign-direction">
+      <div class="d-flex align-center flex-wrap ga-2">
+        <span class="flex-grow-1"><strong>{{ aOrienter }} élève(s) de 2nde</strong> attendent le choix de leur série : ils ne peuvent pas encore recevoir de notes.</span>
+        <v-btn size="small" color="warning" variant="flat" to="/administration/dashbord/eleves/orientation">Orienter</v-btn>
+      </div>
+    </v-alert>
+
+    <!-- Premiers pas : visible tant que la mise en place n'est pas terminée -->
+    <v-card v-if="demarrage && !demarrage.termine" class="rounded-lg pa-3 mb-3 demarrage" elevation="0">
+      <div class="demarrage-titre">
+        <v-icon color="primary" class="mr-2">mdi-rocket-launch-outline</v-icon>
+        Premiers pas : {{ etapesFaites }}/{{ demarrage.etapes.length }} étapes
+      </div>
+      <v-progress-linear :model-value="(etapesFaites / demarrage.etapes.length) * 100" color="primary" rounded height="6" class="my-2" />
+      <div v-for="(e, i) in demarrage.etapes" :key="e.cle" class="demarrage-etape" :class="{ 'is-fait': e.fait, 'is-suivante': e.cle === prochaineEtape }">
+        <v-icon size="20" :color="e.fait ? 'success' : 'grey'">{{ e.fait ? 'mdi-check-circle' : 'mdi-numeric-' + (i + 1) + '-circle-outline' }}</v-icon>
+        <div class="demarrage-texte">
+          <div class="demarrage-nom">{{ e.titre }}</div>
+          <div class="demarrage-aide">{{ e.fait ? `${e.nombre} enregistré(s)` : e.aide }}</div>
+        </div>
+        <v-btn v-if="!e.fait" size="small" :variant="e.cle === prochaineEtape ? 'flat' : 'text'" color="primary" :to="e.lien">
+          {{ e.cle === prochaineEtape ? 'Commencer' : 'Ouvrir' }}
+        </v-btn>
+      </div>
+    </v-card>
+
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-3" density="compact">
       {{ error }}
     </v-alert>
 
+    <div v-if="anneeScolaireId">
     <!-- KPI -->
-    <v-row>
-      <v-col cols="12" sm="6" md="3" v-for="(kpi, i) in kpis" :key="i">
-        <v-card class="rounded-xl pa-4 kpi-card" elevation="1">
+    <v-row dense>
+      <v-col cols="6" md="3" v-for="(kpi, i) in kpis" :key="i">
+        <v-card class="rounded-lg pa-3 kpi-card" elevation="0">
           <div class="d-flex align-center">
-            <v-avatar :color="kpi.color" variant="tonal" size="48" class="mr-4">
-              <v-icon :color="kpi.color">{{ kpi.icon }}</v-icon>
+            <v-avatar :color="kpi.color" variant="tonal" size="32" class="mr-2 flex-shrink-0">
+              <v-icon :color="kpi.color" size="18">{{ kpi.icon }}</v-icon>
             </v-avatar>
-            <div>
-              <div class="text-caption text-medium-emphasis font-weight-medium text-uppercase">
+            <div class="kpi-body">
+              <div class="kpi-label text-medium-emphasis font-weight-medium text-uppercase">
                 {{ kpi.title }}
               </div>
-              <div class="text-h5 font-weight-black">
+              <div class="kpi-value font-weight-bold">
                 <v-skeleton-loader v-if="loading" type="text" width="60" />
                 <span v-else>{{ kpi.value }}</span>
               </div>
@@ -45,11 +73,11 @@
     </v-row>
 
     <!-- Finances -->
-    <v-row class="mt-2">
+    <v-row dense class="mt-1">
       <v-col cols="12" md="5">
-        <v-card class="rounded-xl pa-2 pa-sm-6 fill-height" elevation="1">
-          <div class="d-flex align-center justify-space-between mb-4">
-            <span class="text-subtitle-1 font-weight-bold">Situation financière</span>
+        <v-card class="rounded-lg pa-3 fill-height dash-card" elevation="0">
+          <div class="d-flex align-center justify-space-between flex-wrap ga-1 mb-2">
+            <span class="text-subtitle-2 font-weight-bold">Situation financière</span>
             <v-chip
               v-if="stats.finances.paiementsEnAttente > 0"
               color="warning"
@@ -61,20 +89,20 @@
             </v-chip>
           </div>
 
-          <div class="text-h4 font-weight-black mb-1">{{ formatMoney(stats.finances.montantPaye) }}</div>
-          <div class="text-caption text-medium-emphasis mb-4">
+          <div class="money-value font-weight-bold mb-1">{{ formatMoney(stats.finances.montantPaye) }}</div>
+          <div class="text-caption text-medium-emphasis mb-3">
             collectés sur {{ formatMoney(stats.finances.montantTotal) }} attendus
           </div>
 
           <v-progress-linear
             :model-value="stats.finances.tauxRecouvrement"
-            height="10"
+            height="6"
             rounded
             :color="recouvrementColor"
             bg-color="grey-lighten-3"
             class="mb-2"
           />
-          <div class="d-flex justify-space-between text-caption text-medium-emphasis mb-6">
+          <div class="d-flex justify-space-between flex-wrap ga-1 text-caption text-medium-emphasis mb-3">
             <span>{{ stats.finances.tauxRecouvrement }}% recouvré</span>
             <span>Reste : {{ formatMoney(stats.finances.reste) }}</span>
           </div>
@@ -83,7 +111,7 @@
           <ClientOnly>
             <apexchart
               type="area"
-              height="180"
+              height="160"
               :options="paiementsChartOptions"
               :series="paiementsChartSeries"
             />
@@ -92,8 +120,8 @@
       </v-col>
 
       <v-col cols="12" md="7">
-        <v-card class="rounded-xl pa-2 pa-sm-6 fill-height" elevation="1">
-          <div class="text-subtitle-1 font-weight-bold mb-4">Effectifs par classe</div>
+        <v-card class="rounded-lg pa-3 fill-height dash-card" elevation="0">
+          <div class="text-subtitle-2 font-weight-bold mb-2">Effectifs par classe</div>
           <ClientOnly>
             <apexchart
               type="bar"
@@ -107,14 +135,14 @@
     </v-row>
 
     <!-- Répartition + moyennes -->
-    <v-row class="mt-2">
+    <v-row dense class="mt-1">
       <v-col cols="12" md="4">
-        <v-card class="rounded-xl pa-2 pa-sm-6 fill-height" elevation="1">
-          <div class="text-subtitle-1 font-weight-bold mb-4">Répartition par genre</div>
+        <v-card class="rounded-lg pa-3 fill-height dash-card" elevation="0">
+          <div class="text-subtitle-2 font-weight-bold mb-2">Répartition par genre</div>
           <ClientOnly>
             <apexchart
               type="donut"
-              height="260"
+              height="220"
               :options="genreChartOptions"
               :series="genreChartSeries"
             />
@@ -123,9 +151,9 @@
       </v-col>
 
       <v-col cols="12" md="8">
-        <v-card class="rounded-xl pa-2 pa-sm-6 fill-height" elevation="1">
-          <div class="d-flex align-center justify-space-between mb-4">
-            <span class="text-subtitle-1 font-weight-bold">Moyenne générale par classe</span>
+        <v-card class="rounded-lg pa-3 fill-height dash-card" elevation="0">
+          <div class="d-flex align-center justify-space-between flex-wrap ga-1 mb-2">
+            <span class="text-subtitle-2 font-weight-bold">Moyenne générale par classe</span>
             <div class="d-flex align-center ga-2">
               <span class="legend-dot" style="background:#0ca30c"></span>
               <span class="text-caption text-medium-emphasis mr-3">≥ 10/20</span>
@@ -137,11 +165,11 @@
             <apexchart
               v-if="moyenneChartSeries[0].data.length"
               type="bar"
-              height="260"
+              height="220"
               :options="moyenneChartOptions"
               :series="moyenneChartSeries"
             />
-            <div v-else class="text-center text-medium-emphasis py-10">
+            <div v-else class="text-center text-body-2 text-medium-emphasis py-4">
               Aucune note enregistrée pour cette année scolaire.
             </div>
           </ClientOnly>
@@ -150,14 +178,14 @@
     </v-row>
 
     <!-- Absences -->
-    <v-row class="mt-2 mb-4">
+    <v-row dense class="mt-1 mb-2">
       <v-col cols="12">
-        <v-card class="rounded-xl pa-2 pa-sm-6" elevation="1">
-          <div class="text-subtitle-1 font-weight-bold mb-4">Absences déclarées par mois</div>
+        <v-card class="rounded-lg pa-3 dash-card" elevation="0">
+          <div class="text-subtitle-2 font-weight-bold mb-2">Absences déclarées par mois</div>
           <ClientOnly>
             <apexchart
               type="bar"
-              height="220"
+              height="190"
               :options="absencesChartOptions"
               :series="absencesChartSeries"
             />
@@ -165,6 +193,7 @@
         </v-card>
       </v-col>
     </v-row>
+    </div>
   </div>
 </template>
 
@@ -175,7 +204,7 @@ import axios from 'axios'
 const props = defineProps({
   etablissementId: { type: Number, required: true },
   etablissementNom: { type: String, default: '' },
-  anneeScolaireId: { type: Number, required: true },
+  anneeScolaireId: { type: Number, default: null },
 })
 
 const API_BASE = ''
@@ -211,6 +240,29 @@ const authHeaders = () => {
   const token = localStorage.getItem('token')
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {}
 }
+
+// Mise en place de l'établissement (carte « Premiers pas »).
+const demarrage = ref(null)
+const fetchDemarrage = async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/api/dashboard/demarrage`, authHeaders())
+    demarrage.value = res.data
+  } catch (e) {
+    demarrage.value = null
+  }
+}
+const etapesFaites = computed(() => (demarrage.value?.etapes || []).filter((e) => e.fait).length)
+const prochaineEtape = computed(() => (demarrage.value?.etapes || []).find((e) => !e.fait)?.cle)
+onMounted(fetchDemarrage)
+
+// Élèves admis en 2nde dont la série reste à choisir.
+const aOrienter = ref(0)
+onMounted(async () => {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/orientation-2nde/compte`, authHeaders())
+    aOrienter.value = Number(data?.n || 0)
+  } catch (e) { aOrienter.value = 0 }
+})
 
 const fetchStats = async () => {
   if (!props.etablissementId || !props.anneeScolaireId) return
@@ -263,7 +315,7 @@ const baseOptions = {
 }
 
 // ---- Effectifs par classe (bar horizontal, une seule série) ----
-const effectifsHeight = computed(() => Math.max(260, stats.value.effectifsParClasse.length * 36))
+const effectifsHeight = computed(() => Math.max(200, stats.value.effectifsParClasse.length * 28))
 const effectifsChartSeries = computed(() => [
   { name: 'Élèves', data: stats.value.effectifsParClasse.map((c) => c.effectif) },
 ])
@@ -365,11 +417,52 @@ const absencesChartOptions = computed(() => ({
 </script>
 
 <style scoped>
+.demarrage { border: 1px solid #c5d8f5; background: #f5f9ff; }
+.demarrage-titre { display: flex; align-items: center; font-weight: 800; color: #0d47a1; }
+.demarrage-etape { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-top: 1px solid #e3ecf8; }
+.demarrage-etape.is-fait .demarrage-nom { color: #6b7a8c; text-decoration: line-through; }
+.demarrage-etape.is-suivante { background: #e8f1ff; border-radius: 8px; }
+.demarrage-texte { flex: 1; min-width: 0; }
+.demarrage-nom { font-weight: 700; font-size: 0.9rem; }
+.demarrage-aide { font-size: 0.75rem; color: #5f6b7a; }
 .dashboard-home {
   animation: fadeIn 0.4s ease-in-out;
 }
+.dash-title {
+  font-size: 20px;
+  line-height: 1.3;
+  margin: 0;
+}
 .kpi-card {
-  border: 1px solid rgba(11, 11, 11, 0.06);
+  border: 1px solid rgba(11, 11, 11, 0.08);
+}
+.kpi-body {
+  min-width: 0;
+}
+.kpi-label {
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kpi-value {
+  font-size: 20px;
+  line-height: 1.25;
+}
+/* Montant collecté : lisible mais plus « énorme » (22 px max, retour à la
+   ligne autorisé pour les très grands montants). */
+.money-value {
+  font-size: 22px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .dash-title { font-size: 18px; }
+  .kpi-value { font-size: 18px; }
+  .money-value { font-size: 20px; }
+  .kpi-label { font-size: 11px; }
 }
 .legend-dot {
   display: inline-block;

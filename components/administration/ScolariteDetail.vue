@@ -1,16 +1,13 @@
 <template>
-  <v-container fluid class="pa-4 bg-grey-lighten-4">
+  <v-container fluid class="pa-3 bg-grey-lighten-4">
 
     <!-- En-tête -->
-    <v-row align="center" class="mb-6 px-2">
+    <v-row align="center" class="mb-3 px-2">
       <v-col cols="auto">
-        <v-btn icon variant="elevated" color="white" elevation="2" @click="$emit('back')">
-          <v-icon color="success">mdi-arrow-left</v-icon>
-        </v-btn>
       </v-col>
 
       <v-col>
-        <h1 class="text-h5 font-weight-bold text-success d-flex align-center">
+        <h1 class="text-h6 font-weight-bold text-success d-flex align-center">
           <v-icon start size="32">mdi-cash-multiple</v-icon>
           Scolarité - {{ className }}
         </h1>
@@ -43,9 +40,9 @@
     </v-row>
 
     <!-- Tableau -->
-    <v-card flat class="rounded-xl">
-      <v-toolbar color="white" flat>
-        <v-toolbar-title>Situation des scolarités</v-toolbar-title>
+    <v-card flat class="rounded-lg">
+      <v-toolbar height="40" color="white" flat>
+        <v-toolbar-title class="text-subtitle-1">Situation des scolarités</v-toolbar-title>
         <v-spacer />
         <v-text-field
           v-model="search"
@@ -627,9 +624,9 @@ export default {
   max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 24px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   font-family: 'Roboto', system-ui, sans-serif;
 }
 .modal--lg { max-width: 640px; }
@@ -798,7 +795,7 @@ export default {
   font-size: 14px;
   font-weight: 500;
   z-index: 4000;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 .toast--success { background: #43a047; }
 .toast--error { background: #e53935; }

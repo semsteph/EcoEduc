@@ -11,85 +11,130 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const JWT_SECRET = process.env.JWT_SECRET;
+const comptesEns = require('../server-lib/comptes-enseignants.cjs');
 
+// Connexion enseignant : un seul compte pour tous ses établissements.
+// Identifiant, e-mail ou téléphone + mot de passe. Une seule école : entrée
+// directe. Plusieurs : la réponse liste les écoles et un jeton de choix
+// (valable 10 min) ; POST /loginEns/choisir donne ensuite l'accès.
+// `etablissement` reste accepté (choix fait d'avance).
 router.post('/loginEns', async (req, res) => {
-  const { username, password, etablissement } = req.body;
-
+  const { username, password, etablissement } = req.body || {};
+  if (!process.env.JWT_SECRET) return res.status(500).json({ message: 'JWT_SECRET manquant côté serveur' });
+  if (!String(username || '').trim() || !String(password || '').trim()) {
+    return res.status(400).json({ message: 'Identifiant et mot de passe requis.' });
+  }
   try {
-    const [rows] = await db.query(
-      `SELECT 
-        enseignants.id AS enseignant_id, 
-        enseignants.nom AS enseignant_nom, 
-        enseignants.prenom AS enseignant_prenom, 
-        enseignants.telephone AS enseignant_telephone, 
-        enseignants.email AS enseignant_email, 
-        enseignants.mot_de_passe AS enseignant_mot_de_passe, 
-        enseignants.nom_utilisateur AS enseignant_nom_utilisateur, 
-        enseignants.etablissement_id AS enseignant_etablissement_id,
-        etablissement.id AS etablissement_id, 
-        etablissement.nom AS etablissement_nom, 
-        etablissement.departement_id, 
-        etablissement.commune_id, 
-        etablissement.statut, 
-        etablissement.telephone AS etablissement_telephone, 
-        etablissement.mail AS etablissement_mail
-      FROM enseignants 
-      INNER JOIN etablissement ON enseignants.etablissement_id = etablissement.id 
-      WHERE (enseignants.nom_utilisateur = ? OR enseignants.email = ?) AND etablissement.id = ?`,
-      [username, username, etablissement]
-    );
+    const comptes = await comptesEns.comptesPourIdentifiant(db, username);
+    const valides = [];
+    for (const c of comptes) if (await comptesEns.motDePasseValide(db, c, password)) valides.push(c);
+    if (!valides.length) return res.status(401).json({ message: 'Identifiant ou mot de passe incorrect.' });
 
-    if (rows.length === 0) {
-      return res.status(401).json({ message: 'Identifiants ou établissement incorrect' });
+    let fiches = await comptesEns.fichesActives(db, valides.map((c) => c.id));
+    if (etablissement) fiches = fiches.filter((f) => Number(f.etablissement_id) === Number(etablissement));
+    if (!fiches.length) {
+      return res.status(403).json({
+        message: etablissement
+          ? "Vous n'enseignez pas (ou plus) dans cet établissement."
+          : "Votre compte n'est rattaché à aucun établissement pour le moment. Rapprochez-vous de l'administration de votre école.",
+      });
     }
-
-    const enseignant = rows[0];
-    const storedPassword = (enseignant.enseignant_mot_de_passe || '').trim();
-    const inputPassword = password.trim();
-    const isBcryptHash = /^\$2[aby]\$/.test(storedPassword);
-
-    let passwordOk;
-    if (isBcryptHash) {
-      passwordOk = await bcrypt.compare(inputPassword, storedPassword);
-    } else {
-      // Compte hérité créé avant le passage au hachage : on accepte encore une
-      // comparaison en clair une seule fois, puis on migre immédiatement le
-      // mot de passe vers un hash bcrypt pour cette ligne.
-      passwordOk = inputPassword === storedPassword;
-      if (passwordOk) {
-        const migratedHash = await bcrypt.hash(inputPassword, 10);
-        await db.query('UPDATE enseignants SET mot_de_passe = ? WHERE id = ?', [migratedHash, enseignant.enseignant_id]);
-      }
+    const provisoire = valides.some((c) => c.mdp_provisoire);
+    if (fiches.length > 1) {
+      return res.json({
+        choix: fiches.map((f) => ({ etablissementId: f.etablissement_id, nom: f.etablissement_nom })),
+        jetonChoix: comptesEns.jetonDeChoix(fiches),
+        motDePasseProvisoire: provisoire,
+      });
     }
-
-    if (!passwordOk) {
-      return res.status(401).json({ message: 'Mot de passe incorrect' });
-    }
-
-    // ✅ IMPORTANT : même secret que authenticateJWT
-    const JWT_SECRET = process.env.JWT_SECRET;
-    if (!JWT_SECRET) {
-      return res.status(500).json({ message: "JWT_SECRET manquant côté serveur" });
-    }
-
-    const token = jwt.sign(
-      {
-        id: enseignant.enseignant_id,
-        username: enseignant.enseignant_nom_utilisateur,
-        etablissement: enseignant.enseignant_etablissement_id, // ✅ cohérent
-        enseignant_nom: enseignant.enseignant_nom,
-        enseignant_prenom: enseignant.enseignant_prenom,
-        etablissement_nom: enseignant.etablissement_nom
-      },
-      JWT_SECRET, // ✅ FIX ICI (plus secretKey)
-      { expiresIn: '1h' }
-    );
-
-    return res.json({ message: 'Connexion réussie', token });
-
+    return res.json({ message: 'Connexion réussie', token: comptesEns.signerJeton(fiches[0]), motDePasseProvisoire: provisoire });
   } catch (error) {
     console.error('Erreur lors de la connexion:', error);
     return res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+router.post('/loginEns/choisir', async (req, res) => {
+  const { jetonChoix, etablissementId } = req.body || {};
+  let payload;
+  try {
+    payload = jwt.verify(String(jetonChoix || ''), process.env.JWT_SECRET);
+  } catch (e) {
+    return res.status(401).json({ message: 'Le délai est dépassé : reconnectez-vous.' });
+  }
+  if (payload.purpose !== 'choix-etablissement' || !Array.isArray(payload.fiches)) return res.status(401).json({ message: 'Jeton invalide.' });
+  try {
+    const [rows] = await db.query(
+      `SELECT e.id, e.compte_id, e.nom, e.prenom, e.nom_utilisateur, e.etablissement_id, et.nom AS etablissement_nom
+       FROM enseignants e JOIN etablissement et ON et.id = e.etablissement_id
+       WHERE e.id IN (?) AND e.actif = 1 AND e.etablissement_id = ?`,
+      [payload.fiches, etablissementId]
+    );
+    if (!rows.length) return res.status(403).json({ message: "Vous n'enseignez pas dans cet établissement." });
+    return res.json({ message: 'Connexion réussie', token: comptesEns.signerJeton(rows[0]) });
+  } catch (error) {
+    console.error('Erreur choix établissement :', error);
+    return res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+// Enseignant connecté : ses établissements, pour passer de l'un à l'autre
+// sans retaper son mot de passe.
+const ficheConnectee = async (req, res) => {
+  const u = req.user || {};
+  if (u.type !== undefined || u.role === 'parent' || !u.id) { res.status(403).json({ message: 'Réservé aux enseignants.' }); return null; }
+  const [[f]] = await db.query('SELECT id, compte_id FROM enseignants WHERE id = ? AND actif = 1', [u.id]);
+  if (!f || !f.compte_id) { res.status(403).json({ message: 'Compte introuvable.' }); return null; }
+  return f;
+};
+
+router.get('/enseignant/etablissements', authenticateJWT, async (req, res) => {
+  try {
+    const f = await ficheConnectee(req, res);
+    if (!f) return;
+    const fiches = await comptesEns.fichesActives(db, [f.compte_id]);
+    res.json(fiches.map((x) => ({ etablissementId: x.etablissement_id, nom: x.etablissement_nom, actuel: x.id === f.id })));
+  } catch (error) {
+    console.error('Erreur établissements enseignant :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+router.post('/enseignant/changer-etablissement', authenticateJWT, async (req, res) => {
+  try {
+    const f = await ficheConnectee(req, res);
+    if (!f) return;
+    const fiches = await comptesEns.fichesActives(db, [f.compte_id]);
+    // « vers » et non « etablissementId » : la garde centrale refuserait une
+    // autre école que celle du jeton ; ici le compte est vérifié.
+    const cible = fiches.find((x) => Number(x.etablissement_id) === Number(req.body?.vers));
+    if (!cible) return res.status(403).json({ message: "Vous n'enseignez pas dans cet établissement." });
+    res.json({ token: comptesEns.signerJeton(cible), etablissementNom: cible.etablissement_nom });
+  } catch (error) {
+    console.error('Erreur changement établissement :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+});
+
+// Changer son mot de passe (obligatoire après un mot de passe provisoire
+// donné par l'école : l'ancien n'est alors pas redemandé).
+router.post('/enseignant/mot-de-passe', authenticateJWT, async (req, res) => {
+  try {
+    const f = await ficheConnectee(req, res);
+    if (!f) return;
+    const { actuel, nouveau } = req.body || {};
+    if (String(nouveau || '').length < 6) return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères.' });
+    const [[compte]] = await db.query('SELECT * FROM compte_enseignant WHERE id = ?', [f.compte_id]);
+    if (!compte.mdp_provisoire && !(await comptesEns.motDePasseValide(db, compte, actuel))) {
+      return res.status(401).json({ message: 'Mot de passe actuel incorrect.' });
+    }
+    const hash = await bcrypt.hash(String(nouveau), 10);
+    await db.query('UPDATE compte_enseignant SET mot_de_passe = ?, mdp_provisoire = 0 WHERE id = ?', [hash, compte.id]);
+    await db.query('UPDATE enseignants SET mot_de_passe = ? WHERE compte_id = ?', [hash, compte.id]);
+    res.json({ message: 'Mot de passe modifié.' });
+  } catch (error) {
+    console.error('Erreur changement mot de passe enseignant :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
   }
 });
 
@@ -104,16 +149,14 @@ function generateResetCode() {
 
 // Route pour envoyer le code par email
 router.post('/send-reset-code', async (req, res) => {
-  const { email, etablissement } = req.body;
+  // Compte enseignant (unique pour tous ses établissements) : l'e-mail suffit.
+  const email = comptesEns.emailNorm(req.body?.email);
 
   try {
-    const [rows] = await db.query(
-      'SELECT * FROM enseignants WHERE email = ? AND etablissement_id = ?',
-      [email, etablissement]
-    );
+    const [rows] = await db.query('SELECT id FROM compte_enseignant WHERE email = ?', [email]);
 
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'Aucun compte trouvé avec cet e-mail et établissement.' });
+    if (!email || rows.length === 0) {
+      return res.status(404).json({ message: 'Aucun compte enseignant avec cet e-mail.' });
     }
 
     const resetCode = generateResetCode();
@@ -151,7 +194,8 @@ router.post('/send-reset-code', async (req, res) => {
 
 // Vérifier le code avec expiration de 10 minutes
 router.post('/verify-reset-code', async (req, res) => {
-  const { email, code, etablissement } = req.body;
+  const email = comptesEns.emailNorm(req.body?.email);
+  const { code } = req.body || {};
 
   try {
     const [rows] = await db.query(
@@ -165,19 +209,15 @@ router.post('/verify-reset-code', async (req, res) => {
       return res.status(400).json({ message: 'Code invalide ou expiré.' });
     }
 
-    const [enseignant] = await db.query(
-      'SELECT id FROM enseignants WHERE email = ? AND etablissement_id = ?',
-      [email, etablissement]
-    );
-
-    if (enseignant.length === 0) {
+    const [comptes] = await db.query('SELECT id FROM compte_enseignant WHERE email = ?', [email]);
+    if (comptes.length === 0) {
       return res.status(404).json({ message: 'Compte enseignant introuvable.' });
     }
 
     // Jeton de réinitialisation signé et à courte durée de vie : prouve que le code
-    // OTP a bien été vérifié pour CE compte, sans laisser le client choisir l'id cible.
+    // OTP a bien été vérifié pour CET e-mail, sans laisser le client choisir le compte.
     const resetToken = jwt.sign(
-      { purpose: 'teacher-password-reset', enseignantId: enseignant[0].id },
+      { purpose: 'teacher-password-reset', compteIds: comptes.map((c) => c.id), email },
       JWT_SECRET,
       { expiresIn: '10m' }
     );
@@ -204,27 +244,19 @@ router.post('/update-password', async (req, res) => {
     return res.status(401).json({ message: 'Jeton de réinitialisation invalide ou expiré.' });
   }
 
-  if (payload.purpose !== 'teacher-password-reset' || !payload.enseignantId) {
+  if (payload.purpose !== 'teacher-password-reset' || !Array.isArray(payload.compteIds) || !payload.compteIds.length) {
     return res.status(401).json({ message: 'Jeton de réinitialisation invalide.' });
   }
-
-  const enseignantId = payload.enseignantId;
+  if (String(newPassword).length < 6) {
+    return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères.' });
+  }
 
   try {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await db.query(
-      'UPDATE enseignants SET mot_de_passe = ? WHERE id = ?',
-      [hashedPassword, enseignantId]
-    );
-
-    // Supprime les codes associés à l'email de cet enseignant
-    await db.query(`
-      DELETE FROM reset_codes
-      WHERE email = (SELECT email FROM enseignants WHERE id = ?)
-    `,
-      [enseignantId]
-    );
+    await db.query('UPDATE compte_enseignant SET mot_de_passe = ?, mdp_provisoire = 0 WHERE id IN (?)', [hashedPassword, payload.compteIds]);
+    await db.query('UPDATE enseignants SET mot_de_passe = ? WHERE compte_id IN (?)', [hashedPassword, payload.compteIds]);
+    await db.query('DELETE FROM reset_codes WHERE email = ?', [payload.email]);
 
     res.status(200).json({ message: 'Mot de passe mis à jour avec succès.' });
   } catch (err) {

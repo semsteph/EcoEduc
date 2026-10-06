@@ -14,13 +14,13 @@
       color="primary"
       dark
       app
-      elevation="12"
+      elevation="0"
     >
       <!-- Drawer header -->
       <div class="drawer-header">
         <div class="drawer-user">
-          <v-avatar size="44" class="drawer-avatar">
-            <v-icon size="26">mdi-account</v-icon>
+          <v-avatar size="32" class="drawer-avatar">
+            <v-icon size="20">mdi-account</v-icon>
           </v-avatar>
 
           <div class="drawer-user-info">
@@ -55,6 +55,39 @@
 
       <!-- Drawer content -->
       <v-list density="compact" nav class="px-2">
+        <!-- Enseignant de plusieurs établissements : un seul compte -->
+        <v-list-item v-if="mesEcoles.length > 1" class="drawer-item" @click="choixEcole = true">
+          <template #prepend>
+            <v-icon>mdi-swap-horizontal</v-icon>
+          </template>
+          <v-list-item-title class="drawer-item-title">Changer d'établissement ({{ mesEcoles.length }})</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item class="drawer-item" :active="route.path === `${DASHBOARD_PATH}/guide`" @click="goTo('/guide'); if (smAndDown) drawer = false">
+          <template #prepend>
+            <v-icon>mdi-help-circle-outline</v-icon>
+          </template>
+          <v-list-item-title class="drawer-item-title">Guide d'utilisation</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item class="drawer-item" @click="ouvrirMotDePasse(false)">
+          <template #prepend>
+            <v-icon>mdi-lock-reset</v-icon>
+          </template>
+          <v-list-item-title class="drawer-item-title">Mon mot de passe</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          class="drawer-item"
+          :active="isEmploiRoute"
+          @click="ouvrirEmploi"
+        >
+          <template #prepend>
+            <v-icon>mdi-calendar-clock</v-icon>
+          </template>
+          <v-list-item-title class="drawer-item-title">Emploi du temps</v-list-item-title>
+        </v-list-item>
+
         <div class="drawer-section-title">
           <v-icon size="18" class="mr-2">mdi-book-open-page-variant</v-icon>
           Matières
@@ -64,7 +97,7 @@
           v-for="subject in uniqueSubjects"
           :key="subject.matiere_id"
           class="drawer-item"
-          :active="selectedSubjectId === subject.matiere_id"
+          :active="!isNotificationsRoute && !isEmploiRoute && selectedSubjectId === subject.matiere_id"
           @click="selectSubject(subject.matiere_id)"
         >
           <template #prepend>
@@ -109,8 +142,11 @@
           L'année scolaire n'est pas encore définie.
         </v-alert>
 
-        <!-- Notifications -->
-        <v-row v-if="showNotificationsComponent" class="mb-4">
+        <!-- Fil d'Ariane et flèche de retour, en haut et en bas de chaque écran -->
+        <PageNav :crumbs="crumbs" position="top" />
+
+        <!-- Notifications : /professeurs/dashbord/notifications -->
+        <v-row v-if="isNotificationsRoute" class="mb-2">
           <v-col cols="12">
             <div class="section-card">
               <div class="section-title">
@@ -118,63 +154,49 @@
                 Notifications
               </div>
 
-              <NotificationComponent
-                :notifications="notifications"
-                :enseignant-id="enseignantId"
-                :annee-scolaire="anneeScolaire"
-                :annee-scolaire-id="anneeScolaireId"
-                :etablissement-id="etablissementId"
-              />
+              <NuxtPage v-if="ready" />
             </div>
           </v-col>
         </v-row>
 
-        <!-- Classes -->
-        <v-row class="mb-4">
-          <v-col cols="12">
-            <div class="section-card">
-              <div class="section-title">
-                <v-icon class="mr-2" color="primary">mdi-google-classroom</v-icon>
-                Classes
+        <template v-else>
+          <!-- Classes : liste, fiche de la classe et outils (routes enfants) -->
+          <v-row class="mb-2">
+            <v-col cols="12">
+              <div class="section-card">
+                <div class="section-title">
+                  <v-icon class="mr-2" color="primary">mdi-google-classroom</v-icon>
+                  Classes
+                </div>
+
+                <NuxtPage v-if="ready" />
+                <v-progress-linear v-else indeterminate color="primary" class="mt-3" />
               </div>
+            </v-col>
+          </v-row>
 
-              <ClassManager
-                v-if="selectedSubjectId"
-                :subject-id="selectedSubjectId"
-                :etablissement-id="etablissementId"
-                :classes="classes"
-                :annee-scolaire="anneeScolaire"
-                :annee-scolaire-id="anneeScolaireId"
-                :selected-class-id="selectedClassId"
-                @class-selected="showClassDetails"
-              />
+          <!-- Détails Classe -->
+          <v-row>
+            <v-col cols="12">
+              <div v-if="selectedClassId && selectedClassName" class="section-card">
+                <div class="section-title">
+                  <v-icon class="mr-2" color="primary">mdi-account-group</v-icon>
+                  Détails de la classe — {{ selectedClassName }}
+                </div>
 
-              <v-alert v-else type="info" variant="tonal" class="mt-3">
-                Sélectionnez une matière dans le menu pour afficher les classes.
-              </v-alert>
-            </div>
-          </v-col>
-        </v-row>
-
-        <!-- Détails Classe -->
-        <v-row>
-          <v-col cols="12">
-            <div v-if="selectedClassId" class="section-card">
-              <div class="section-title">
-                <v-icon class="mr-2" color="primary">mdi-account-group</v-icon>
-                Détails de la classe — {{ selectedClassName }}
+                <ClassDetails
+                  :class-id="selectedClassId"
+                  :class-name="selectedClassName"
+                  :etablissement-id="etablissementId"
+                  :annee-scolaire="anneeScolaire"
+                  :annee-scolaire-id="anneeScolaireId"
+                />
               </div>
+            </v-col>
+          </v-row>
+        </template>
 
-              <ClassDetails
-                :class-id="selectedClassId"
-                :class-name="selectedClassName"
-                :etablissement-id="etablissementId"
-                :annee-scolaire="anneeScolaire"
-                :annee-scolaire-id="anneeScolaireId"
-              />
-            </div>
-          </v-col>
-        </v-row>
+        <PageNav :crumbs="crumbs" position="bottom" />
       </v-container>
     </v-main>
 
@@ -198,31 +220,101 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <!-- Changer d'établissement -->
+    <v-dialog v-model="choixEcole" max-width="440">
+      <v-card>
+        <v-card-title class="d-flex align-center"><v-icon class="mr-2" color="primary">mdi-swap-horizontal</v-icon>Changer d'établissement</v-card-title>
+        <v-card-text>
+          <v-btn
+            v-for="e in mesEcoles"
+            :key="e.etablissementId"
+            block
+            :variant="e.actuel ? 'flat' : 'outlined'"
+            :color="e.actuel ? 'primary' : undefined"
+            class="mb-2 ecole-btn"
+            prepend-icon="mdi-school-outline"
+            :loading="changementEnCours === e.etablissementId"
+            :disabled="e.actuel"
+            @click="changerEcole(e.etablissementId)"
+          >{{ e.nom }}<span v-if="e.actuel" class="ml-2">(ouvert)</span></v-btn>
+          <v-alert v-if="erreurEcole" type="error" variant="tonal" density="compact">{{ erreurEcole }}</v-alert>
+        </v-card-text>
+        <v-card-actions><v-spacer /><v-btn variant="text" @click="choixEcole = false">Fermer</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Mot de passe : obligatoire après un mot de passe provisoire -->
+    <v-dialog v-model="mdp.ouvert" max-width="440" :persistent="mdp.obligatoire">
+      <v-card>
+        <v-card-title class="d-flex align-center text-wrap"><v-icon class="mr-2" color="primary">mdi-lock-reset</v-icon>{{ mdp.obligatoire ? 'Choisissez votre mot de passe' : 'Changer mon mot de passe' }}</v-card-title>
+        <v-card-text>
+          <p v-if="mdp.obligatoire" class="mb-3">
+            Votre établissement vous a donné un mot de passe provisoire. Choisissez le vôtre : il servira pour tous les
+            établissements où vous enseignez.
+          </p>
+          <v-text-field v-if="!mdp.obligatoire" v-model="mdp.actuel" type="password" label="Mot de passe actuel" variant="outlined" density="compact" />
+          <v-text-field v-model="mdp.nouveau" type="password" label="Nouveau mot de passe" hint="6 caractères minimum" variant="outlined" density="compact" />
+          <v-text-field v-model="mdp.confirmation" type="password" label="Confirmer" variant="outlined" density="compact" />
+          <v-alert v-if="mdp.erreur" type="error" variant="tonal" density="compact">{{ mdp.erreur }}</v-alert>
+          <v-alert v-if="mdp.ok" type="success" variant="tonal" density="compact">Mot de passe modifié.</v-alert>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn v-if="!mdp.obligatoire" variant="text" @click="mdp.ouvert = false">Fermer</v-btn>
+          <v-btn color="primary" variant="flat" :loading="mdp.envoi" :disabled="mdp.nouveau.length < 6 || mdp.nouveau !== mdp.confirmation" @click="enregistrerMotDePasse">Enregistrer</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-app>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, provide, onMounted, onUnmounted } from "vue";
 import axios from "axios";
-import { useRouter } from "nuxt/app";
+import { useRouter, useRoute } from "nuxt/app";
 import { useDisplay } from "vuetify";
 
 import ToolbarComponents from "@/components/professeurs/ToolbarComponents.vue";
-import ClassManager from "@/components/professeurs/ClassManager.vue";
-import NotificationComponent from "@/components/professeurs/NotificationComponent.vue";
+import PageNav from "@/components/PageNav.vue";
+import { providePageNav, buildCrumbs } from "@/composables/usePageNav";
 
 // Responsive
 const drawer = ref(false);
 const { smAndDown } = useDisplay();
 const drawerWidth = computed(() => (smAndDown.value ? 260 : 320));
 
-// State
-const selectedSubjectId = ref(null);
-const selectedClassId = ref(null);
-const selectedClassName = ref("");
+const router = useRouter();
+const route = useRoute();
+
+// Chaque écran a sa propre adresse (routes enfants de pages/professeurs/dashbord/) :
+//   /professeurs/dashbord/matieres/:matiereId                       liste des classes
+//   /professeurs/dashbord/matieres/:matiereId/classes/:classeId     fiche de la classe
+//   .../classes/:classeId/notes | presences | absences | conduite | cahier-de-texte | devoirs
+//   /professeurs/dashbord/notifications
+// La matière et la classe choisies se déduisent donc de la route.
+const DASHBOARD_PATH = "/professeurs/dashbord";
+
+const routeNumber = (value) => {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+const selectedSubjectId = computed(() => routeNumber(route.params.matiereId));
+const selectedClassId = computed(() => routeNumber(route.params.classeId));
+const isNotificationsRoute = computed(() => route.path === `${DASHBOARD_PATH}/notifications`);
+const isEmploiRoute = computed(() => route.path === `${DASHBOARD_PATH}/emploi-du-temps`);
 
 const subjects = ref([]); // [{matiere_id, matiere, classe_id, classe}, ...]
-const classes = ref([]);  // classes filtrées pour une matière
+// Classes de la matière choisie
+const classes = computed(() =>
+  subjects.value.filter((s) => s.matiere_id === selectedSubjectId.value)
+);
+const selectedClassName = computed(
+  () => classes.value.find((cl) => cl.classe_id === selectedClassId.value)?.classe || ""
+);
+
+// Les écrans enfants ne s'affichent qu'une fois l'année scolaire et les
+// matières chargées (ils en ont besoin dès leur montage).
+const ready = ref(false);
 
 const etablissementId = ref(null);
 const nomEtablissement = ref("");
@@ -233,13 +325,56 @@ const enseignantId = ref(null);
 
 const logoutDialog = ref(false);
 
+// Un seul compte pour tous ses établissements.
+const mesEcoles = ref([]);
+const choixEcole = ref(false);
+const changementEnCours = ref(null);
+const erreurEcole = ref("");
+const chargerMesEcoles = async () => {
+  try {
+    const { data } = await axios.get("/api/enseignant/etablissements", { headers: authHeaders() });
+    mesEcoles.value = Array.isArray(data) ? data : [];
+  } catch (e) { mesEcoles.value = []; }
+};
+const changerEcole = async (etablissementId) => {
+  erreurEcole.value = "";
+  changementEnCours.value = etablissementId;
+  try {
+    const { data } = await axios.post("/api/enseignant/changer-etablissement", { vers: etablissementId }, { headers: authHeaders() });
+    localStorage.setItem("token", data.token);
+    const p = decodeJwtPayload(data.token);
+    // Rechargement complet : chaque écran repart avec la nouvelle école.
+    window.location.href = `/professeurs/dashbord?id=${p.id}&etablissement=${p.etablissement}`;
+  } catch (e) {
+    erreurEcole.value = e?.response?.data?.message || "Changement impossible.";
+    changementEnCours.value = null;
+  }
+};
+
+const mdp = ref({ ouvert: false, obligatoire: false, actuel: "", nouveau: "", confirmation: "", erreur: "", ok: false, envoi: false });
+const ouvrirMotDePasse = (obligatoire) => {
+  mdp.value = { ouvert: true, obligatoire, actuel: "", nouveau: "", confirmation: "", erreur: "", ok: false, envoi: false };
+};
+const enregistrerMotDePasse = async () => {
+  mdp.value.erreur = "";
+  mdp.value.envoi = true;
+  try {
+    await axios.post("/api/enseignant/mot-de-passe", { actuel: mdp.value.actuel, nouveau: mdp.value.nouveau }, { headers: authHeaders() });
+    try { sessionStorage.removeItem("ens-mdp-provisoire"); } catch (e) { /* stockage indisponible */ }
+    mdp.value.ok = true;
+    mdp.value.obligatoire = false;
+    setTimeout(() => { mdp.value.ouvert = false; }, 1200);
+  } catch (e) {
+    mdp.value.erreur = e?.response?.data?.message || "Le mot de passe n'a pas pu être modifié.";
+  } finally {
+    mdp.value.envoi = false;
+  }
+};
+
 const anneeScolaire = ref("");
 const anneeScolaireId = ref(null);
 
-const showNotificationsComponent = ref(false);
 const notifications = ref([]);
-
-const router = useRouter();
 
 // Matières uniques
 const uniqueSubjects = computed(() => {
@@ -284,68 +419,111 @@ const fetchAnneeScolaire = async () => {
 
 // Nombre de notifications non lues — la seule source de vérité pour tous les badges
 // (drawer + cloche), pour éviter d'afficher deux chiffres différents pour la même notion.
-const unreadCount = computed(() =>
-  notifications.value.filter(
-    (n) => n?.isRead === 0 || n?.isRead === false || n?.isRead === null || n?.isRead === undefined
-  ).length
-);
+const unreadCount = computed(() => notifications.value.filter((n) => !n?.lu).length);
+const notificationsChargement = ref(false);
 
 // Sync + fetch notifications
+// Permissions d'absence de ses élèves + réponses à ses demandes de
+// modification de notes (identité lue dans le jeton).
 const syncAndFetchNotifications = async () => {
+  notificationsChargement.value = true;
   try {
-    await axios.post(
-      `${API_BASE}/api/notificationprof/sync/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`,
-      {},
-      { headers: authHeaders() }
-    );
-
-    const { data } = await axios.get(
-      `${API_BASE}/api/notificationprof/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`,
-      { headers: authHeaders() }
-    );
-
-    notifications.value = Array.isArray(data) ? data : [];
+    const { data } = await axios.get(`${API_BASE}/api/enseignant/notifications`, { headers: authHeaders() });
+    notifications.value = Array.isArray(data?.items) ? data.items : [];
   } catch (error) {
-    console.error("❌ Erreur synchro/récup notifications :", error);
+    console.error("❌ Erreur récupération notifications :", error);
+  } finally {
+    notificationsChargement.value = false;
   }
 };
 
-const selectSubject = (matiereId) => {
-  selectedSubjectId.value = matiereId;
-  selectedClassId.value = null;
-  selectedClassName.value = "";
+// Navigation entre écrans du tableau de bord. Les paramètres du login (id,
+// etablissement, enseignantNom...) restent dans la query : CahierDeTexteManager
+// et DevoirsManager lisent l'id de l'enseignant dans $route.query.id.
+// La période choisie dans un écran (?periode=) ne suit pas vers l'écran suivant.
+// Fil d'Ariane : Mathematique › 6ème 1 › Notes. L'accueil du tableau de bord
+// ouvre la première matière : la matière est donc le premier niveau.
+const pageNav = providePageNav();
+const TOOL_LABELS = {
+  notes: "Notes",
+  presences: "Présences",
+  absences: "Derniers absents",
+  conduite: "Conduite",
+  "cahier-de-texte": "Cahier de texte",
+  devoirs: "Devoirs",
+};
+const crumbs = computed(() => {
+  const { periode, ...query } = route.query;
+  const all = buildCrumbs(route.path, DASHBOARD_PATH, "Tableau de bord", (segment, previous) => {
+    const parent = previous[previous.length - 1];
+    if (segment === "matieres" || segment === "classes") return null;
+    if (parent === "matieres") {
+      return subjects.value.find((s) => String(s.matiere_id) === segment)?.matiere || "Matière";
+    }
+    if (parent === "classes") {
+      return subjects.value.find((s) => String(s.classe_id) === segment)?.classe || "Classe";
+    }
+    if (segment === "notifications") return "Notifications";
+    if (segment === "emploi-du-temps") return "Emploi du temps";
+    if (segment === "guide") return "Guide d'utilisation";
+    return TOOL_LABELS[segment] || null;
+  }, { query, labels: pageNav.labels });
+  return route.path.startsWith(`${DASHBOARD_PATH}/matieres`) ? all.slice(1) : all;
+});
 
-  // ✅ classes filtrées depuis la liste complète subjects
-  classes.value = subjects.value.filter((s) => s.matiere_id === matiereId);
+const goTo = (path, { replace = false } = {}) => {
+  const { periode, ...query } = route.query;
+  return router[replace ? "replace" : "push"]({ path: `${DASHBOARD_PATH}${path}`, query });
+};
+
+const ouvrirEmploi = () => {
+  goTo('/emploi-du-temps');
+  if (smAndDown.value) drawer.value = false;
+};
+
+const selectSubject = (matiereId) => {
+  goTo(`/matieres/${matiereId}`);
 
   // UX: fermer le drawer sur mobile après sélection
   if (smAndDown.value) drawer.value = false;
 };
 
-const showClassDetails = (classeId) => {
-  // ✅ l’API renvoie classe_id et classe
-  const selected = classes.value.find((cl) => cl.classe_id === classeId);
-  selectedClassId.value = classeId;
-  selectedClassName.value = selected ? selected.classe : "";
-};
-
-// Show notifications + mark read
-const showNotifications = async () => {
-  showNotificationsComponent.value = !showNotificationsComponent.value;
-
-  if (showNotificationsComponent.value && notifications.value.length > 0) {
-    try {
-      await axios.put(
-        `${API_BASE}/api/notificationprof/mark-read/${etablissementId.value}/${anneeScolaireId.value}/${enseignantId.value}`,
-        {},
-        { headers: authHeaders() }
-      );
-      notifications.value = notifications.value.map((n) => ({ ...n, isRead: 1 }));
-    } catch (error) {
-      console.error("❌ Erreur marquage comme lues :", error);
-    }
+// Marque tout comme vu (le badge s'efface) ; l'écran des notifications garde
+// lui-même la trace de ce qui était nouveau à l'ouverture.
+const markNotificationsRead = async () => {
+  try {
+    await axios.put(`${API_BASE}/api/enseignant/notifications/lues`, {}, { headers: authHeaders() });
+    notifications.value = notifications.value.map((n) => ({ ...n, lu: true }));
+  } catch (error) {
+    console.error("❌ Erreur marquage comme lues :", error);
   }
 };
+
+// La cloche ouvre /notifications ; un second clic ramène à l'écran précédent.
+let lastScreenPath = "";
+const showNotifications = () => {
+  if (isNotificationsRoute.value) {
+    goTo(lastScreenPath);
+  } else {
+    lastScreenPath = route.path.slice(DASHBOARD_PATH.length);
+    goTo("/notifications");
+  }
+};
+
+// Contexte partagé avec les écrans enfants (pages/professeurs/dashbord/...).
+provide("profDashboard", {
+  goTo,
+  subjects,
+  classes,
+  etablissementId,
+  enseignantId,
+  anneeScolaire,
+  anneeScolaireId,
+  notifications,
+  notificationsChargement,
+  markNotificationsRead,
+  syncAndFetchNotifications,
+});
 
 const showLogoutDialog = () => {
   logoutDialog.value = true;
@@ -364,10 +542,13 @@ const logout = () => {
 let notificationsPollId = null;
 onMounted(async () => {
   const token = localStorage.getItem("token");
-  if (!token) return;
+  if (!token) {
+    ready.value = true;
+    return;
+  }
 
   try {
-    const decodedToken = JSON.parse(atob(token.split(".")[1]));
+    const decodedToken = decodeJwtPayload(token);
     enseignantId.value = decodedToken.id;
     etablissementId.value = decodedToken.etablissement;
     nomEtablissement.value = decodedToken.etablissement_nom;
@@ -384,10 +565,10 @@ onMounted(async () => {
 
     subjects.value = Array.isArray(response.data) ? response.data : [];
 
-    // Optionnel : sélectionner automatiquement la 1ère matière
-    if (uniqueSubjects.value.length) {
-      selectSubject(uniqueSubjects.value[0].matiere_id);
-    }
+    ready.value = true;
+
+    chargerMesEcoles();
+    try { if (sessionStorage.getItem("ens-mdp-provisoire") === "1") ouvrirMotDePasse(true); } catch (e) { /* stockage indisponible */ }
 
     if (anneeScolaireId.value) {
       await syncAndFetchNotifications();
@@ -398,6 +579,8 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error("Erreur récupération données enseignant :", error);
+  } finally {
+    ready.value = true;
   }
 });
 
@@ -407,6 +590,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.ecole-btn { justify-content: flex-start; text-transform: none; }
 /* ✅ IMPORTANT: bloquer le scroll global (page) */
 :global(html, body, #__nuxt) {
   height: 100%;
@@ -456,13 +640,13 @@ onUnmounted(() => {
 }
 
 .drawer-header {
-  padding: 16px 14px 10px;
+  padding: 10px 12px 8px;
 }
 
 .drawer-user {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .drawer-avatar {
@@ -493,7 +677,7 @@ onUnmounted(() => {
 }
 
 .drawer-badges {
-  margin-top: 12px;
+  margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -515,12 +699,14 @@ onUnmounted(() => {
 }
 
 .drawer-item {
-  border-radius: 12px;
-  margin: 4px 6px;
+  border-radius: 8px;
+  margin: 2px 4px;
+  min-height: 36px !important;
 }
 
 .drawer-item-title {
-  font-weight: 800;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .logout-item {
@@ -558,18 +744,21 @@ onUnmounted(() => {
 
 /* Content */
 .content-wrap {
-  padding-top: 18px;
-  padding-bottom: 28px;
+  padding-top: 10px;
+  padding-bottom: 20px;
   max-width: 1400px;
 }
 
 /* Sections */
+/* Section « Classes » / « Notifications » : simple titre posé sur la page,
+   sans cadre autour de tout l'écran (les écrans enfants ont déjà leurs
+   propres cartes fines). */
 .section-card {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(25, 118, 210, 0.12);
-  box-shadow: 0 18px 60px rgba(11, 46, 74, 0.10);
-  border-radius: 18px;
-  padding: 14px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .section-title {
@@ -577,13 +766,13 @@ onUnmounted(() => {
   align-items: center;
   font-weight: 950;
   color: var(--blue-dark);
-  margin-bottom: 10px;
-  font-size: 1.02rem;
+  margin-bottom: 8px;
+  font-size: 16px;
 }
 
 /* Dialog */
 .dialog-card {
-  border-radius: 16px !important;
+  border-radius: 10px!important;
 }
 
 /* Mobile tweaks */
@@ -592,9 +781,18 @@ onUnmounted(() => {
     padding-left: 10px;
     padding-right: 10px;
   }
-  .section-card {
-    border-radius: 16px;
-    padding: 12px;
+  .section-title {
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+  /* Pas de marges négatives de v-row qui dépasseraient du bord. */
+  .content-wrap > .v-row {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .content-wrap > .v-row > .v-col {
+    padding-left: 0;
+    padding-right: 0;
   }
 }
 </style>

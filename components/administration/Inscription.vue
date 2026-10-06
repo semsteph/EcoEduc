@@ -1,18 +1,15 @@
 <!-- Inscription.vue -->
 <template>
-  <v-container class="registration-page pa-4 pa-md-8" fluid>
+  <v-container class="registration-page pa-1 pa-sm-3" fluid>
     <!-- Top actions -->
-    <v-card class="mx-auto mb-6 elevation-1 rounded-lg" max-width="900">
-      <v-card-text class="d-flex flex-column flex-sm-row align-center justify-space-between pa-4">
-        <v-btn icon variant="tonal" color="primary" @click="$emit('back')" class="mb-4 mb-sm-0">
-          <v-icon>mdi-arrow-left</v-icon>
-        </v-btn>
+    <v-card class="mx-auto mb-2 elevation-0 rounded-lg" max-width="900">
+      <v-card-text class="d-flex flex-row align-center justify-space-between ga-2 pa-2">
 
-        <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-sm-auto justify-end">
+        <div class="d-flex flex-row ga-2 flex-grow-1 justify-end top-choices">
           <v-btn
             prepend-icon="mdi-account-plus"
             color="primary"
-            class="rounded-pill px-2 px-sm-6"
+            class="rounded-pill px-2 px-sm-3"
             @click="toggleSingleForm"
             :variant="showForm ? 'flat' : 'outlined'"
           >
@@ -21,11 +18,11 @@
           <v-btn
             prepend-icon="mdi-file-excel"
             color="secondary"
-            class="rounded-pill px-2 px-sm-6 ml-sm-2 mt-2 mt-sm-0"
+            class="rounded-pill px-2 px-sm-3"
             @click="toggleBulkForm"
             :variant="showBulkForm ? 'flat' : 'outlined'"
           >
-            En masse (Excel)
+            Toute une classe
           </v-btn>
         </div>
       </v-card-text>
@@ -33,22 +30,30 @@
 
     <!-- ✅ INSCRIPTION INDIVIDUELLE -->
     <v-expand-transition>
-      <v-card v-if="showForm" class="mx-auto elevation-2 rounded-xl pa-2 pa-md-6" max-width="900">
-        <v-card-title class="text-h5 font-weight-bold text-center py-4 text-primary">
+      <v-card v-if="showForm" class="mx-auto elevation-0 rounded-lg pa-2 pa-md-3" max-width="900">
+        <v-card-title class="text-subtitle-1 font-weight-bold text-center py-2 text-primary">
           <v-icon start>mdi-account-school</v-icon>
           Fiche d'Inscription Élève
         </v-card-title>
 
-        <v-divider class="mb-6"></v-divider>
+        <v-divider class="mb-3"></v-divider>
 
         <v-form @submit.prevent="submitForm">
-          <v-row>
+          <AideEssentiel cle="inscription-individuelle">
+            <ul>
+              <li>Pour inscrire <strong>une classe entière</strong> d'un coup (liste Excel ou Word), utilisez le bouton « Toute une classe ».</li>
+              <li>Le parent doit exister : choisissez-le dans la liste ou créez-le avec « Ajouter un parent ».</li>
+              <li>La <strong>photo d'identité est facultative</strong> ; elle sert à la carte scolaire, au bulletin et au profil de l'enfant côté parents. Elle peut être ajoutée plus tard.</li>
+              <li>Le matricule est attribué automatiquement.</li>
+            </ul>
+          </AideEssentiel>
+          <v-row dense>
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="form.nom"
                 label="Nom de l'élève"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 required
                 prepend-inner-icon="mdi-account-outline"
                 placeholder="Ex: KOUADIO"
@@ -60,7 +65,7 @@
                 v-model="form.prenom"
                 label="Prénom de l'élève"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 required
                 prepend-inner-icon="mdi-account-outline"
                 placeholder="Ex: Jean"
@@ -73,7 +78,7 @@
                 label="Date de naissance"
                 type="date"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 required
                 prepend-inner-icon="mdi-calendar"
               />
@@ -85,7 +90,7 @@
                 :items="['M', 'F']"
                 label="Sexe"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 required
                 prepend-inner-icon="mdi-gender-male-female"
               />
@@ -99,7 +104,7 @@
                 item-value="id"
                 label="Classe d'affectation"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 required
                 prepend-inner-icon="mdi-google-classroom"
               />
@@ -114,7 +119,7 @@
                 item-title="text"
                 label="Rechercher le Parent"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
                 required
                 prepend-inner-icon="mdi-account-child"
                 placeholder="Taper pour chercher..."
@@ -140,15 +145,17 @@
             </v-col>
           </v-row>
 
-          <v-card-actions class="justify-end mt-4">
-            <v-btn color="grey-darken-1" variant="text" @click="showForm = false" class="px-4">
+          <PhotoIdentite :key="photoKey" class="mt-2" @change="photo = $event" />
+
+          <v-card-actions class="justify-end mt-2">
+            <v-btn color="grey-darken-1" variant="text" @click="showForm = false" class="px-3">
               Annuler
             </v-btn>
             <v-btn
               color="success"
               type="submit"
               variant="elevated"
-              class="px-2 px-sm-8 rounded-lg font-weight-bold"
+              class="px-2 px-sm-3 rounded-lg font-weight-bold"
               :loading="loading"
             >
               Valider l'Inscription
@@ -158,72 +165,20 @@
       </v-card>
     </v-expand-transition>
 
-    <!-- ✅ INSCRIPTION EN MASSE -->
+    <!-- ✅ INSCRIPTION EN MASSE : coller la liste ou un fichier, vérifier, inscrire, photos -->
     <v-expand-transition>
-      <v-card v-if="showBulkForm" class="mx-auto elevation-2 rounded-xl pa-2 pa-md-6" max-width="900">
-        <v-card-title class="text-h5 font-weight-bold text-center py-4 text-secondary">
-          <v-icon start>mdi-file-multiple</v-icon>
-          Importation par Fichier
-        </v-card-title>
-
-        <v-divider class="mb-6"></v-divider>
-
-        <v-row justify="center">
-          <v-col cols="12" class="text-center">
-            <v-btn
-              color="info"
-              variant="tonal"
-              prepend-icon="mdi-download"
-              class="mb-6 rounded-pill"
-              @click="generateExcelTemplate"
-            >
-              Télécharger le canevas Excel
-            </v-btn>
-          </v-col>
-
-          <v-col cols="12" sm="8">
-            <v-select
-              v-model="bulkForm.classeId"
-              :items="classes"
-              item-title="nom"
-              item-value="id"
-              label="Classe de destination"
-              variant="outlined"
-              prepend-inner-icon="mdi-google-classroom"
-              class="mb-2"
-            />
-
-            <v-file-input
-              @change="handleFileUpload"
-              label="Sélectionner le fichier Excel complété"
-              variant="outlined"
-              accept=".xlsx, .xls"
-              prepend-inner-icon="mdi-paperclip"
-              show-size
-            />
-          </v-col>
-        </v-row>
-
-        <v-card-actions class="justify-end mt-4">
-          <v-btn color="grey-darken-1" variant="text" @click="showBulkForm = false" class="px-4">
-            Annuler
-          </v-btn>
-          <v-btn
-            color="success"
-            variant="elevated"
-            class="px-2 px-sm-8 rounded-lg font-weight-bold"
-            @click="submitBulkForm"
-            :loading="loading"
-          >
-            Lancer l'importation
-          </v-btn>
-        </v-card-actions>
-      </v-card>
+      <InscriptionMasse
+        v-if="showBulkForm"
+        :etablissement-id="props.etablissementId"
+        :annee-scolaire-id="props.anneeScolaireId"
+        @fermer="showBulkForm = false"
+        @inscrits="fetchParents"
+      />
     </v-expand-transition>
 
     <!-- ✅ DIALOG ParentManagement.vue -->
     <v-dialog v-model="parentDialog" max-width="1250" persistent scrollable>
-      <v-card class="rounded-xl overflow-hidden">
+      <v-card class="rounded-lg overflow-hidden">
         <v-card-title class="d-flex align-center justify-space-between">
           <div class="d-flex align-center">
             <v-icon class="mr-2" color="primary">mdi-account-group-outline</v-icon>
@@ -246,6 +201,7 @@
           <!-- ✅ On embarque le composant ParentManagement -->
           <ParentManagement
             ref="parentMgmtRef"
+            :garder-dans-adresse="false"
             :etablissementId="props.etablissementId"
             :etablissementNom="props.etablissementNom"
             :anneeScolaire="props.anneeScolaire"
@@ -255,64 +211,6 @@
             @parent-deleted="onParentDeleted"
           />
         </v-card-text>
-      </v-card>
-    </v-dialog>
-
-    <!-- ✅ RAPPORT D'IMPORTATION EN MASSE -->
-    <v-dialog v-model="bulkReportDialog" max-width="700" scrollable>
-      <v-card class="rounded-xl overflow-hidden">
-        <v-card-title class="d-flex align-center">
-          <v-icon class="mr-2" :color="bulkReport?.nombreErreurs ? 'warning' : 'success'">
-            {{ bulkReport?.nombreErreurs ? 'mdi-alert-circle-outline' : 'mdi-check-circle-outline' }}
-          </v-icon>
-          <span class="font-weight-bold">Rapport d'importation</span>
-        </v-card-title>
-
-        <v-divider></v-divider>
-
-        <v-card-text v-if="bulkReport" class="pa-4">
-          <v-row dense class="mb-2">
-            <v-col cols="6" sm="3">
-              <div class="text-caption grey--text">Lignes traitées</div>
-              <div class="text-h6">{{ bulkReport.totalLignes }}</div>
-            </v-col>
-            <v-col cols="6" sm="3">
-              <div class="text-caption grey--text">Inscrits</div>
-              <div class="text-h6 text-success">{{ bulkReport.insertionsReussies }}</div>
-            </v-col>
-            <v-col cols="6" sm="3">
-              <div class="text-caption grey--text">Erreurs</div>
-              <div class="text-h6" :class="bulkReport.nombreErreurs ? 'text-error' : ''">
-                {{ bulkReport.nombreErreurs }}
-              </div>
-            </v-col>
-            <v-col cols="6" sm="3">
-              <div class="text-caption grey--text">Effectif classe</div>
-              <div class="text-h6">
-                {{ bulkReport.effectifClasseApres }} / {{ bulkReport.effectifMaxParClasse }}
-              </div>
-            </v-col>
-          </v-row>
-
-          <v-divider class="my-3" v-if="bulkReport.erreurs?.length"></v-divider>
-
-          <div v-if="bulkReport.erreurs?.length">
-            <div class="text-subtitle-2 font-weight-bold mb-2">Détail des lignes en erreur</div>
-            <v-list density="compact" class="rounded-lg" style="max-height: 300px; overflow-y: auto;">
-              <v-list-item v-for="(err, idx) in bulkReport.erreurs" :key="idx">
-                <v-list-item-title>
-                  Ligne {{ err.ligne }} : {{ err.error }}
-                </v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </div>
-        </v-card-text>
-
-        <v-card-actions class="justify-end pa-4">
-          <v-btn color="primary" variant="elevated" @click="bulkReportDialog = false">
-            Fermer
-          </v-btn>
-        </v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -327,9 +225,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import axios from 'axios';
 import ParentManagement from './ParentManagement.vue'; // ⚠️ adapte le chemin
+import PhotoIdentite from './PhotoIdentite.vue';
+import InscriptionMasse from './InscriptionMasse.vue';
+import AideEssentiel from '~/components/AideEssentiel.vue';
 
 const props = defineProps({
   etablissementId: Number,
@@ -341,10 +242,20 @@ const props = defineProps({
 defineEmits(['back']);
 
 const form = ref({ nom: '', prenom: '', dateNaissance: '', sexe: '', classe: '', parentId: '' });
-const bulkForm = ref({ classeId: '', file: null });
+// Photo d'identité facultative (déjà recadrée par PhotoIdentite).
+const photo = ref(null);
+const photoKey = ref(0);
 
-const showForm = ref(false);
-const showBulkForm = ref(false);
+// Formulaire ouvert, gardé dans l'adresse (?inscription=individuelle|masse).
+const formulaire = useUrlState('inscription', null, { allowed: ['individuelle', 'masse'] });
+const showForm = computed({
+  get: () => formulaire.value === 'individuelle',
+  set: (open) => { formulaire.value = open ? 'individuelle' : (formulaire.value === 'individuelle' ? null : formulaire.value); },
+});
+const showBulkForm = computed({
+  get: () => formulaire.value === 'masse',
+  set: (open) => { formulaire.value = open ? 'masse' : (formulaire.value === 'masse' ? null : formulaire.value); },
+});
 const loading = ref(false);
 
 const classes = ref([]);
@@ -355,8 +266,6 @@ const parentDialog = ref(false);
 const parentMgmtRef = ref(null);
 
 /** ✅ Rapport d'importation en masse */
-const bulkReportDialog = ref(false);
-const bulkReport = ref(null);
 
 const snack = ref({ show: false, text: '' });
 
@@ -449,14 +358,24 @@ const submitForm = async () => {
   loading.value = true;
   try {
     const inscriptionToken = localStorage.getItem("token");
-    await axios.post('/api/inscription', {
+    const { data: eleve } = await axios.post('/api/inscription', {
       ...form.value,
       etablissementId: props.etablissementId,
       anneeScolaireId: props.anneeScolaireId
     }, {
       headers: { Authorization: `Bearer ${inscriptionToken}` },
     });
-    alert("L'élève a été inscrit avec succès !");
+    let message = `${eleve.prenom} ${eleve.nom} est inscrit(e). Matricule : ${eleve.matricule || '—'}.`;
+    if (photo.value && eleve.id) {
+      try {
+        const fd = new FormData();
+        fd.append('photo', photo.value, 'photo.jpg');
+        await axios.post(`/api/eleves/${eleve.id}/photo`, fd);
+      } catch (photoError) {
+        message += " La photo n'a pas pu être enregistrée : vous pourrez l'ajouter depuis la carte scolaire.";
+      }
+    }
+    alert(message);
     resetForm();
     showForm.value = false;
   } catch (e) {
@@ -469,67 +388,12 @@ const submitForm = async () => {
 
 const resetForm = () => {
   form.value = { nom: '', prenom: '', dateNaissance: '', sexe: '', classe: '', parentId: '' };
+  photo.value = null;
+  photoKey.value += 1;
 };
 
-const handleFileUpload = (event) => {
-  const file = event?.target?.files?.[0] || null;
-  bulkForm.value.file = file;
-};
 
-const generateExcelTemplate = async () => {
-  const XLSX = await import('xlsx');
-  const data = [
-    ["NOTE:", "NE PAS SUPPRIMER LA LIGNE D'ENTETE. L'EXEMPLE EN LIGNE 3 NE SERA PAS IMPORTE."],
-    ['Nom Élève', 'Prénom Élève', 'Date de naissance', 'Sexe', 'Nom Parent', 'Prénom Parent', 'Email Parent', 'Téléphone'],
-    ['KOUADIO', 'Jean', '12/05/2011', 'M', 'KOUADIO', 'Claudine', 'claudine.kouadio@mail.com', '0700000000']
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [
-    { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 10 },
-    { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 20 }
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Inscriptions');
-  XLSX.writeFile(wb, 'canevas_inscription_eleves.xlsx');
-};
 
-const submitBulkForm = async () => {
-  if (!bulkForm.value.file || !bulkForm.value.classeId) {
-    alert("Veuillez sélectionner une classe et un fichier.");
-    return;
-  }
-  loading.value = true;
-
-  const formData = new FormData();
-  formData.append('file', bulkForm.value.file);
-  formData.append('classeId', bulkForm.value.classeId);
-  formData.append('etablissementId', props.etablissementId);
-  formData.append('anneeScolaireId', props.anneeScolaireId);
-
-  try {
-    const importToken = localStorage.getItem("token");
-    const res = await axios.post('/api/import-eleves', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        Authorization: `Bearer ${importToken}`,
-      }
-    });
-    bulkReport.value = res.data?.rapport || null;
-    bulkReportDialog.value = true;
-    showBulkForm.value = false;
-  } catch (e) {
-    console.error("Erreur:", e);
-    const rapport = e?.response?.data?.rapport;
-    if (rapport) {
-      bulkReport.value = rapport;
-      bulkReportDialog.value = true;
-    } else {
-      alert(e?.response?.data?.message || "Erreur lors de l'importation.");
-    }
-  } finally {
-    loading.value = false;
-  }
-};
 
 onMounted(() => {
   fetchClasses();
@@ -544,24 +408,37 @@ onMounted(() => {
 }
 
 .gap-2 {
-  gap: 12px;
+  gap: 8px;
+}
+
+.top-choices .v-btn {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .rounded-pill {
-  border-radius: 50px !important;
+  border-radius: 10px!important;
 }
 
 .rounded-xl {
-  border-radius: 20px !important;
+  border-radius: 10px!important;
 }
 
 @media (max-width: 600px) {
   .registration-page {
-    padding: 10px !important;
+    padding: 4px !important;
+    background-color: transparent;
+    min-height: 0;
   }
 
   .v-card-title {
-    font-size: 1.15rem !important;
+    font-size: 15px !important;
+  }
+
+  .top-choices .v-btn {
+    flex: 1 1 0;
+    padding: 0 8px !important;
+    font-size: 13px !important;
   }
 
   .w-100 {

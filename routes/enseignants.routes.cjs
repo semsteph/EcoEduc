@@ -5,11 +5,13 @@
 const express = require('express');
 const router = express.Router();
 
-const { authenticateJWT } = require('../server-lib/auth.cjs');
+const { authenticateJWT, requireAdminStaff } = require('../server-lib/auth.cjs');
 const db = require('../server-lib/db.cjs');
 const bcrypt = require('bcrypt');
+const comptesEns = require('../server-lib/comptes-enseignants.cjs');
+const { oublierEnseignant } = require('../server-lib/access-guard.cjs');
 
-router.get('/enseignements', async (req, res) => {
+router.get('/enseignements', authenticateJWT, async (req, res) => {
   const { etablissementId, classeId, anneeScolaireId } = req.query;
 
   console.log('📥 Reçu dans API :', req.query);
@@ -65,74 +67,102 @@ router.get('/enseignements', async (req, res) => {
   }
 });
 
-router.post('/enseignements/delete', (req, res) => {
-  const { Enseignants_id, Classes_id, matiere_id } = req.body;
-
-  console.log('Requête reçue pour suppression :', req.body);
-
+// Retire un enseignant d'une matière dans une classe (année en cours).
+// L'écran envoyait DELETE alors que seule la route POST existait, et
+// l'ancienne requête (style « callback ») ne répondait jamais.
+async function supprimerEnseignement(req, res) {
+  const { Enseignants_id, Classes_id, matiere_id, anneeScolaireId } = req.body || {};
   if (!Enseignants_id || !Classes_id || !matiere_id) {
-    console.log('Champs manquants');
     return res.status(400).json({ error: 'Champs manquants' });
   }
-
-  const sql = `
-    DELETE FROM enseigner
-    WHERE Enseignants_id = ? AND Classes_id = ? AND matiere_id = ?
-  `;
-
-  db.query(sql, [Enseignants_id, Classes_id, matiere_id], (err, result) => {
-    if (err) {
-      console.error('Erreur suppression enseignement :', err);
-      return res.status(500).json({ error: 'Erreur serveur' });
+  try {
+    const params = [Enseignants_id, Classes_id, matiere_id, req.user.etablissementId];
+    let sql = 'DELETE FROM enseigner WHERE Enseignants_id = ? AND Classes_id = ? AND matiere_id = ? AND etablissement_id = ?';
+    if (anneeScolaireId) {
+      sql += ' AND Annee_scolaire_id = ?';
+      params.push(anneeScolaireId);
     }
-
-    console.log('Suppression réussie :', result);
+    const [result] = await db.query(sql, params);
+    if (!result.affectedRows) return res.status(404).json({ error: 'Enseignement introuvable' });
     return res.json({ success: true, message: 'Enseignement supprimé' });
-  });
-});
+  } catch (err) {
+    console.error('Erreur suppression enseignement :', err);
+    return res.status(500).json({ error: 'Erreur serveur' });
+  }
+}
+router.post('/enseignements/delete', authenticateJWT, requireAdminStaff, supprimerEnseignement);
+router.delete('/enseignements/delete', authenticateJWT, requireAdminStaff, supprimerEnseignement);
 
 // Route pour l'inscription d'un enseignant
-router.post('/Enseignants', authenticateJWT, async (req, res) => {
-  const { name, firstName, email, phone, username, password, etablissementId } = req.body;
+// Ajout d'un enseignant par l'école. S'il a déjà un compte (même
+// téléphone ou e-mail, créé par une autre école), sa nouvelle fiche est
+// simplement rattachée à ce compte : il garde son identifiant et son mot de
+// passe. Sinon un compte est créé avec un mot de passe provisoire, qu'il
+// remplace à sa première connexion.
+router.post('/Enseignants', authenticateJWT, requireAdminStaff, async (req, res) => {
+  const { name, firstName, email, phone, username, password } = req.body || {};
+  const etablissementId = Number(req.user.etablissementId);
+  const nom = String(name || '').trim();
+  const prenom = String(firstName || '').trim();
+  const mail = comptesEns.emailNorm(email);
+  const tel = comptesEns.chiffres(phone);
+  if (!nom || !prenom) return res.status(400).json({ error: 'Nom et prénom obligatoires.' });
+  if (!mail && tel.length < 8) return res.status(400).json({ error: 'Téléphone ou e-mail obligatoire : il sert à reconnaître le professeur.' });
+  if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return res.status(400).json({ error: 'E-mail invalide.' });
 
+  const conn = await db.getConnection();
   try {
-    // Vérifie s'il existe déjà un enseignant avec le même email dans le même établissement
-    const [existingEmail] = await req.db.query(
-      'SELECT id FROM enseignants WHERE email = ? AND etablissement_id = ?',
-      [email, etablissementId]
-    );
-    if (existingEmail.length > 0) {
-      return res.status(409).json({ error: 'Un enseignant avec cet e-mail existe déjà dans cet établissement.' });
+    await conn.beginTransaction();
+    const compte = await comptesEns.compteConnu(conn, { email: mail, telephone: tel });
+    if (compte) {
+      const [[fiche]] = await conn.query('SELECT id, actif FROM enseignants WHERE compte_id = ? AND etablissement_id = ?', [compte.id, etablissementId]);
+      if (fiche && fiche.actif) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'Ce professeur fait déjà partie de votre établissement.' });
+      }
+      if (fiche) {
+        await conn.query('UPDATE enseignants SET actif = 1, nom = ?, prenom = ? WHERE id = ?', [nom, prenom, fiche.id]);
+      } else {
+        await conn.query(
+          `INSERT INTO enseignants (compte_id, nom, prenom, email, telephone, mot_de_passe, nom_utilisateur, etablissement_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [compte.id, nom, prenom, mail || compte.email || '', phone || compte.telephone || null, compte.mot_de_passe, compte.nom_utilisateur, etablissementId]
+        );
+      }
+      await conn.commit();
+      return res.status(201).json({
+        lie: true,
+        username: compte.nom_utilisateur,
+        message: `${prenom} ${nom} avait déjà un compte EchoEducation : votre établissement a été ajouté à son compte. Il/elle se connecte avec ses identifiants habituels (identifiant : ${compte.nom_utilisateur}).`,
+      });
     }
 
-    // Vérifie s'il existe déjà un enseignant avec le même nom d'utilisateur dans le même établissement
-    const [existingUsername] = await req.db.query(
-      'SELECT id FROM enseignants WHERE nom_utilisateur = ? AND etablissement_id = ?',
-      [username, etablissementId]
-    );
-    if (existingUsername.length > 0) {
-      return res.status(409).json({ error: 'Ce nom d’utilisateur est déjà utilisé dans cet établissement.' });
+    if (String(password || '').length < 6) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Mot de passe provisoire trop court.' });
     }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Insérer les données
-    const [result] = await req.db.query(
-      'INSERT INTO enseignants (nom, prenom, email, telephone, mot_de_passe, nom_utilisateur, etablissement_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, firstName, email, phone, hashedPassword, username, etablissementId]
+    const identifiant = await comptesEns.identifiantLibre(conn, username || `${prenom}.${nom}`);
+    const hash = await bcrypt.hash(String(password), 10);
+    const [c] = await conn.query(
+      'INSERT INTO compte_enseignant (nom_utilisateur, email, telephone, mot_de_passe, mdp_provisoire) VALUES (?, ?, ?, ?, 1)',
+      [identifiant, mail || null, tel || null, hash]
     );
-
-    res.status(201).json({
-      id: result.insertId,
-      name,
-      firstName,
-      email,
-      phone,
-      username
-    });
+    const [r] = await conn.query(
+      `INSERT INTO enseignants (compte_id, nom, prenom, email, telephone, mot_de_passe, nom_utilisateur, etablissement_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [c.insertId, nom, prenom, mail || '', phone || null, hash, identifiant, etablissementId]
+    );
+    await conn.commit();
+    res.status(201).json({ id: r.insertId, lie: false, username: identifiant, name: nom, firstName: prenom, email: mail, phone });
   } catch (error) {
+    try { await conn.rollback(); } catch (_) {}
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Un enseignant de votre établissement utilise déjà cet e-mail ou cet identifiant.' });
+    }
     console.error('Erreur lors de la création de l’enseignant :', error);
     res.status(500).json({ error: 'Erreur serveur lors de la création de l’enseignant.' });
+  } finally {
+    conn.release();
   }
 });
 
@@ -211,9 +241,37 @@ router.post('/Enseignants/add', authenticateJWT, async (req, res) => {
     });
   }
 
-  const conn = req.db;
+  if (etablissementId !== Number(req.user.etablissementId)) {
+    return res.status(403).json({ message: "Vous n'avez pas accès à cet établissement." });
+  }
+
+  // Une vraie connexion unique : « START TRANSACTION » envoyé au pool
+  // partait sur une connexion quelconque, et une erreur à la 3e ligne
+  // laissait les deux premières enregistrées.
+  const conn = await db.getConnection();
 
   try {
+    // Enseignant, classes, matières, coefficients et année : tous de
+    // l'établissement connecté.
+    const owned = async (sql, ids) => {
+      const unique = [...new Set(ids)];
+      const [rows] = await conn.query(sql, [unique, etablissementId]);
+      return rows.length === unique.length;
+    };
+    const checks = await Promise.all([
+      owned('SELECT id FROM enseignants WHERE id IN (?) AND etablissement_id = ? AND actif = 1', [teacherId]),
+      owned('SELECT id FROM classes WHERE id IN (?) AND etablissement_id = ?', classIds),
+      owned('SELECT id FROM matieres WHERE id IN (?) AND etablissement_id = ?', subjectIds),
+      owned('SELECT id FROM annee_scolaire WHERE id IN (?) AND etablissement_id = ?', [anneeScolaireId]),
+    ]);
+    if (checks.includes(false)) {
+      return res.status(403).json({ message: "Enseignant, classe, matière ou année hors de votre établissement." });
+    }
+    const [coefRows] = await conn.query('SELECT id FROM coefficient WHERE id IN (?)', [[...new Set(coefficientIds)]]);
+    if (coefRows.length !== new Set(coefficientIds).size) {
+      return res.status(400).json({ message: 'Coefficient invalide.' });
+    }
+
     await conn.query("START TRANSACTION");
 
     for (let i = 0; i < classIds.length; i++) {
@@ -266,7 +324,7 @@ router.post('/Enseignants/add', authenticateJWT, async (req, res) => {
           return res.status(409).json({
             type: "TEACHER_ALREADY_HAS_SUBJECT_IN_CLASS",
             message: `Ligne ${i + 1} : cet enseignant a déjà une matière dans cette classe pour cette année. ` +
-                     `(force=true pour autoriser plusieurs matières OU replaceTeacherSubject=true pour remplacer l'ancienne).`
+                     ` .`
           });
         }
         // si force=true => autoriser plusieurs matières, on continue sans supprimer
@@ -322,6 +380,8 @@ router.post('/Enseignants/add', authenticateJWT, async (req, res) => {
     }
 
     return res.status(500).json({ message: "Erreur interne du serveur. Veuillez réessayer plus tard." });
+  } finally {
+    conn.release();
   }
 });
 
@@ -332,7 +392,7 @@ router.get('/Enseignants/:etablissementId', authenticateJWT, async (req, res) =>
     return res.status(403).json({ error: "Vous n'avez pas accès à cet établissement." });
   }
   try {
-    const [teachers] = await req.db.query('SELECT id, nom, prenom FROM enseignants where etablissement_id = ?', [etablissementId]);
+    const [teachers] = await req.db.query('SELECT id, nom, prenom FROM enseignants WHERE etablissement_id = ? AND actif = 1 ORDER BY nom, prenom', [etablissementId]);
     res.status(200).json(teachers);
   } catch (error) {
     console.error('Error fetching teachers:', error);
@@ -346,47 +406,35 @@ router.get('/EnseignantAdmin/:etablissementId', authenticateJWT, async (req, res
     if (Number(etablissementId) !== Number(req.user.etablissementId)) {
       return res.status(403).json({ message: "Vous n'avez pas accès à cet établissement." });
     }
-    console.log("Début de la récupération des enseignants pour l'établissement ID:", etablissementId);
-
-    // Récupérer uniquement les enseignants de l'établissement concerné
+    // Jamais le mot de passe (même chiffré) vers le navigateur.
     const [enseignants] = await req.db.query(
-      'SELECT * FROM enseignants WHERE etablissement_id = ?',
+      `SELECT id, nom, prenom, telephone, email, nom_utilisateur, etablissement_id,
+              (SELECT COUNT(*) FROM enseignants x WHERE x.compte_id = e.compte_id AND x.actif = 1) > 1 AS plusieursEcoles
+       FROM enseignants e WHERE etablissement_id = ? AND actif = 1 ORDER BY nom, prenom`,
       [etablissementId]
     );
-    console.log("Enseignants récupérés :", enseignants);
 
-    // Récupérer les classes et matières enseignées par chaque enseignant
-    const enseignantsWithDetails = await Promise.all(
-      enseignants.map(async (enseignant) => {
-        console.log(`Traitement des détails pour l'enseignant ID: ${enseignant.id}...`);
-
-        const [classes] = await req.db.query(
-          `SELECT classes.nom AS classe
-           FROM enseigner
-           JOIN classes ON classes.id = enseigner.classes_id
-           WHERE enseigner.Enseignants_id = ?`,
-          [enseignant.id]
-        );
-        console.log(`Classes enseignées pour l'enseignant ID: ${enseignant.id} -`, classes);
-
-        const [matieres] = await req.db.query(
-          `SELECT matieres.nom AS matiere
-           FROM enseigner
-           JOIN matieres ON matieres.id = enseigner.matiere_id
-           WHERE enseigner.Enseignants_id = ?`,
-          [enseignant.id]
-        );
-        console.log(`Matières enseignées pour l'enseignant ID: ${enseignant.id} -`, matieres);
-
-        return {
-          ...enseignant,
-          classes: classes.map(c => c.classe),
-          matieres: matieres.map(m => m.matiere),
-        };
-      })
+    // Classes et matières de l'année en cours, chacune une seule fois
+    // (une ligne par affectation faisait répéter « Mathématiques » autant
+    // de fois que de classes, et les classes des années passées s'ajoutaient).
+    const [affectations] = await req.db.query(
+      `SELECT e.Enseignants_id AS enseignantId, c.nom AS classe, c.Promotion_id AS promo, m.nom AS matiere
+       FROM enseigner e
+       JOIN classes c ON c.id = e.Classes_id
+       JOIN matieres m ON m.id = e.matiere_id
+       JOIN annee_scolaire a ON a.id = e.Annee_scolaire_id AND a.statut = 'ouverte'
+       WHERE e.etablissement_id = ?
+       ORDER BY c.Promotion_id IS NULL, c.Promotion_id, LENGTH(c.nom), c.nom, m.nom`,
+      [etablissementId]
     );
-
-    console.log("Détails complets des enseignants :", enseignantsWithDetails);
+    const enseignantsWithDetails = enseignants.map((enseignant) => {
+      const siennes = affectations.filter((a) => a.enseignantId === enseignant.id);
+      return {
+        ...enseignant,
+        classes: [...new Set(siennes.map((a) => a.classe))],
+        matieres: [...new Set(siennes.map((a) => a.matiere))].sort((a, b) => a.localeCompare(b, 'fr')),
+      };
+    });
 
     res.json(enseignantsWithDetails);
   } catch (error) {
@@ -395,57 +443,63 @@ router.get('/EnseignantAdmin/:etablissementId', authenticateJWT, async (req, res
   }
 });
 
-router.put('/Enseignants/:id', authenticateJWT, async (req, res) => {
+// Modification par l'école. Nom, prénom, téléphone et e-mail de la fiche :
+// toujours. Identifiant et mot de passe appartiennent au compte : l'école ne
+// les change que si le professeur n'enseigne que chez elle (sinon elle
+// pourrait le bloquer, ou entrer sur son compte, dans ses autres écoles).
+router.put('/Enseignants/:id', authenticateJWT, requireAdminStaff, async (req, res) => {
   const id = req.params.id;
-  const { name, firstName, email, phone, username, password } = req.body;
-
-  const [target] = await req.db.query('SELECT etablissement_id FROM enseignants WHERE id = ?', [id]);
-  if (target.length === 0) {
-    return res.status(404).json({ message: 'Enseignant non trouvé' });
-  }
-  if (Number(target[0].etablissement_id) !== Number(req.user.etablissementId)) {
-    return res.status(403).json({ message: "Cet enseignant n'appartient pas à votre établissement." });
-  }
-
-  const updates = [];
-  const values = [];
-
-  if (name) {
-    updates.push('nom = ?');
-    values.push(name);
-  }
-  if (firstName) {
-    updates.push('prenom = ?');
-    values.push(firstName);
-  }
-  if (email) {
-    updates.push('email = ?');
-    values.push(email);
-  }
-  if (phone) {
-    updates.push('telephone = ?');
-    values.push(phone);
-  }
-  if (username) {
-    updates.push('nom_utilisateur = ?');
-    values.push(username);
-  }
-  if (password) {
-    updates.push('mot_de_passe = ?');
-    values.push(await bcrypt.hash(password, 10));
-  }
-
-  if (updates.length > 0) {
-    values.push(id);
-    const sql = `UPDATE enseignants SET ${updates.join(', ')} WHERE id = ?`;
-    try {
-      await req.db.query(sql, values);
-      res.json({ message: 'Teacher updated successfully' });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+  const { name, firstName, email, phone, username, password } = req.body || {};
+  try {
+    const [[fiche]] = await req.db.query('SELECT id, compte_id, etablissement_id, nom_utilisateur FROM enseignants WHERE id = ? AND actif = 1', [id]);
+    if (!fiche) return res.status(404).json({ message: 'Enseignant non trouvé' });
+    if (Number(fiche.etablissement_id) !== Number(req.user.etablissementId)) {
+      return res.status(403).json({ message: "Cet enseignant n'appartient pas à votre établissement." });
     }
-  } else {
-    res.status(400).json({ message: 'No data provided for update' });
+    const [[{ n }]] = await req.db.query('SELECT COUNT(*) AS n FROM enseignants WHERE compte_id = ? AND actif = 1', [fiche.compte_id]);
+    const seulementIci = Number(n) <= 1;
+    const changeIdentifiant = username && String(username).trim().toLowerCase() !== String(fiche.nom_utilisateur || '').toLowerCase();
+    if (!seulementIci && (changeIdentifiant || password)) {
+      return res.status(409).json({
+        code: 'COMPTE_PARTAGE',
+        message: "Ce professeur enseigne aussi dans un autre établissement : c'est lui qui gère son identifiant et son mot de passe (« Mot de passe oublié » sur la page de connexion). Les autres informations peuvent être modifiées.",
+      });
+    }
+
+    const fichier = [];
+    const valeurs = [];
+    if (name) { fichier.push('nom = ?'); valeurs.push(String(name).trim()); }
+    if (firstName) { fichier.push('prenom = ?'); valeurs.push(String(firstName).trim()); }
+    if (email) { fichier.push('email = ?'); valeurs.push(comptesEns.emailNorm(email)); }
+    if (phone) { fichier.push('telephone = ?'); valeurs.push(phone); }
+
+    const compte = [];
+    const valeursCompte = [];
+    if (seulementIci) {
+      if (email) { compte.push('email = ?'); valeursCompte.push(comptesEns.emailNorm(email)); }
+      if (phone) { compte.push('telephone = ?'); valeursCompte.push(comptesEns.chiffres(phone) || null); }
+      if (changeIdentifiant) {
+        const ident = String(username).trim().toLowerCase();
+        const [pris] = await req.db.query('SELECT id FROM compte_enseignant WHERE LOWER(nom_utilisateur) = ? AND id <> ?', [ident, fiche.compte_id]);
+        if (pris.length) return res.status(409).json({ message: 'Cet identifiant est déjà utilisé : choisissez-en un autre.' });
+        compte.push('nom_utilisateur = ?'); valeursCompte.push(ident);
+        fichier.push('nom_utilisateur = ?'); valeurs.push(ident);
+      }
+      if (password) {
+        if (String(password).length < 6) return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères.' });
+        const hash = await bcrypt.hash(String(password), 10);
+        compte.push('mot_de_passe = ?', 'mdp_provisoire = 1'); valeursCompte.push(hash);
+        fichier.push('mot_de_passe = ?'); valeurs.push(hash);
+      }
+    }
+    if (!fichier.length && !compte.length) return res.status(400).json({ message: 'Aucune modification.' });
+    if (fichier.length) await req.db.query(`UPDATE enseignants SET ${fichier.join(', ')} WHERE id = ?`, [...valeurs, id]);
+    if (compte.length) await req.db.query(`UPDATE compte_enseignant SET ${compte.join(', ')} WHERE id = ?`, [...valeursCompte, fiche.compte_id]);
+    res.json({ message: 'Enseignant modifié.' });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Un enseignant de votre établissement utilise déjà cet e-mail ou cet identifiant.' });
+    console.error('Erreur modification enseignant :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
   }
 });
 
@@ -461,10 +515,15 @@ router.get('/enseignant/matieres-classes', authenticateJWT, async (req, res) => 
       FROM enseigner e
       JOIN matieres m ON e.matiere_id = m.id
       JOIN classes c ON e.Classes_id = c.id
-      WHERE e.Enseignants_id = ?
+      JOIN annee_scolaire a ON a.id = e.Annee_scolaire_id AND a.statut = 'ouverte'
+      WHERE e.Enseignants_id = ? AND e.etablissement_id = ?
+      GROUP BY m.id, m.nom, c.id, c.nom, c.Promotion_id
+      ORDER BY c.Promotion_id IS NULL, c.Promotion_id, LENGTH(c.nom), c.nom, m.nom
     `;
 
-    const [rows] = await db.query(query, [enseignantId]);
+    // Année en cours seulement : après une clôture, les classes de l'année
+    // passée apparaissaient en double.
+    const [rows] = await db.query(query, [enseignantId, req.user.etablissementId]);
     res.json(rows);
   } catch (error) {
     console.error(error);
@@ -472,21 +531,182 @@ router.get('/enseignant/matieres-classes', authenticateJWT, async (req, res) => 
   }
 });
 
-router.delete('/Enseignants/:id', authenticateJWT, async (req, res) => {
+// Emploi du temps d'un enseignant dans l'établissement : créneaux des
+// classes et matières qu'il enseigne cette année (saisis dans les
+// programmes des classes), conflits (deux classes au même moment) et
+// classes dont l'horaire n'est pas encore saisi.
+const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+function minutes(t) {
+  const m = String(t || '').trim().match(/^(\d{1,2})\s*(?:h|:)\s*(\d{0,2})/i);
+  return m ? Number(m[1]) * 60 + Number(m[2] || 0) : null;
+}
+function plage(horaire) {
+  const [a, b] = String(horaire || '').split(/\s*[-–à]\s*/);
+  return { debut: minutes(a), fin: minutes(b) };
+}
+
+async function emploiDuTemps(enseignantId, etablissementId) {
+    const [[enseignant]] = await db.query('SELECT id, nom, prenom FROM enseignants WHERE id = ? AND etablissement_id = ?', [enseignantId, etablissementId]);
+    if (!enseignant) return null;
+
+    const [affectations] = await db.query(
+      `SELECT e.Classes_id AS classeId, c.nom AS classe, e.matiere_id AS matiereId, m.nom AS matiere
+       FROM enseigner e
+       JOIN classes c ON c.id = e.Classes_id
+       JOIN matieres m ON m.id = e.matiere_id
+       JOIN annee_scolaire a ON a.id = e.Annee_scolaire_id AND a.statut = 'ouverte'
+       WHERE e.Enseignants_id = ? AND e.etablissement_id = ?
+       ORDER BY c.Promotion_id IS NULL, c.Promotion_id, LENGTH(c.nom), c.nom`,
+      [enseignant.id, etablissementId]
+    );
+    const creneaux = [];
+    if (affectations.length) {
+      const [rows] = await db.query(
+        `SELECT p.classe_id, p.\`matière_id\` AS matiere_id, p.jour, p.horaire FROM programmes p
+         WHERE p.etablissement_id = ? AND p.classe_id IN (?) AND p.Annee_scolaire_id = (SELECT a.id FROM annee_scolaire a WHERE a.etablissement_id = p.etablissement_id AND a.statut = 'ouverte' ORDER BY a.id DESC LIMIT 1)`,
+        [etablissementId, [...new Set(affectations.map((a) => a.classeId))]]
+      );
+      for (const r of rows) {
+        const a = affectations.find((x) => x.classeId === r.classe_id && x.matiereId === r.matiere_id);
+        if (!a) continue;
+        const jour = JOURS.find((x) => x.toLowerCase() === String(r.jour || '').trim().toLowerCase()) || String(r.jour || '').trim();
+        creneaux.push({ jour, horaire: r.horaire, ...plage(r.horaire), classe: a.classe, matiere: a.matiere });
+      }
+    }
+    creneaux.sort((x, y) => (JOURS.indexOf(x.jour) - JOURS.indexOf(y.jour)) || ((x.debut ?? 0) - (y.debut ?? 0)));
+
+    // Conflits : même jour, horaires qui se chevauchent, classes différentes.
+    const conflits = [];
+    for (let i = 0; i < creneaux.length; i += 1) {
+      for (let j = i + 1; j < creneaux.length; j += 1) {
+        const a = creneaux[i]; const b = creneaux[j];
+        if (a.jour !== b.jour || a.debut === null || b.debut === null) continue;
+        if (a.debut < (b.fin ?? b.debut + 60) && b.debut < (a.fin ?? a.debut + 60)) {
+          a.conflit = true; b.conflit = true;
+          conflits.push(`${a.jour} ${a.horaire} : ${a.classe} (${a.matiere}) et ${b.classe} (${b.matiere})`);
+        }
+      }
+    }
+    const avecHoraire = new Set(creneaux.map((c) => `${c.classe}|${c.matiere}`));
+    const sansHoraire = affectations.filter((a) => !avecHoraire.has(`${a.classe}|${a.matiere}`)).map((a) => ({ classe: a.classe, matiere: a.matiere }));
+    const heures = creneaux.reduce((t, c) => t + (c.fin !== null && c.debut !== null ? (c.fin - c.debut) / 60 : 0), 0);
+
+    return { enseignant, creneaux, conflits, sansHoraire, heuresParSemaine: Math.round(heures * 10) / 10, jours: JOURS.slice(0, 6) };
+}
+
+// Administration : emploi du temps d'un enseignant de l'établissement.
+router.get('/enseignants/:id/emploi-du-temps', authenticateJWT, requireAdminStaff, async (req, res) => {
+  try {
+    const edt = await emploiDuTemps(req.params.id, Number(req.user.etablissementId));
+    if (!edt) return res.status(404).json({ message: 'Enseignant introuvable.' });
+    res.json(edt);
+  } catch (error) {
+    console.error('Erreur emploi du temps enseignant :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Enseignant connecté : son emploi du temps — dans TOUS ses établissements
+// s'il en a plusieurs (un cours à 8h dans deux écoles est signalé). Chaque
+// école, elle, ne voit que ses propres cours.
+router.get('/enseignant/emploi-du-temps', authenticateJWT, async (req, res) => {
+  if (req.user.role !== 'enseignant') return res.status(403).json({ message: 'Réservé aux enseignants.' });
+  try {
+    const edt = await emploiDuTemps(req.user.id, Number(req.user.etablissementId));
+    if (!edt) return res.status(404).json({ message: 'Enseignant introuvable.' });
+    const [[moi]] = await db.query('SELECT compte_id FROM enseignants WHERE id = ?', [req.user.id]);
+    const fiches = moi && moi.compte_id ? await comptesEns.fichesActives(db, [moi.compte_id]) : [];
+    if (fiches.length > 1) {
+      const tous = { ...edt, creneaux: [], sansHoraire: [], conflits: [], plusieursEtablissements: true, etablissements: fiches.map((f) => f.etablissement_nom) };
+      for (const f of fiches) {
+        const e = f.id === Number(req.user.id) ? edt : await emploiDuTemps(f.id, f.etablissement_id);
+        if (!e) continue;
+        const ecole = f.etablissement_nom;
+        tous.creneaux.push(...e.creneaux.map((c) => ({ ...c, conflit: false, classe: `${c.classe} · ${ecole}`, etablissement: ecole })));
+        tous.sansHoraire.push(...e.sansHoraire.map((x) => ({ ...x, classe: `${x.classe} · ${ecole}` })));
+      }
+      tous.creneaux.sort((x, y) => (JOURS.indexOf(x.jour) - JOURS.indexOf(y.jour)) || ((x.debut ?? 0) - (y.debut ?? 0)));
+      for (let i = 0; i < tous.creneaux.length; i += 1) {
+        for (let j = i + 1; j < tous.creneaux.length; j += 1) {
+          const x = tous.creneaux[i]; const y = tous.creneaux[j];
+          if (x.jour !== y.jour || x.debut === null || y.debut === null) continue;
+          if (x.debut < (y.fin ?? y.debut + 60) && y.debut < (x.fin ?? x.debut + 60)) {
+            x.conflit = true; y.conflit = true;
+            tous.conflits.push(`${x.jour} ${x.horaire} : ${x.classe} (${x.matiere}) et ${y.classe} (${y.matiere})`);
+          }
+        }
+      }
+      tous.heuresParSemaine = Math.round(tous.creneaux.reduce((t, c) => t + (c.fin !== null && c.debut !== null ? (c.fin - c.debut) / 60 : 0), 0) * 10) / 10;
+      return res.json(tous);
+    }
+    res.json(edt);
+  } catch (error) {
+    console.error('Erreur emploi du temps enseignant :', error);
+    res.status(500).json({ message: 'Erreur serveur.' });
+  }
+});
+
+// Suppression d'un enseignant : refusée tant qu'il est affecté à une
+// classe ou une matière (il faut d'abord retirer ses affectations dans la
+// Répartition), ou s'il a un historique à conserver (années passées,
+// cahier de texte, devoirs) — sinon les bulletins passés seraient abîmés.
+router.delete('/Enseignants/:id', authenticateJWT, requireAdminStaff, async (req, res) => {
   const id = req.params.id;
   try {
-    const [target] = await req.db.query('SELECT etablissement_id FROM enseignants WHERE id = ?', [id]);
+    const [target] = await req.db.query('SELECT etablissement_id, nom, prenom FROM enseignants WHERE id = ? AND actif = 1', [id]);
     if (target.length === 0) {
-      return res.status(404).json({ message: 'Enseignant non trouvé' });
+      return res.status(404).json({ message: 'Enseignant non trouvé.' });
     }
     if (Number(target[0].etablissement_id) !== Number(req.user.etablissementId)) {
       return res.status(403).json({ message: "Cet enseignant n'appartient pas à votre établissement." });
     }
+    const nom = `${target[0].prenom} ${target[0].nom}`;
+
+    const [affectations] = await req.db.query(
+      `SELECT c.nom AS classe, m.nom AS matiere
+       FROM enseigner e
+       JOIN classes c ON c.id = e.Classes_id
+       JOIN matieres m ON m.id = e.matiere_id
+       JOIN annee_scolaire a ON a.id = e.Annee_scolaire_id AND a.statut = 'ouverte'
+       WHERE e.Enseignants_id = ?
+       ORDER BY c.Promotion_id IS NULL, c.Promotion_id, LENGTH(c.nom), c.nom, m.nom`,
+      [id]
+    );
+    if (affectations.length) {
+      return res.status(409).json({
+        code: 'AFFECTE',
+        message: `${nom} est encore affecté(e) à ${affectations.length} classe(s). Retirez d'abord ses affectations (Enseignants → Répartition), puis revenez le/la retirer.`,
+        affectations,
+      });
+    }
+
+    const [[historique]] = await req.db.query(
+      `SELECT (SELECT COUNT(*) FROM enseigner WHERE Enseignants_id = ?)
+            + (SELECT COUNT(*) FROM tests WHERE enseignant_id = ?)
+            + (SELECT COUNT(*) FROM devoirs WHERE enseignant_id = ?) AS n`,
+      [id, id, id]
+    );
+    // Avec un historique (notes, cahier de texte, devoirs) : la fiche est
+    // gardée mais désactivée — il n'a plus accès à l'établissement, ses
+    // autres écoles et son compte ne sont pas touchés.
+    if (Number(historique.n) > 0) {
+      await req.db.query('UPDATE enseignants SET actif = 0 WHERE id = ?', [id]);
+      oublierEnseignant(id);
+      return res.json({ retire: true, message: `${nom} a été retiré(e) de l'établissement. Son historique (notes, cahier de texte, devoirs) est conservé.` });
+    }
 
     await req.db.query('DELETE FROM enseignants WHERE id = ?', [id]);
-    res.json({ message: 'Teacher deleted successfully' });
+    oublierEnseignant(id);
+    res.json({ message: `${nom} a été retiré(e) de l'établissement.` });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.errno === 1451) {
+      // Lié à d'autres données (demandes de modification de notes...) : retiré sans effacer.
+      await req.db.query('UPDATE enseignants SET actif = 0 WHERE id = ?', [id]);
+      oublierEnseignant(id);
+      return res.json({ retire: true, message: "L'enseignant a été retiré de l'établissement. Son historique est conservé." });
+    }
+    console.error('Erreur suppression enseignant :', error);
+    res.status(500).json({ message: 'Erreur serveur lors de la suppression.' });
   }
 });
 
